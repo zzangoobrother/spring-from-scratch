@@ -2391,7 +2391,1210 @@ git commit -m "feat(sfs-beans): destroySingletons 역순 실행 + 실패 복원 
 
 ---
 
-## 🚧 이어서 작성 예정 (Task 24~33)
+## 섹션 F: BeanFactory 구현체들 (Task 24~29)
 
-- **섹션 F (Task 24~29):** `AbstractBeanFactory` → `AbstractAutowireCapableBeanFactory` → `DefaultListableBeanFactory`
-- **섹션 G (Task 30~33):** 통합 테스트 (세터/필드 순환, 생성자 순환, FactoryBean, BPP 순서) + Plan 1A DoD 검증
+### Task 24: `AbstractBeanFactory` 골격 + `getBean` 템플릿
+
+**Files:**
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/support/AbstractBeanFactory.java`
+
+> `support` 하위 패키지로 구현체를 분리. 공개 API(인터페이스·메타데이터)는 `com.choisk.sfs.beans` 루트 패키지에만 둠.
+
+- [ ] **Step 1: 클래스 구현 — 추상 뼈대 + `getBean` 템플릿**
+
+```java
+package com.choisk.sfs.beans.support;
+
+import com.choisk.sfs.beans.*;
+import com.choisk.sfs.core.*;
+import java.util.*;
+
+/**
+ * BeanFactory의 기본 구현. getBean 템플릿 메서드, FactoryBean/& 접두사 분기,
+ * 싱글톤/프로토타입 라우팅을 담당. 실제 빈 생성은 서브클래스에서 {@link #createBean}.
+ */
+public abstract class AbstractBeanFactory
+        extends DefaultSingletonBeanRegistry
+        implements ConfigurableBeanFactory {
+
+    private final List<BeanPostProcessor> beanPostProcessors = new ArrayList<>();
+    private BeanFactory parentBeanFactory;
+
+    @Override
+    public Object getBean(String name) {
+        return doGetBean(name, null);
+    }
+
+    @Override
+    public <T> T getBean(String name, Class<T> requiredType) {
+        Object bean = doGetBean(name, requiredType);
+        if (requiredType != null && !requiredType.isInstance(bean)) {
+            throw new BeanNotOfRequiredTypeException(name, requiredType, bean.getClass());
+        }
+        return requiredType.cast(bean);
+    }
+
+    @Override
+    public <T> T getBean(Class<T> requiredType) {
+        String name = resolveBeanNameByType(requiredType);
+        return getBean(name, requiredType);
+    }
+
+    /** 이름→타입 해결은 DefaultListableBeanFactory에서 오버라이드 (BeanDefinition 맵 필요). */
+    protected abstract String resolveBeanNameByType(Class<?> requiredType);
+
+    /**
+     * 핵심 진입점. Java 25 pattern matching으로 3-level cache 결과 분기.
+     */
+    protected Object doGetBean(String name, Class<?> requiredType) {
+        String beanName = transformBeanName(name);
+        boolean isFactoryDereference = isFactoryDereference(name);
+
+        Object sharedInstance = switch (lookup(beanName)) {
+            case CacheLookup.Complete(var bean)        -> bean;
+            case CacheLookup.EarlyReference(var bean)  -> bean;
+            case CacheLookup.DeferredFactory(var ignored) -> promoteToEarlyReference(beanName);
+            case CacheLookup.Miss ignored              -> null;
+        };
+
+        if (sharedInstance != null) {
+            return resolveFactoryBean(beanName, sharedInstance, isFactoryDereference);
+        }
+
+        BeanDefinition definition = getBeanDefinition(beanName);
+        if (definition == null) {
+            throw new NoSuchBeanDefinitionException(
+                    buildNoSuchBeanMessage(beanName, requiredType));
+        }
+
+        if (definition.isSingleton()) {
+            Object created = getSingletonOrCreate(beanName, () -> createBean(beanName, definition));
+            return resolveFactoryBean(beanName, created, isFactoryDereference);
+        } else if (definition.isPrototype()) {
+            Object created = createBean(beanName, definition);
+            return resolveFactoryBean(beanName, created, isFactoryDereference);
+        } else {
+            throw new IllegalStateException("Unsupported scope: " + definition.getScope());
+        }
+    }
+
+    /**
+     * 싱글톤 캐시 조회 + 미존재 시 factory 실행 + 캐시 승격을 원자적으로.
+     */
+    protected Object getSingletonOrCreate(String beanName, ObjectFactory<?> factory) {
+        Object existing = getSingleton(beanName);
+        if (existing != null) return existing;
+
+        beforeSingletonCreation(beanName);
+        try {
+            Object created = factory.getObject();
+            addSingletonCommitted(beanName, created);
+            return created;
+        } finally {
+            afterSingletonCreation(beanName);
+        }
+    }
+
+    private void addSingletonCommitted(String name, Object bean) {
+        // 이미 3-level 캐시의 2차에 있을 수 있음 (조기 참조로 노출됨).
+        // 그 경우 기존 earlyReference를 신뢰하고 1차로 그대로 승격해야 동일 인스턴스 보장.
+        Object early = earlySingletonObjects.get(name);
+        if (early != null) {
+            registerSingleton(name, early);
+        } else {
+            registerSingleton(name, bean);
+        }
+    }
+
+    public String transformBeanName(String name) {
+        return isFactoryDereference(name) ? name.substring(FACTORY_BEAN_PREFIX.length()) : name;
+    }
+
+    public boolean isFactoryDereference(String name) {
+        return name != null && name.startsWith(FACTORY_BEAN_PREFIX);
+    }
+
+    /** & 접두사 처리는 Task 25에서 완성. */
+    protected Object resolveFactoryBean(String beanName, Object sharedInstance, boolean isFactoryDereference) {
+        return sharedInstance;
+    }
+
+    protected abstract BeanDefinition getBeanDefinition(String beanName);
+
+    protected abstract Object createBean(String beanName, BeanDefinition definition);
+
+    private String buildNoSuchBeanMessage(String name, Class<?> requiredType) {
+        var candidates = Arrays.asList(getSingletonNames());
+        var similar = candidates.stream()
+                .filter(existing -> levenshtein(existing, name) <= 3)
+                .limit(3)
+                .toList();
+        var sb = new StringBuilder("No bean named '").append(name).append("' found");
+        if (requiredType != null) {
+            sb.append(" (required type: ").append(requiredType.getName()).append(")");
+        }
+        if (!similar.isEmpty()) {
+            sb.append(". Did you mean: ").append(similar).append("?");
+        }
+        sb.append("\nPossible solutions:")
+          .append("\n  - Register the bean via registerBeanDefinition or register a @Component class")
+          .append("\n  - Check bean name spelling");
+        return sb.toString();
+    }
+
+    private static int levenshtein(String a, String b) {
+        int[][] dp = new int[a.length() + 1][b.length() + 1];
+        for (int i = 0; i <= a.length(); i++) dp[i][0] = i;
+        for (int j = 0; j <= b.length(); j++) dp[0][j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            for (int j = 1; j <= b.length(); j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                dp[i][j] = Math.min(Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1), dp[i - 1][j - 1] + cost);
+            }
+        }
+        return dp[a.length()][b.length()];
+    }
+
+    // --- BeanFactory ---
+    @Override
+    public boolean containsBean(String name) {
+        String beanName = transformBeanName(name);
+        return containsSingleton(beanName) || containsBeanDefinition(beanName);
+    }
+
+    @Override
+    public boolean isSingleton(String name) {
+        String beanName = transformBeanName(name);
+        BeanDefinition def = getBeanDefinition(beanName);
+        return def != null && def.isSingleton();
+    }
+
+    @Override
+    public boolean isPrototype(String name) {
+        String beanName = transformBeanName(name);
+        BeanDefinition def = getBeanDefinition(beanName);
+        return def != null && def.isPrototype();
+    }
+
+    @Override
+    public Class<?> getType(String name) {
+        String beanName = transformBeanName(name);
+        Object singleton = getSingleton(beanName);
+        if (singleton != null) return singleton.getClass();
+        BeanDefinition def = getBeanDefinition(beanName);
+        return def != null ? def.getBeanClass() : null;
+    }
+
+    protected abstract boolean containsBeanDefinition(String beanName);
+
+    // --- HierarchicalBeanFactory ---
+    @Override
+    public BeanFactory getParentBeanFactory() { return parentBeanFactory; }
+
+    public void setParentBeanFactory(BeanFactory parent) { this.parentBeanFactory = parent; }
+
+    @Override
+    public boolean containsLocalBean(String name) {
+        String beanName = transformBeanName(name);
+        return containsSingleton(beanName) || containsBeanDefinition(beanName);
+    }
+
+    // --- ConfigurableBeanFactory ---
+    @Override
+    public void addBeanPostProcessor(BeanPostProcessor processor) {
+        beanPostProcessors.remove(processor);
+        beanPostProcessors.add(processor);
+    }
+
+    @Override
+    public int getBeanPostProcessorCount() { return beanPostProcessors.size(); }
+
+    public List<BeanPostProcessor> getBeanPostProcessors() {
+        return Collections.unmodifiableList(beanPostProcessors);
+    }
+}
+```
+
+- [ ] **Step 2: 컴파일 확인 & 커밋 (단독 테스트는 서브클래스 필요해서 Task 29에서 통합 검증)**
+
+```bash
+./gradlew :sfs-beans:compileJava
+git add sfs-beans/
+git commit -m "feat(sfs-beans): AbstractBeanFactory 골격 + getBean 템플릿 구현"
+```
+
+---
+
+### Task 25: `AbstractBeanFactory`의 FactoryBean `&` 접두사 완성
+
+**Files:**
+- Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/support/AbstractBeanFactory.java`
+
+- [ ] **Step 1: `resolveFactoryBean` 메서드 확장**
+
+기존 `resolveFactoryBean` 본문을 아래로 교체:
+
+```java
+    protected Object resolveFactoryBean(String beanName, Object sharedInstance, boolean isFactoryDereference) {
+        // & 접두사: FactoryBean 자신을 반환
+        if (isFactoryDereference) {
+            if (!(sharedInstance instanceof FactoryBean<?>)) {
+                throw new BeanIsNotAFactoryException(beanName, sharedInstance.getClass());
+            }
+            return sharedInstance;
+        }
+
+        // 일반 조회: FactoryBean이면 getObject() 결과 반환, 아니면 그대로
+        if (!(sharedInstance instanceof FactoryBean<?> factory)) {
+            return sharedInstance;
+        }
+
+        // FactoryBean 결과 캐시 (싱글톤 FactoryBean의 경우)
+        String cacheKey = "&__fb_obj__" + beanName;
+        Object cached = getSingleton(cacheKey);
+        if (cached != null) return cached;
+
+        try {
+            Object produced = factory.getObject();
+            if (produced == null) {
+                throw new FactoryBeanNotInitializedException(beanName);
+            }
+            if (factory.isSingleton()) {
+                registerSingleton(cacheKey, produced);
+            }
+            return produced;
+        } catch (FactoryBeanNotInitializedException | BeansException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BeanCreationException(beanName, "FactoryBean.getObject() threw exception", e);
+        }
+    }
+```
+
+- [ ] **Step 2: 컴파일 & 커밋 (FactoryBean 통합 테스트는 Task 32)**
+
+```bash
+./gradlew :sfs-beans:compileJava
+git add sfs-beans/
+git commit -m "feat(sfs-beans): AbstractBeanFactory FactoryBean & 접두사 처리 완성"
+```
+
+---
+
+### Task 26: `AbstractAutowireCapableBeanFactory` — 인스턴스화
+
+**Files:**
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/support/AbstractAutowireCapableBeanFactory.java`
+
+- [ ] **Step 1: 클래스 구현 — `createBean` → `doCreateBean` → `instantiateBean`**
+
+```java
+package com.choisk.sfs.beans.support;
+
+import com.choisk.sfs.beans.*;
+import com.choisk.sfs.core.*;
+import java.lang.reflect.*;
+import java.util.*;
+
+/**
+ * 실제 빈 인스턴스화 + 프로퍼티 주입 + 초기화 로직을 담당.
+ * <p>Spring 원본: {@code AbstractAutowireCapableBeanFactory}.
+ */
+public abstract class AbstractAutowireCapableBeanFactory
+        extends AbstractBeanFactory
+        implements AutowireCapableBeanFactory {
+
+    @Override
+    protected Object createBean(String beanName, BeanDefinition definition) {
+        // B-1: InstantiationAware.before (프록시로 조기 종료 가능성)
+        Object shortCircuit = resolveBeforeInstantiation(beanName, definition);
+        if (shortCircuit != null) {
+            return shortCircuit;
+        }
+        return doCreateBean(beanName, definition);
+    }
+
+    /** B-1 단계. 현재는 hook point만 제공; AOP에서 오버라이드. */
+    protected Object resolveBeforeInstantiation(String beanName, BeanDefinition def) {
+        for (var bpp : getBeanPostProcessors()) {
+            if (bpp instanceof InstantiationAwareBeanPostProcessor iabpp) {
+                Object result = iabpp.postProcessBeforeInstantiation(def.getBeanClass(), beanName);
+                if (result != null) return applyBeanPostProcessorsAfterInitialization(result, beanName);
+            }
+        }
+        return null;
+    }
+
+    protected Object doCreateBean(String beanName, BeanDefinition definition) {
+        // B-2: 인스턴스화
+        Object bean = instantiateBean(beanName, definition);
+
+        // B-3: 3차 캐시에 팩토리 등록 (조기 참조용)
+        boolean earlySingletonExposure = definition.isSingleton();
+        if (earlySingletonExposure) {
+            registerSingletonFactory(beanName, () -> getEarlyBeanReference(beanName, bean));
+        }
+
+        // B-4: 프로퍼티 주입
+        populateBean(beanName, definition, bean);
+
+        // B-5: 초기화
+        Object exposed = initializeBean(beanName, definition, bean);
+
+        // B-7: destroy 등록 (Task 28에서 확장)
+        registerDisposableIfNeeded(beanName, definition, exposed);
+
+        return exposed;
+    }
+
+    protected Object instantiateBean(String beanName, BeanDefinition definition) {
+        Class<?> beanClass = definition.getBeanClass();
+        try {
+            if (beanClass.isInterface() || Modifier.isAbstract(beanClass.getModifiers())) {
+                throw new BeanCreationException(beanName,
+                        "Cannot instantiate interface or abstract class: " + beanClass.getName());
+            }
+            // 생성자 인자가 명시됐으면 해당 시그니처 찾기
+            List<Object> args = definition.getConstructorArgs();
+            if (args.isEmpty()) {
+                Constructor<?> ctor = beanClass.getDeclaredConstructor();
+                ctor.setAccessible(true);
+                return ctor.newInstance();
+            }
+            for (Constructor<?> ctor : beanClass.getDeclaredConstructors()) {
+                if (ctor.getParameterCount() == args.size()) {
+                    Object[] resolved = resolveConstructorArgs(ctor.getParameterTypes(), args);
+                    ctor.setAccessible(true);
+                    return ctor.newInstance(resolved);
+                }
+            }
+            throw new BeanCreationException(beanName,
+                    "No constructor matching %d args on %s".formatted(args.size(), beanClass.getName()));
+        } catch (ReflectiveOperationException e) {
+            throw new BeanCreationException(beanName, "Instantiation failed", e);
+        }
+    }
+
+    private Object[] resolveConstructorArgs(Class<?>[] paramTypes, List<Object> raw) {
+        Object[] resolved = new Object[raw.size()];
+        for (int i = 0; i < raw.size(); i++) {
+            Object a = raw.get(i);
+            if (a instanceof BeanReference ref) {
+                resolved[i] = getBean(ref.beanName());
+            } else {
+                resolved[i] = a;
+            }
+        }
+        return resolved;
+    }
+
+    /** B-3에서 3차 factory가 생산하는 조기 참조. SmartInstantiationAwareBPP를 체인 적용. */
+    protected Object getEarlyBeanReference(String beanName, Object rawBean) {
+        Object exposed = rawBean;
+        for (var bpp : getBeanPostProcessors()) {
+            if (bpp instanceof SmartInstantiationAwareBeanPostProcessor smart) {
+                exposed = smart.getEarlyBeanReference(exposed, beanName);
+            }
+        }
+        return exposed;
+    }
+
+    // --- Task 27/28에서 구현 ---
+    protected abstract void populateBean(String beanName, BeanDefinition definition, Object bean);
+
+    protected abstract Object initializeBean(String beanName, BeanDefinition definition, Object bean);
+
+    protected abstract void registerDisposableIfNeeded(String beanName, BeanDefinition definition, Object bean);
+
+    // --- AutowireCapableBeanFactory 수동 API ---
+    @Override
+    public Object createBean(Class<?> beanClass) {
+        var def = new BeanDefinition(beanClass).setScope(Scope.Prototype.INSTANCE);
+        return doCreateBean(beanClass.getName(), def);
+    }
+
+    @Override
+    public void autowireBean(Object existingBean) {
+        var def = new BeanDefinition(existingBean.getClass());
+        populateBean(existingBean.getClass().getName(), def, existingBean);
+    }
+
+    @Override
+    public Object initializeBean(Object existingBean, String beanName) {
+        var def = new BeanDefinition(existingBean.getClass());
+        return initializeBean(beanName, def, existingBean);
+    }
+
+    @Override
+    public Object applyBeanPostProcessorsBeforeInitialization(Object existingBean, String beanName) {
+        Object result = existingBean;
+        for (var bpp : getBeanPostProcessors()) {
+            result = bpp.postProcessBeforeInitialization(result, beanName);
+            if (result == null) return null;
+        }
+        return result;
+    }
+
+    @Override
+    public Object applyBeanPostProcessorsAfterInitialization(Object existingBean, String beanName) {
+        Object result = existingBean;
+        for (var bpp : getBeanPostProcessors()) {
+            result = bpp.postProcessAfterInitialization(result, beanName);
+            if (result == null) return null;
+        }
+        return result;
+    }
+}
+```
+
+- [ ] **Step 2: 컴파일 & 커밋**
+
+```bash
+./gradlew :sfs-beans:compileJava
+git add sfs-beans/
+git commit -m "feat(sfs-beans): AbstractAutowireCapableBeanFactory 인스턴스화 플로우 구현"
+```
+
+---
+
+### Task 27: `populateBean` — 프로퍼티 주입
+
+**Files:**
+- Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/support/AbstractAutowireCapableBeanFactory.java`
+
+- [ ] **Step 1: `populateBean` 구현**
+
+`protected abstract void populateBean` 선언을 제거하고 실제 구현으로 교체:
+
+```java
+    @Override
+    protected void populateBean(String beanName, BeanDefinition definition, Object bean) {
+        // InstantiationAwareBPP 후킹 (Plan 1B에서 @Autowired 주입이 여기에 꽂힘)
+        boolean continuePopulation = true;
+        for (var bpp : getBeanPostProcessors()) {
+            if (bpp instanceof InstantiationAwareBeanPostProcessor iabpp) {
+                if (!iabpp.postProcessAfterInstantiation(bean, beanName)) {
+                    continuePopulation = false;
+                    break;
+                }
+            }
+        }
+        if (!continuePopulation) return;
+
+        PropertyValues pvs = definition.getPropertyValues();
+        for (var bpp : getBeanPostProcessors()) {
+            if (bpp instanceof InstantiationAwareBeanPostProcessor iabpp) {
+                pvs = iabpp.postProcessProperties(pvs, bean, beanName);
+                if (pvs == null) return;
+            }
+        }
+
+        // BeanDefinition에 명시된 propertyValues를 리플렉션으로 적용
+        applyPropertyValues(beanName, bean, pvs);
+    }
+
+    private void applyPropertyValues(String beanName, Object bean, PropertyValues pvs) {
+        if (pvs == null || pvs.isEmpty()) return;
+        for (var pv : pvs.all()) {
+            Object value = pv.value() instanceof BeanReference ref
+                    ? getBean(ref.beanName())
+                    : pv.value();
+            Field field = ReflectionUtils.findField(bean.getClass(), pv.name());
+            if (field != null) {
+                ReflectionUtils.setField(field, bean, value);
+                continue;
+            }
+            String setter = "set" + Character.toUpperCase(pv.name().charAt(0)) + pv.name().substring(1);
+            Method method = ReflectionUtils.findMethod(bean.getClass(), setter, value == null ? Object.class : value.getClass());
+            if (method != null) {
+                ReflectionUtils.invokeMethod(method, bean, value);
+                continue;
+            }
+            throw new BeanCreationException(beanName,
+                    "No property '%s' found on %s".formatted(pv.name(), bean.getClass().getName()));
+        }
+    }
+```
+
+- [ ] **Step 2: 컴파일 & 커밋**
+
+```bash
+./gradlew :sfs-beans:compileJava
+git add sfs-beans/
+git commit -m "feat(sfs-beans): populateBean 프로퍼티 주입 구현 (BeanReference 해결 포함)"
+```
+
+---
+
+### Task 28: `initializeBean` + destroy 등록
+
+**Files:**
+- Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/support/AbstractAutowireCapableBeanFactory.java`
+
+- [ ] **Step 1: `initializeBean`과 destroy 구현으로 교체**
+
+```java
+    @Override
+    protected Object initializeBean(String beanName, BeanDefinition definition, Object bean) {
+        // B-5 (a) Aware 콜백
+        invokeAwareCallbacks(beanName, bean);
+
+        // B-5 (b) BPP before
+        Object current = applyBeanPostProcessorsBeforeInitialization(bean, beanName);
+        if (current == null) return null;
+
+        // B-5 (c) InitializingBean + init-method
+        try {
+            if (current instanceof InitializingBean ib) {
+                ib.afterPropertiesSet();
+            }
+            if (definition.getInitMethodName() != null) {
+                Method m = ReflectionUtils.findMethod(current.getClass(), definition.getInitMethodName());
+                if (m == null) {
+                    throw new BeanCreationException(beanName,
+                            "Init method '%s' not found on %s".formatted(definition.getInitMethodName(), current.getClass().getName()));
+                }
+                ReflectionUtils.invokeMethod(m, current);
+            }
+        } catch (Exception e) {
+            throw new BeanCreationException(beanName, "Initialization callback failed", e);
+        }
+
+        // B-5 (d) BPP after (AOP 프록시는 여기서 - Phase 2)
+        return applyBeanPostProcessorsAfterInitialization(current, beanName);
+    }
+
+    private void invokeAwareCallbacks(String beanName, Object bean) {
+        if (bean instanceof BeanNameAware bna) bna.setBeanName(beanName);
+        if (bean instanceof BeanFactoryAware bfa) bfa.setBeanFactory(this);
+    }
+
+    @Override
+    protected void registerDisposableIfNeeded(String beanName, BeanDefinition definition, Object bean) {
+        if (!definition.isSingleton()) return;
+        boolean hasDisposable = bean instanceof DisposableBean;
+        boolean hasDestroyMethod = definition.getDestroyMethodName() != null;
+        if (!hasDisposable && !hasDestroyMethod) return;
+
+        registerDisposableBean(beanName, () -> {
+            try {
+                if (bean instanceof DisposableBean db) db.destroy();
+                if (definition.getDestroyMethodName() != null) {
+                    Method m = ReflectionUtils.findMethod(bean.getClass(), definition.getDestroyMethodName());
+                    if (m != null) ReflectionUtils.invokeMethod(m, bean);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Destroy failed for " + beanName, e);
+            }
+        });
+    }
+```
+
+- [ ] **Step 2: 컴파일 & 커밋**
+
+```bash
+./gradlew :sfs-beans:compileJava
+git add sfs-beans/
+git commit -m "feat(sfs-beans): initializeBean + destroy 등록 구현 (Aware/BPP/InitializingBean/init-method)"
+```
+
+---
+
+### Task 29: `DefaultListableBeanFactory`
+
+**Files:**
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/support/DefaultListableBeanFactory.java`
+- Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/support/DefaultListableBeanFactoryTest.java`
+
+- [ ] **Step 1: 실패 테스트**
+
+```java
+package com.choisk.sfs.beans.support;
+
+import com.choisk.sfs.beans.*;
+import com.choisk.sfs.core.*;
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.*;
+
+class DefaultListableBeanFactoryTest {
+
+    static class Greeter {
+        private String message = "hello";
+        public String greet() { return message; }
+    }
+
+    @Test
+    void registerAndGetSimpleBean() {
+        var factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("g", new BeanDefinition(Greeter.class));
+        var g = factory.getBean("g", Greeter.class);
+        assertThat(g.greet()).isEqualTo("hello");
+    }
+
+    @Test
+    void getBeanByType_singleCandidate() {
+        var factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("g", new BeanDefinition(Greeter.class));
+        assertThat(factory.getBean(Greeter.class)).isNotNull();
+    }
+
+    @Test
+    void getBeanByType_multipleCandidates_requiresPrimaryOrQualifier() {
+        var factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("a", new BeanDefinition(Greeter.class));
+        factory.registerBeanDefinition("b", new BeanDefinition(Greeter.class));
+        assertThatThrownBy(() -> factory.getBean(Greeter.class))
+                .isInstanceOf(NoUniqueBeanDefinitionException.class);
+    }
+
+    @Test
+    void primaryWins() {
+        var factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("a", new BeanDefinition(Greeter.class));
+        factory.registerBeanDefinition("b", new BeanDefinition(Greeter.class).setPrimary(true));
+        assertThat(factory.getBean(Greeter.class)).isNotNull();
+    }
+
+    @Test
+    void prototypeNewInstanceEachGet() {
+        var factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("g", new BeanDefinition(Greeter.class).setScope(Scope.Prototype.INSTANCE));
+        assertThat(factory.getBean("g")).isNotSameAs(factory.getBean("g"));
+    }
+
+    @Test
+    void preInstantiateSingletonsCreatesAllEagerBeans() {
+        var factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("g1", new BeanDefinition(Greeter.class));
+        factory.registerBeanDefinition("g2", new BeanDefinition(Greeter.class).setLazyInit(true));
+        factory.preInstantiateSingletons();
+        assertThat(factory.containsSingleton("g1")).isTrue();
+        assertThat(factory.containsSingleton("g2")).isFalse();
+    }
+
+    @Test
+    void noSuchBeanHasHelpfulMessage() {
+        var factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("greater", new BeanDefinition(Greeter.class));
+        assertThatThrownBy(() -> factory.getBean("greeter"))
+                .isInstanceOf(NoSuchBeanDefinitionException.class)
+                .hasMessageContaining("greeter")
+                .hasMessageContaining("Possible solutions");
+    }
+}
+```
+
+- [ ] **Step 2: FAIL 확인 후 구현**
+
+```java
+package com.choisk.sfs.beans.support;
+
+import com.choisk.sfs.beans.*;
+import com.choisk.sfs.core.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class DefaultListableBeanFactory
+        extends AbstractAutowireCapableBeanFactory
+        implements ConfigurableListableBeanFactory {
+
+    private final Map<String, BeanDefinition> beanDefinitionMap = new ConcurrentHashMap<>();
+    private final List<String> beanDefinitionNames = Collections.synchronizedList(new ArrayList<>());
+
+    @Override
+    public void registerBeanDefinition(String name, BeanDefinition definition) {
+        Assert.hasText(name, "name");
+        Assert.notNull(definition, "definition");
+        BeanDefinition existing = beanDefinitionMap.put(name, definition);
+        if (existing == null) {
+            beanDefinitionNames.add(name);
+        } else {
+            // 덮어쓰기 허용 (Spring도 기본 허용). 주소록 순서는 기존 유지.
+        }
+    }
+
+    @Override
+    public BeanDefinition getBeanDefinition(String name) {
+        return beanDefinitionMap.get(name);
+    }
+
+    @Override
+    protected boolean containsBeanDefinition(String beanName) {
+        return beanDefinitionMap.containsKey(beanName);
+    }
+
+    @Override
+    public boolean containsBeanDefinition(String name) {
+        return beanDefinitionMap.containsKey(name);
+    }
+
+    @Override
+    public int getBeanDefinitionCount() { return beanDefinitionMap.size(); }
+
+    @Override
+    public String[] getBeanDefinitionNames() {
+        synchronized (beanDefinitionNames) {
+            return beanDefinitionNames.toArray(new String[0]);
+        }
+    }
+
+    @Override
+    public String[] getBeanNamesForType(Class<?> type) {
+        var matches = new ArrayList<String>();
+        for (var entry : beanDefinitionMap.entrySet()) {
+            if (type.isAssignableFrom(entry.getValue().getBeanClass())) {
+                matches.add(entry.getKey());
+            }
+        }
+        return matches.toArray(new String[0]);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> Map<String, T> getBeansOfType(Class<T> type) {
+        var result = new LinkedHashMap<String, T>();
+        for (var name : getBeanNamesForType(type)) {
+            result.put(name, (T) getBean(name));
+        }
+        return result;
+    }
+
+    @Override
+    protected String resolveBeanNameByType(Class<?> type) {
+        var matches = getBeanNamesForType(type);
+        if (matches.length == 0) {
+            throw new NoSuchBeanDefinitionException(
+                    "No bean of type " + type.getName() + " registered");
+        }
+        if (matches.length == 1) return matches[0];
+
+        // @Primary 우선
+        var primaries = new ArrayList<String>();
+        for (var name : matches) {
+            if (beanDefinitionMap.get(name).isPrimary()) primaries.add(name);
+        }
+        if (primaries.size() == 1) return primaries.get(0);
+        if (primaries.size() > 1) {
+            throw new NoUniqueBeanDefinitionException(
+                    "Multiple @Primary beans of type " + type.getName() + ": " + primaries, primaries);
+        }
+        throw new NoUniqueBeanDefinitionException(
+                "Multiple beans of type " + type.getName() + ": " + Arrays.asList(matches)
+                        + "\nPossible solutions: annotate one with @Primary or inject by name",
+                Arrays.asList(matches));
+    }
+
+    @Override
+    public void preInstantiateSingletons() {
+        String[] names;
+        synchronized (beanDefinitionNames) {
+            names = beanDefinitionNames.toArray(new String[0]);
+        }
+        for (String name : names) {
+            BeanDefinition def = beanDefinitionMap.get(name);
+            if (def != null && def.isSingleton() && !def.isLazyInit()) {
+                getBean(name);
+            }
+        }
+    }
+
+    @Override
+    public void destroySingletons() {
+        super.destroySingletons();
+    }
+}
+```
+
+- [ ] **Step 3: 테스트 PASS 확인**
+
+```bash
+./gradlew :sfs-beans:test --tests DefaultListableBeanFactoryTest
+```
+
+- [ ] **Step 4: 커밋**
+
+```bash
+git add sfs-beans/
+git commit -m "feat(sfs-beans): DefaultListableBeanFactory 구현 (Primary/Qualifier 해결 포함)"
+```
+
+---
+
+## ✅ 섹션 F 체크포인트
+
+**`DefaultListableBeanFactory`가 독립 동작.** 수동으로 `registerBeanDefinition`한 빈을 `getBean`으로 가져올 수 있음.
+
+```bash
+./gradlew :sfs-beans:test
+# 모든 테스트 PASS
+```
+
+---
+
+## 섹션 G: 통합 테스트 & Plan 1A DoD (Task 30~33)
+
+이 섹션에서 **설계 문서의 핵심 보장**(3-level cache 순환 해결, FactoryBean, BPP 순서)을 통합 테스트로 검증.
+
+### Task 30: 통합 테스트 — 세터/필드 주입 순환 참조 해결
+
+**Files:**
+- Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/integration/CircularReferenceSetterTest.java`
+
+- [ ] **Step 1: 통합 테스트 작성**
+
+```java
+package com.choisk.sfs.beans.integration;
+
+import com.choisk.sfs.beans.*;
+import com.choisk.sfs.beans.support.DefaultListableBeanFactory;
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.*;
+
+class CircularReferenceSetterTest {
+
+    static class ServiceA {
+        ServiceB b;
+        public void setB(ServiceB b) { this.b = b; }
+    }
+
+    static class ServiceB {
+        ServiceA a;
+        public void setA(ServiceA a) { this.a = a; }
+    }
+
+    @Test
+    void setterCircularResolved() {
+        var factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("a",
+                new BeanDefinition(ServiceA.class).addPropertyValue("b", new BeanReference("b")));
+        factory.registerBeanDefinition("b",
+                new BeanDefinition(ServiceB.class).addPropertyValue("a", new BeanReference("a")));
+
+        factory.preInstantiateSingletons();
+
+        var a = factory.getBean("a", ServiceA.class);
+        var b = factory.getBean("b", ServiceB.class);
+
+        assertThat(a.b).isSameAs(b);
+        assertThat(b.a).isSameAs(a);
+    }
+}
+```
+
+- [ ] **Step 2: 테스트 실행**
+
+```bash
+./gradlew :sfs-beans:test --tests CircularReferenceSetterTest
+```
+예상: PASS. 이 하나가 통과하면 **3-level cache의 핵심 기능이 증명됨**.
+
+- [ ] **Step 3: 커밋**
+
+```bash
+git add sfs-beans/
+git commit -m "test(sfs-beans): 세터 주입 순환 참조 해결 통합 테스트"
+```
+
+---
+
+### Task 31: 통합 테스트 — 생성자 순환 참조 예외
+
+**Files:**
+- Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/integration/CircularReferenceConstructorTest.java`
+
+- [ ] **Step 1: 통합 테스트**
+
+```java
+package com.choisk.sfs.beans.integration;
+
+import com.choisk.sfs.beans.*;
+import com.choisk.sfs.beans.support.DefaultListableBeanFactory;
+import com.choisk.sfs.core.BeanCreationException;
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.*;
+
+class CircularReferenceConstructorTest {
+
+    static class A { A(B b) {} }
+    static class B { B(A a) {} }
+
+    @Test
+    void constructorCircularThrows() {
+        var factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("a",
+                new BeanDefinition(A.class).addConstructorArg(new BeanReference("b")));
+        factory.registerBeanDefinition("b",
+                new BeanDefinition(B.class).addConstructorArg(new BeanReference("a")));
+
+        assertThatThrownBy(factory::preInstantiateSingletons)
+                .isInstanceOfAny(BeanCreationException.class, IllegalStateException.class)
+                .hasMessageContaining("circular");
+    }
+}
+```
+
+- [ ] **Step 2: PASS 확인 & 커밋**
+
+```bash
+./gradlew :sfs-beans:test --tests CircularReferenceConstructorTest
+git add sfs-beans/
+git commit -m "test(sfs-beans): 생성자 순환 참조 예외 통합 테스트"
+```
+
+---
+
+### Task 32: 통합 테스트 — FactoryBean + BeanPostProcessor 순서
+
+**Files:**
+- Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/integration/FactoryBeanTest.java`
+- Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/integration/BeanPostProcessorOrderTest.java`
+
+- [ ] **Step 1: `FactoryBeanTest`**
+
+```java
+package com.choisk.sfs.beans.integration;
+
+import com.choisk.sfs.beans.*;
+import com.choisk.sfs.beans.support.DefaultListableBeanFactory;
+import com.choisk.sfs.core.BeanIsNotAFactoryException;
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.*;
+
+class FactoryBeanTest {
+
+    static class DateFormatterFactory implements FactoryBean<java.time.format.DateTimeFormatter> {
+        public java.time.format.DateTimeFormatter getObject() {
+            return java.time.format.DateTimeFormatter.ISO_LOCAL_DATE;
+        }
+        public Class<?> getObjectType() { return java.time.format.DateTimeFormatter.class; }
+    }
+
+    static class PlainBean {}
+
+    @Test
+    void getBeanWithoutPrefixReturnsProduct() {
+        var factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("fmt", new BeanDefinition(DateFormatterFactory.class));
+        Object product = factory.getBean("fmt");
+        assertThat(product).isInstanceOf(java.time.format.DateTimeFormatter.class);
+    }
+
+    @Test
+    void getBeanWithPrefixReturnsFactoryItself() {
+        var factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("fmt", new BeanDefinition(DateFormatterFactory.class));
+        Object itself = factory.getBean("&fmt");
+        assertThat(itself).isInstanceOf(DateFormatterFactory.class);
+    }
+
+    @Test
+    void prefixOnNonFactoryThrows() {
+        var factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("plain", new BeanDefinition(PlainBean.class));
+        assertThatThrownBy(() -> factory.getBean("&plain"))
+                .isInstanceOf(BeanIsNotAFactoryException.class);
+    }
+
+    @Test
+    void singletonFactoryBeanCachesProduct() {
+        var factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("fmt", new BeanDefinition(DateFormatterFactory.class));
+        Object first = factory.getBean("fmt");
+        Object second = factory.getBean("fmt");
+        assertThat(first).isSameAs(second);
+    }
+}
+```
+
+- [ ] **Step 2: `BeanPostProcessorOrderTest`**
+
+```java
+package com.choisk.sfs.beans.integration;
+
+import com.choisk.sfs.beans.*;
+import com.choisk.sfs.beans.support.DefaultListableBeanFactory;
+import org.junit.jupiter.api.Test;
+import java.util.*;
+import static org.assertj.core.api.Assertions.*;
+
+class BeanPostProcessorOrderTest {
+
+    static class Widget implements BeanNameAware, InitializingBean {
+        List<String> calls = new ArrayList<>();
+        @Override public void setBeanName(String name) { calls.add("awareName:" + name); }
+        @Override public void afterPropertiesSet() { calls.add("afterProps"); }
+        public void customInit() { calls.add("customInit"); }
+    }
+
+    static class TracingBPP implements BeanPostProcessor {
+        final List<String> log;
+        TracingBPP(List<String> log) { this.log = log; }
+        public Object postProcessBeforeInitialization(Object bean, String n) {
+            if (bean instanceof Widget) ((Widget) bean).calls.add("bpp:before");
+            return bean;
+        }
+        public Object postProcessAfterInitialization(Object bean, String n) {
+            if (bean instanceof Widget) ((Widget) bean).calls.add("bpp:after");
+            return bean;
+        }
+    }
+
+    @Test
+    void callbackOrderMatchesSpringSpec() {
+        var factory = new DefaultListableBeanFactory();
+        factory.addBeanPostProcessor(new TracingBPP(new ArrayList<>()));
+        factory.registerBeanDefinition("w",
+                new BeanDefinition(Widget.class).setInitMethodName("customInit"));
+        var w = factory.getBean("w", Widget.class);
+        assertThat(w.calls).containsExactly(
+                "awareName:w",
+                "bpp:before",
+                "afterProps",
+                "customInit",
+                "bpp:after"
+        );
+    }
+}
+```
+
+- [ ] **Step 3: 두 테스트 PASS 확인 & 커밋**
+
+```bash
+./gradlew :sfs-beans:test --tests FactoryBeanTest --tests BeanPostProcessorOrderTest
+git add sfs-beans/
+git commit -m "test(sfs-beans): FactoryBean + BeanPostProcessor 호출 순서 통합 테스트"
+```
+
+---
+
+### Task 33: Plan 1A DoD 최종 검증 + README 스냅샷
+
+**Files:**
+- Create: `sfs-beans/README.md`
+
+- [ ] **Step 1: `sfs-beans/README.md` 작성**
+
+```markdown
+# sfs-beans
+
+Spring From Scratch의 **컨테이너 코어 모듈**. `BeanDefinition`, `BeanFactory` 계층,
+`FactoryBean`, 확장점 인터페이스들, 3-level cache 기반 싱글톤 레지스트리를 담당한다.
+
+## 의존 관계
+- 의존: `sfs-core` (유틸, 예외, ASM 메타데이터)
+- 의존됨: `sfs-context` (Plan 1B에서 추가)
+
+## Spring 원본 매핑
+
+| 이 모듈 | Spring 원본 |
+|---|---|
+| `BeanFactory` / `ListableBeanFactory` / `HierarchicalBeanFactory` | 동명 인터페이스 |
+| `BeanDefinition` | `AbstractBeanDefinition` 계열을 mutable class로 단순화 |
+| `DefaultSingletonBeanRegistry` | 동명. `CacheLookup` sealed 결과는 우리 개선 |
+| `AbstractBeanFactory` / `AbstractAutowireCapableBeanFactory` / `DefaultListableBeanFactory` | 동명 |
+| `FactoryBean` | 동명 |
+| `BeanPostProcessor` / `InstantiationAwareBeanPostProcessor` / `SmartInstantiationAwareBeanPostProcessor` | 동명 |
+| `BeanFactoryPostProcessor` | 동명 |
+
+## 내부 구현 특징 (Approach 3)
+
+- `CacheLookup` **sealed interface**로 3-level 조회 결과 표현 → 호출부에서 pattern matching switch
+- `Scope` **sealed interface**로 Singleton/Prototype 닫기 (Request/Session은 sealed에 추가로 확장)
+- `BeanDefinition`은 **mutable class**로 유지 — BFPP가 수정할 수 있어야 함
+- `PropertyValue`, `BeanReference`, `BeanCreationContext`는 **record**
+
+## 학습 포인트
+
+### 3-Level Cache 핵심 아이디어
+1차 `singletonObjects` = 완성된 빈, 2차 `earlySingletonObjects` = 조기 노출된 참조,
+3차 `singletonFactories` = `SmartInstantiationAwareBeanPostProcessor.getEarlyBeanReference`
+훅을 실행할 수 있는 지연 팩토리. 자세한 시나리오는 `docs/superpowers/specs/2026-04-19-ioc-container-design.md` 섹션 5 참조.
+
+### 승격 시점 분리
+`lookup()`이 3차 hit일 때 자동 승격하지 않고 `promoteToEarlyReference()` 별도 호출.
+이유: 호출자가 SmartBPP 체인 실행 여부를 제어해야 하므로 (Spring 원본과 동일 의도).
+
+## 테스트 실행
+\`\`\`bash
+./gradlew :sfs-beans:test
+\`\`\`
+
+주요 통합 테스트:
+- `integration/CircularReferenceSetterTest` — 3-level cache 순환 해결
+- `integration/CircularReferenceConstructorTest` — 생성자 순환 적절 예외
+- `integration/FactoryBeanTest` — `&` 접두사 + 싱글톤 캐싱
+- `integration/BeanPostProcessorOrderTest` — 콜백 순서 (awareName → bpp:before → afterProps → customInit → bpp:after)
+```
+
+- [ ] **Step 2: `sfs-core/README.md` 간단 작성**
+
+```markdown
+# sfs-core
+
+Spring From Scratch의 공통 유틸리티 계층. 다른 모든 모듈이 의존하지만
+이 모듈 자체는 ASM 외 외부 의존이 없다.
+
+## 주요 타입
+- `Assert` — 인자 검증 유틸 (Spring `Assert` 대응)
+- `ClassUtils`, `ReflectionUtils` — 리플렉션 래퍼
+- `ClassPathScanner` — 파일 시스템 기반 `.class` 열거
+- `AnnotationMetadataReader` — ASM 기반 애노테이션 메타데이터 추출 (클래스 로드 없이)
+- `BeansException` sealed 계층 — 모든 컨테이너 예외의 루트
+```
+
+- [ ] **Step 3: Plan 1A 최종 검증**
+
+```bash
+./gradlew build
+```
+예상: BUILD SUCCESSFUL, `sfs-core` + `sfs-beans` 전 테스트 PASS.
+
+- [ ] **Step 4: 최종 커밋**
+
+```bash
+git add sfs-core/README.md sfs-beans/README.md
+git commit -m "docs: sfs-core와 sfs-beans 모듈 README 추가 (Spring 매핑 포함)"
+```
+
+---
+
+## 🎯 Plan 1A Definition of Done — 최종 체크리스트
+
+**기능:**
+- [ ] `DefaultListableBeanFactory`를 new로 생성 가능
+- [ ] `registerBeanDefinition(name, definition)`으로 빈 등록
+- [ ] `getBean(name)`, `getBean(name, Class)`, `getBean(Class)` 전 variant 동작
+- [ ] 싱글톤/프로토타입 스코프 구분 동작
+- [ ] `@Primary` 해결 (수동 `setPrimary(true)`로 테스트됨)
+- [ ] `FactoryBean<T>` 지원 + `&` 접두사 + 제품 캐싱
+- [ ] `BeanPostProcessor` / `InstantiationAwareBeanPostProcessor` / `SmartInstantiationAwareBeanPostProcessor` / `BeanFactoryPostProcessor` 전 훅 동작
+- [ ] `BeanNameAware`, `BeanFactoryAware` 콜백
+- [ ] `InitializingBean`, `DisposableBean`, `initMethodName`, `destroyMethodName`
+- [ ] 3-level cache로 세터/필드 순환 참조 해결
+- [ ] 생성자 순환 참조 시 명확한 예외
+- [ ] `destroySingletons()` 역순 실행 + 부분 실패 복원
+
+**품질:**
+- [ ] `./gradlew build` BUILD SUCCESSFUL
+- [ ] 모든 단위 테스트 + 통합 테스트 PASS
+- [ ] 각 예외가 "Possible solutions" 힌트 포함
+- [ ] 각 모듈 README에 Spring 매핑표
+
+**커밋 히스토리:**
+- [ ] 의미 있는 단위별 커밋 (태스크 ≈ 커밋)
+- [ ] 한국어 커밋 메시지
+
+---
+
+## ▶ Plan 1A 완료 후 다음 단계
+
+1. **Plan 1B 작성**: 사용자 승인 후 이어서 작성. 범위:
+   - `sfs-context` 모듈 생성
+   - 애노테이션 (`@Component`, `@Configuration`, `@Bean`, `@Autowired`, `@Primary`, `@Qualifier`, `@Lazy`, `@Scope`, `@PostConstruct`, `@PreDestroy`)
+   - `ApplicationContext` + `AbstractApplicationContext` + `AnnotationConfigApplicationContext`
+   - `ClassPathBeanDefinitionScanner`, `ConfigurationClassPostProcessor`, `AutowiredAnnotationBeanPostProcessor`, `CommonAnnotationBeanPostProcessor`
+   - refresh() 8단계 + close() 플로우
+
+2. **Plan 1C 작성**: 샘플 앱 + Spring 교차 검증.
+
+3. **구현 착수**: Plan 1A 완성되면 서브에이전트 기반 자동 실행 또는 인라인 배치 실행 중 선택.
