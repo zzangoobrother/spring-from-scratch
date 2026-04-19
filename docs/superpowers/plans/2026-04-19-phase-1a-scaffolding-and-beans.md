@@ -1577,9 +1577,821 @@ git commit -m "feat(sfs-beans): ObjectFactory, BeanCreationContext, CreationStag
 
 ---
 
-## 🚧 이어서 작성 예정 (Task 15~33)
+## 섹션 D: BeanFactory 인터페이스 계층 + 확장점 (Task 15~19)
 
-- **섹션 D (Task 15~19):** `BeanFactory` 인터페이스 계층 + `FactoryBean` + 확장점 인터페이스
-- **섹션 E (Task 20~23):** `DefaultSingletonBeanRegistry` — 3-level cache + 순환 참조 감지 + destruction 콜백
+### Task 15: `BeanFactory` + `HierarchicalBeanFactory` + `ListableBeanFactory`
+
+**Files:**
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/BeanFactory.java`
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/HierarchicalBeanFactory.java`
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/ListableBeanFactory.java`
+
+> 인터페이스는 동작이 없어 단독 테스트 의미가 작다. `DefaultListableBeanFactory` 통합 테스트(Task 29)에서 합쳐 검증.
+
+- [ ] **Step 1: `BeanFactory` 정의**
+
+```java
+package com.choisk.sfs.beans;
+
+/**
+ * 컨테이너 사용자가 주로 보는 최상위 인터페이스.
+ * <p>Spring 원본: {@code org.springframework.beans.factory.BeanFactory}.
+ */
+public interface BeanFactory {
+
+    String FACTORY_BEAN_PREFIX = "&";
+
+    Object getBean(String name);
+
+    <T> T getBean(String name, Class<T> requiredType);
+
+    <T> T getBean(Class<T> requiredType);
+
+    boolean containsBean(String name);
+
+    boolean isSingleton(String name);
+
+    boolean isPrototype(String name);
+
+    Class<?> getType(String name);
+}
+```
+
+- [ ] **Step 2: `HierarchicalBeanFactory`**
+
+```java
+package com.choisk.sfs.beans;
+
+public interface HierarchicalBeanFactory extends BeanFactory {
+    BeanFactory getParentBeanFactory();
+
+    boolean containsLocalBean(String name);
+}
+```
+
+- [ ] **Step 3: `ListableBeanFactory`**
+
+```java
+package com.choisk.sfs.beans;
+
+import java.util.Map;
+
+public interface ListableBeanFactory extends BeanFactory {
+
+    boolean containsBeanDefinition(String name);
+
+    int getBeanDefinitionCount();
+
+    String[] getBeanDefinitionNames();
+
+    String[] getBeanNamesForType(Class<?> type);
+
+    <T> Map<String, T> getBeansOfType(Class<T> type);
+}
+```
+
+- [ ] **Step 4: 컴파일 확인 & 커밋**
+
+```bash
+./gradlew :sfs-beans:compileJava
+git add sfs-beans/
+git commit -m "feat(sfs-beans): BeanFactory / Hierarchical / Listable 인터페이스 추가"
+```
+
+---
+
+### Task 16: `AutowireCapableBeanFactory` + `ConfigurableBeanFactory` + `ConfigurableListableBeanFactory`
+
+**Files:**
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/AutowireCapableBeanFactory.java`
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/ConfigurableBeanFactory.java`
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/ConfigurableListableBeanFactory.java`
+
+- [ ] **Step 1: `AutowireCapableBeanFactory`**
+
+```java
+package com.choisk.sfs.beans;
+
+public interface AutowireCapableBeanFactory extends BeanFactory {
+
+    Object createBean(Class<?> beanClass);
+
+    void autowireBean(Object existingBean);
+
+    Object initializeBean(Object existingBean, String beanName);
+
+    Object applyBeanPostProcessorsBeforeInitialization(Object existingBean, String beanName);
+
+    Object applyBeanPostProcessorsAfterInitialization(Object existingBean, String beanName);
+}
+```
+
+- [ ] **Step 2: `ConfigurableBeanFactory`**
+
+```java
+package com.choisk.sfs.beans;
+
+public interface ConfigurableBeanFactory extends HierarchicalBeanFactory {
+
+    void registerSingleton(String name, Object bean);
+
+    void addBeanPostProcessor(BeanPostProcessor processor);
+
+    int getBeanPostProcessorCount();
+
+    void destroySingletons();
+}
+```
+
+- [ ] **Step 3: `ConfigurableListableBeanFactory`**
+
+```java
+package com.choisk.sfs.beans;
+
+public interface ConfigurableListableBeanFactory
+        extends ListableBeanFactory, AutowireCapableBeanFactory, ConfigurableBeanFactory {
+
+    void registerBeanDefinition(String name, BeanDefinition definition);
+
+    BeanDefinition getBeanDefinition(String name);
+
+    void preInstantiateSingletons();
+}
+```
+
+- [ ] **Step 4: 컴파일 & 커밋**
+
+```bash
+./gradlew :sfs-beans:compileJava
+git add sfs-beans/
+git commit -m "feat(sfs-beans): AutowireCapable / Configurable BeanFactory 인터페이스 추가"
+```
+
+---
+
+### Task 17: `FactoryBean` 인터페이스
+
+**Files:**
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/FactoryBean.java`
+
+- [ ] **Step 1: 구현**
+
+```java
+package com.choisk.sfs.beans;
+
+/**
+ * "빈을 만드는 빈". new로 만들 수 없는 객체를 컨테이너에 등록하는 공식 통로.
+ * <p>Spring 원본: {@code org.springframework.beans.factory.FactoryBean<T>}.
+ *
+ * <p>사용 규칙:
+ * <ul>
+ *   <li>{@code getBean("myFactory")} → {@code getObject()} 호출 결과 반환</li>
+ *   <li>{@code getBean("&myFactory")} → FactoryBean 자신 반환</li>
+ *   <li>{@code isSingleton() == true}면 getObject() 결과도 캐시됨</li>
+ * </ul>
+ */
+public interface FactoryBean<T> {
+
+    T getObject() throws Exception;
+
+    Class<?> getObjectType();
+
+    default boolean isSingleton() { return true; }
+}
+```
+
+- [ ] **Step 2: 커밋**
+
+```bash
+git add sfs-beans/src/main/java/com/choisk/sfs/beans/FactoryBean.java
+git commit -m "feat(sfs-beans): FactoryBean 인터페이스 추가"
+```
+
+---
+
+### Task 18: `BeanPostProcessor` 계열 + `BeanFactoryPostProcessor`
+
+**Files:**
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/BeanPostProcessor.java`
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/InstantiationAwareBeanPostProcessor.java`
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/SmartInstantiationAwareBeanPostProcessor.java`
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/BeanFactoryPostProcessor.java`
+
+- [ ] **Step 1: `BeanPostProcessor` (가장 기본)**
+
+```java
+package com.choisk.sfs.beans;
+
+/**
+ * 초기화 전/후로 빈 인스턴스를 감싸는 훅. AOP 프록시가 여기에 꽂힘 (Phase 2).
+ */
+public interface BeanPostProcessor {
+
+    default Object postProcessBeforeInitialization(Object bean, String beanName) {
+        return bean;
+    }
+
+    default Object postProcessAfterInitialization(Object bean, String beanName) {
+        return bean;
+    }
+}
+```
+
+- [ ] **Step 2: `InstantiationAwareBeanPostProcessor`**
+
+```java
+package com.choisk.sfs.beans;
+
+/**
+ * 인스턴스화 자체를 가로채거나 프로퍼티 주입을 후킹하는 BPP.
+ * <p>@Autowired 필드 주입 로직이 여기에 꽂힘 (AutowiredAnnotationBeanPostProcessor).
+ */
+public interface InstantiationAwareBeanPostProcessor extends BeanPostProcessor {
+
+    /**
+     * 반환값이 null이 아니면 그 객체를 빈으로 사용 (생성자 스킵).
+     */
+    default Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName) {
+        return null;
+    }
+
+    default boolean postProcessAfterInstantiation(Object bean, String beanName) {
+        return true;
+    }
+
+    /**
+     * populateBean 도중 호출. 여기서 @Autowired 필드를 채움.
+     */
+    default PropertyValues postProcessProperties(PropertyValues pvs, Object bean, String beanName) {
+        return pvs;
+    }
+}
+```
+
+- [ ] **Step 3: `SmartInstantiationAwareBeanPostProcessor`**
+
+```java
+package com.choisk.sfs.beans;
+
+/**
+ * 3-level cache의 3차 팩토리가 실행될 때 호출되는 훅.
+ * <p>AOP 프록시 조기 생성(Phase 2)이 여기에 꽂힘. 순환 참조 상황에서도
+ * 다른 빈이 프록시를 참조하도록 보장.
+ */
+public interface SmartInstantiationAwareBeanPostProcessor
+        extends InstantiationAwareBeanPostProcessor {
+
+    /**
+     * 조기 참조가 필요할 때 호출. 반환값이 다른 빈들에게 노출됨.
+     */
+    default Object getEarlyBeanReference(Object bean, String beanName) {
+        return bean;
+    }
+}
+```
+
+- [ ] **Step 4: `BeanFactoryPostProcessor`**
+
+```java
+package com.choisk.sfs.beans;
+
+/**
+ * 모든 싱글톤 인스턴스화 전에 BeanDefinition 자체를 수정할 수 있는 훅.
+ * <p>@Configuration 클래스 처리(ConfigurationClassPostProcessor, Plan 1B)가 여기에 꽂힘.
+ */
+public interface BeanFactoryPostProcessor {
+
+    void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory);
+}
+```
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add sfs-beans/
+git commit -m "feat(sfs-beans): BeanPostProcessor 계층 + BeanFactoryPostProcessor 인터페이스 추가"
+```
+
+---
+
+### Task 19: Aware 인터페이스 + `InitializingBean` / `DisposableBean`
+
+**Files:**
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/Aware.java`
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/BeanNameAware.java`
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/BeanFactoryAware.java`
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/InitializingBean.java`
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/DisposableBean.java`
+
+- [ ] **Step 1~5: 각 인터페이스 파일 생성**
+
+```java
+// Aware.java - 마커 인터페이스
+package com.choisk.sfs.beans;
+public interface Aware {}
+```
+
+```java
+// BeanNameAware.java
+package com.choisk.sfs.beans;
+public interface BeanNameAware extends Aware {
+    void setBeanName(String name);
+}
+```
+
+```java
+// BeanFactoryAware.java
+package com.choisk.sfs.beans;
+public interface BeanFactoryAware extends Aware {
+    void setBeanFactory(BeanFactory beanFactory);
+}
+```
+
+```java
+// InitializingBean.java
+package com.choisk.sfs.beans;
+public interface InitializingBean {
+    void afterPropertiesSet() throws Exception;
+}
+```
+
+```java
+// DisposableBean.java
+package com.choisk.sfs.beans;
+public interface DisposableBean {
+    void destroy() throws Exception;
+}
+```
+
+- [ ] **Step 6: 커밋**
+
+```bash
+git add sfs-beans/
+git commit -m "feat(sfs-beans): Aware/InitializingBean/DisposableBean 콜백 인터페이스 추가"
+```
+
+---
+
+## ✅ 섹션 D 체크포인트
+
+`sfs-beans`의 **모든 공개 인터페이스**가 정의됨. 구현체는 섹션 E~F에서 추가.
+
+```bash
+./gradlew :sfs-beans:compileJava
+# BUILD SUCCESSFUL
+```
+
+---
+
+## 섹션 E: `DefaultSingletonBeanRegistry` — 3-Level Cache (Task 20~23) ⭐
+
+이 섹션이 Phase 1의 **가장 정교한 부분**. 각 스텝을 꼼꼼히 따라가기.
+
+### Task 20: 1차 캐시 + `registerSingleton` / `getSingleton`
+
+**Files:**
+- Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistry.java`
+- Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistryTest.java`
+
+- [ ] **Step 1: 실패 테스트**
+
+```java
+package com.choisk.sfs.beans;
+
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+
+class DefaultSingletonBeanRegistryTest {
+
+    @Test
+    void registerAndGetCompletesHit() {
+        var registry = new DefaultSingletonBeanRegistry();
+        registry.registerSingleton("foo", "hello");
+        assertThat(registry.getSingleton("foo")).isEqualTo("hello");
+    }
+
+    @Test
+    void missingSingletonReturnsNull() {
+        var registry = new DefaultSingletonBeanRegistry();
+        assertThat(registry.getSingleton("missing")).isNull();
+    }
+
+    @Test
+    void containsSingleton() {
+        var registry = new DefaultSingletonBeanRegistry();
+        assertThat(registry.containsSingleton("x")).isFalse();
+        registry.registerSingleton("x", 42);
+        assertThat(registry.containsSingleton("x")).isTrue();
+    }
+}
+```
+
+- [ ] **Step 2: FAIL 확인 후 구현 (1차 캐시만)**
+
+```java
+package com.choisk.sfs.beans;
+
+import com.choisk.sfs.core.Assert;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class DefaultSingletonBeanRegistry {
+
+    /** 1차: 완성된 싱글톤. */
+    protected final Map<String, Object> singletonObjects = new ConcurrentHashMap<>();
+
+    public void registerSingleton(String name, Object bean) {
+        Assert.hasText(name, "name");
+        Assert.notNull(bean, "bean");
+        synchronized (singletonObjects) {
+            Object existing = singletonObjects.get(name);
+            if (existing != null) {
+                throw new IllegalStateException(
+                        "Singleton '%s' already exists (%s)".formatted(name, existing.getClass().getName()));
+            }
+            singletonObjects.put(name, bean);
+        }
+    }
+
+    public Object getSingleton(String name) {
+        return singletonObjects.get(name);
+    }
+
+    public boolean containsSingleton(String name) {
+        return singletonObjects.containsKey(name);
+    }
+
+    public String[] getSingletonNames() {
+        return singletonObjects.keySet().toArray(new String[0]);
+    }
+}
+```
+
+- [ ] **Step 3: 테스트 PASS 확인**
+
+```bash
+./gradlew :sfs-beans:test --tests DefaultSingletonBeanRegistryTest
+```
+
+- [ ] **Step 4: 커밋**
+
+```bash
+git add sfs-beans/
+git commit -m "feat(sfs-beans): DefaultSingletonBeanRegistry 1차 캐시 구현"
+```
+
+---
+
+### Task 21: 2차 + 3차 캐시 + `CacheLookup` 기반 조회 + 승격 ⭐
+
+**Files:**
+- Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistry.java`
+- Modify: `sfs-beans/src/test/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistryTest.java`
+
+- [ ] **Step 1: 실패 테스트 추가**
+
+기존 `DefaultSingletonBeanRegistryTest`에 아래 테스트 **추가**:
+
+```java
+    @Test
+    void factoryLevelCacheExecutesExactlyOnce() {
+        var registry = new DefaultSingletonBeanRegistry();
+        var counter = new java.util.concurrent.atomic.AtomicInteger();
+        registry.registerSingletonFactory("early", () -> {
+            counter.incrementAndGet();
+            return "producedOnce";
+        });
+
+        // 처음 조회: factory 실행, 2차로 승격
+        var first = registry.lookup("early");
+        assertThat(first).isInstanceOf(CacheLookup.EarlyReference.class);
+        assertThat(((CacheLookup.EarlyReference) first).bean()).isEqualTo("producedOnce");
+
+        // 두 번째 조회: 2차에서 hit, factory 재실행 X
+        var second = registry.lookup("early");
+        assertThat(second).isInstanceOf(CacheLookup.EarlyReference.class);
+
+        assertThat(counter.get()).isEqualTo(1);
+    }
+
+    @Test
+    void lookupOrderIs_CompleteThenEarlyThenFactory() {
+        var registry = new DefaultSingletonBeanRegistry();
+
+        registry.registerSingletonFactory("name", () -> "fromFactory");
+        assertThat(registry.lookup("name")).isInstanceOf(CacheLookup.DeferredFactory.class);
+
+        // promote 요청 → 2차로 이동
+        registry.promoteToEarlyReference("name");
+        assertThat(registry.lookup("name")).isInstanceOf(CacheLookup.EarlyReference.class);
+
+        // 완성 빈 등록 시 1차가 우선
+        registry.registerSingleton("name2", "complete");
+        assertThat(registry.lookup("name2")).isInstanceOf(CacheLookup.Complete.class);
+    }
+
+    @Test
+    void missReturnsMiss() {
+        var registry = new DefaultSingletonBeanRegistry();
+        assertThat(registry.lookup("nope")).isInstanceOf(CacheLookup.Miss.class);
+    }
+```
+
+- [ ] **Step 2: FAIL 확인 후 `DefaultSingletonBeanRegistry`에 2차/3차 추가**
+
+클래스 전체 교체:
+
+```java
+package com.choisk.sfs.beans;
+
+import com.choisk.sfs.core.Assert;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class DefaultSingletonBeanRegistry {
+
+    /** 1차: 완성된 싱글톤. */
+    protected final Map<String, Object> singletonObjects = new ConcurrentHashMap<>();
+    /** 2차: 조기 노출된 참조 (AOP 프록시가 씌워졌을 수도 있음). */
+    protected final Map<String, Object> earlySingletonObjects = new ConcurrentHashMap<>();
+    /** 3차: 조기 참조 팩토리 (getEarlyBeanReference 훅 포함). */
+    protected final Map<String, ObjectFactory<?>> singletonFactories = new ConcurrentHashMap<>();
+
+    private final Object singletonLock = new Object();
+
+    public void registerSingleton(String name, Object bean) {
+        Assert.hasText(name, "name");
+        Assert.notNull(bean, "bean");
+        synchronized (singletonLock) {
+            Object existing = singletonObjects.get(name);
+            if (existing != null) {
+                throw new IllegalStateException(
+                        "Singleton '%s' already exists (%s)".formatted(name, existing.getClass().getName()));
+            }
+            singletonObjects.put(name, bean);
+            earlySingletonObjects.remove(name);
+            singletonFactories.remove(name);
+        }
+    }
+
+    public void registerSingletonFactory(String name, ObjectFactory<?> factory) {
+        Assert.hasText(name, "name");
+        Assert.notNull(factory, "factory");
+        synchronized (singletonLock) {
+            if (!singletonObjects.containsKey(name)) {
+                singletonFactories.put(name, factory);
+                earlySingletonObjects.remove(name);
+            }
+        }
+    }
+
+    /**
+     * 3-level 조회를 sealed result로 반환. 호출자는 switch pattern matching.
+     * <p>3차 hit 시에도 여기서는 <b>승격하지 않음</b> - 승격 시점은 {@link #promoteToEarlyReference} 호출에서 명시적으로 결정.
+     * 이렇게 나눈 이유는 호출자(AbstractBeanFactory)가 SmartBPP 체인 실행 여부를 제어할 수 있어야 하기 때문.
+     */
+    public CacheLookup lookup(String name) {
+        Object complete = singletonObjects.get(name);
+        if (complete != null) return new CacheLookup.Complete(complete);
+
+        Object early = earlySingletonObjects.get(name);
+        if (early != null) return new CacheLookup.EarlyReference(early);
+
+        ObjectFactory<?> factory = singletonFactories.get(name);
+        if (factory != null) return new CacheLookup.DeferredFactory(factory);
+
+        return CacheLookup.Miss.INSTANCE;
+    }
+
+    /**
+     * 3차 → 2차 승격. factory를 실행하여 결과를 earlySingletonObjects에 저장하고 3차에서 제거.
+     * <p>이 메서드는 <b>정확히 한 번만</b> factory를 실행해야 한다. 동시 호출 시 synchronized 보장.
+     */
+    public Object promoteToEarlyReference(String name) {
+        synchronized (singletonLock) {
+            Object existing = earlySingletonObjects.get(name);
+            if (existing != null) return existing;
+
+            ObjectFactory<?> factory = singletonFactories.get(name);
+            if (factory == null) {
+                throw new IllegalStateException("No singleton factory registered for: " + name);
+            }
+            Object produced = factory.getObject();
+            earlySingletonObjects.put(name, produced);
+            singletonFactories.remove(name);
+            return produced;
+        }
+    }
+
+    public boolean containsSingleton(String name) {
+        return singletonObjects.containsKey(name)
+                || earlySingletonObjects.containsKey(name)
+                || singletonFactories.containsKey(name);
+    }
+
+    public String[] getSingletonNames() {
+        return singletonObjects.keySet().toArray(new String[0]);
+    }
+
+    public Object getSingleton(String name) {
+        return singletonObjects.get(name);
+    }
+}
+```
+
+- [ ] **Step 3: 테스트 PASS 확인**
+
+```bash
+./gradlew :sfs-beans:test --tests DefaultSingletonBeanRegistryTest
+```
+
+- [ ] **Step 4: 커밋**
+
+```bash
+git add sfs-beans/
+git commit -m "feat(sfs-beans): 2차/3차 캐시 + CacheLookup 기반 lookup/promote 구현"
+```
+
+---
+
+### Task 22: "현재 생성 중" 추적 (`ThreadLocal`)
+
+**Files:**
+- Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistry.java`
+- Modify: `sfs-beans/src/test/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistryTest.java`
+
+- [ ] **Step 1: 실패 테스트 추가**
+
+```java
+    @Test
+    void creationTrackingDetectsRecursion() {
+        var registry = new DefaultSingletonBeanRegistry();
+        registry.beforeSingletonCreation("a");
+        assertThat(registry.isCurrentlyInCreation("a")).isTrue();
+        registry.afterSingletonCreation("a");
+        assertThat(registry.isCurrentlyInCreation("a")).isFalse();
+    }
+
+    @Test
+    void creationChainReturnsOrdered() {
+        var registry = new DefaultSingletonBeanRegistry();
+        registry.beforeSingletonCreation("a");
+        registry.beforeSingletonCreation("b");
+        assertThat(registry.getCurrentCreationChain()).containsExactly("a", "b");
+        registry.afterSingletonCreation("b");
+        registry.afterSingletonCreation("a");
+    }
+```
+
+- [ ] **Step 2: FAIL 확인 후 `DefaultSingletonBeanRegistry`에 추가**
+
+기존 클래스에 메서드 추가 (기존 필드 아래):
+
+```java
+    /** 현재 스레드에서 생성 중인 빈 이름들 (생성자 순환 감지용). 순서 유지를 위해 LinkedHashSet. */
+    private final ThreadLocal<LinkedHashSet<String>> currentlyInCreation =
+            ThreadLocal.withInitial(LinkedHashSet::new);
+
+    public void beforeSingletonCreation(String name) {
+        if (!currentlyInCreation.get().add(name)) {
+            throw new IllegalStateException(
+                    "Bean '%s' is already being created in this thread — circular reference".formatted(name));
+        }
+    }
+
+    public void afterSingletonCreation(String name) {
+        currentlyInCreation.get().remove(name);
+    }
+
+    public boolean isCurrentlyInCreation(String name) {
+        return currentlyInCreation.get().contains(name);
+    }
+
+    public List<String> getCurrentCreationChain() {
+        return List.copyOf(currentlyInCreation.get());
+    }
+```
+
+- [ ] **Step 3: PASS 확인 & 커밋**
+
+```bash
+./gradlew :sfs-beans:test --tests DefaultSingletonBeanRegistryTest
+git add sfs-beans/
+git commit -m "feat(sfs-beans): ThreadLocal 기반 빈 생성 추적 (순환 감지)"
+```
+
+---
+
+### Task 23: Destruction 콜백 등록 + `destroySingletons`
+
+**Files:**
+- Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistry.java`
+- Modify: `sfs-beans/src/test/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistryTest.java`
+
+- [ ] **Step 1: 실패 테스트 추가**
+
+```java
+    @Test
+    void destroySingletonsInvokesCallbacksInReverseOrder() {
+        var registry = new DefaultSingletonBeanRegistry();
+        var order = new java.util.ArrayList<String>();
+
+        registry.registerSingleton("first", "bean1");
+        registry.registerDisposableBean("first", () -> order.add("first"));
+        registry.registerSingleton("second", "bean2");
+        registry.registerDisposableBean("second", () -> order.add("second"));
+
+        registry.destroySingletons();
+
+        assertThat(order).containsExactly("second", "first");
+        assertThat(registry.containsSingleton("first")).isFalse();
+    }
+
+    @Test
+    void destroyContinuesOnFailure() {
+        var registry = new DefaultSingletonBeanRegistry();
+        var invoked = new java.util.ArrayList<String>();
+        registry.registerSingleton("a", "a");
+        registry.registerDisposableBean("a", () -> invoked.add("a"));
+        registry.registerSingleton("b", "b");
+        registry.registerDisposableBean("b", () -> { throw new RuntimeException("boom"); });
+        registry.registerSingleton("c", "c");
+        registry.registerDisposableBean("c", () -> invoked.add("c"));
+
+        registry.destroySingletons();
+
+        // b는 실패했지만 a와 c는 역순으로 실행됨 (c → [b 실패] → a)
+        assertThat(invoked).containsExactly("c", "a");
+    }
+```
+
+- [ ] **Step 2: FAIL 확인 후 `DefaultSingletonBeanRegistry`에 추가**
+
+```java
+    /** destroy 콜백. 등록 순서의 역순으로 실행되도록 LinkedHashMap. */
+    private final LinkedHashMap<String, Runnable> disposableBeans = new LinkedHashMap<>();
+
+    public void registerDisposableBean(String name, Runnable callback) {
+        synchronized (singletonLock) {
+            disposableBeans.put(name, callback);
+        }
+    }
+
+    public void destroySingletons() {
+        String[] names;
+        synchronized (singletonLock) {
+            names = disposableBeans.keySet().toArray(new String[0]);
+        }
+        // 역순 실행 (LIFO)
+        for (int i = names.length - 1; i >= 0; i--) {
+            String name = names[i];
+            Runnable callback;
+            synchronized (singletonLock) {
+                callback = disposableBeans.remove(name);
+            }
+            if (callback == null) continue;
+            try {
+                callback.run();
+            } catch (Throwable t) {
+                // 한 개 실패가 전체 destroy를 막지 않도록 로그만 (System.err 사용 - 로깅 프레임워크 의존 회피)
+                System.err.println("[sfs-beans] Failed to destroy singleton '" + name + "': " + t);
+            }
+        }
+        synchronized (singletonLock) {
+            singletonObjects.clear();
+            earlySingletonObjects.clear();
+            singletonFactories.clear();
+        }
+    }
+```
+
+- [ ] **Step 3: PASS 확인 & 커밋**
+
+```bash
+./gradlew :sfs-beans:test --tests DefaultSingletonBeanRegistryTest
+git add sfs-beans/
+git commit -m "feat(sfs-beans): destroySingletons 역순 실행 + 실패 복원 구현"
+```
+
+---
+
+## ✅ 섹션 E 체크포인트
+
+**가장 복잡한 파트 완료.** 이 시점에서 `DefaultSingletonBeanRegistry`는:
+
+- 3-level cache 완전 동작
+- `CacheLookup` sealed 결과로 타입 안전 분기
+- 스레드별 "생성 중" 추적으로 순환 참조 감지 준비 완료
+- LIFO 순서 destruction + 부분 실패 복원
+
+```bash
+./gradlew :sfs-beans:test --tests DefaultSingletonBeanRegistryTest
+# 8+ 테스트 모두 PASS
+```
+
+---
+
+## 🚧 이어서 작성 예정 (Task 24~33)
+
 - **섹션 F (Task 24~29):** `AbstractBeanFactory` → `AbstractAutowireCapableBeanFactory` → `DefaultListableBeanFactory`
 - **섹션 G (Task 30~33):** 통합 테스트 (세터/필드 순환, 생성자 순환, FactoryBean, BPP 순서) + Plan 1A DoD 검증
