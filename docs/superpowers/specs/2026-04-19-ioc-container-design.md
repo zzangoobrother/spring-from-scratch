@@ -50,7 +50,7 @@ Spring Framework의 핵심 구조를 **순수 Java 25로 직접 구현**하여, 
 | 7 | 내부 구현 스타일 | Legacy Faithful / Modern Native / Hybrid | **Hybrid** | 공개 API는 Spring과 동일(호환성), 내부는 Java 25 idioms(record, sealed, pattern matching) 활용. 주석에 Spring 원본 매핑 |
 | 8 | `BeanDefinition` 형태 | record (immutable) / class (mutable) | **mutable class** | BeanFactoryPostProcessor가 인스턴스화 전에 definition을 수정할 수 있어야 함. Spring 철학 그대로 |
 | 9 | `@PostConstruct`/`@PreDestroy` | Jakarta / 직접 정의 | **직접 정의** | 외부 의존 제로, "Spring이 왜 자기 애노테이션 쓰다가 Jakarta로 넘어갔는지"의 맥락까지 학습 |
-| 10 | 확장점 5종 | Phase 1 포함 / Phase 2로 지연 | **Phase 1 포함** | 모든 후속 Phase가 여기 꽂히므로 지금 안 만들면 Phase 2 진입 시 대규모 리팩토링 필요 |
+| 10 | 확장점 전체 (BPP/IABPP/SIABPP/BFPP/Aware/InitializingBean·DisposableBean 6종) | Phase 1 포함 / Phase 2로 지연 | **Phase 1 포함** | 모든 후속 Phase가 여기 꽂히므로 지금 안 만들면 Phase 2 진입 시 대규모 리팩토링 필요. 특히 `SmartInstantiationAwareBeanPostProcessor`는 3-level cache의 `getEarlyBeanReference` 훅으로 Phase 2 AOP 프록시 조기 생성에 필수 |
 | 11 | "생성 중" 추적 | ThreadLocal / ScopedValue | **ThreadLocal (Phase 1), ScopedValue 옵션(Phase 3+)** | Spring과 동일 출발점 확보 후 비교 학습 |
 | 12 | 테스트 도구 | JUnit+AssertJ / +Mockito | **JUnit 5 + AssertJ (Mockito 제외)** | 컨테이너 테스트는 통합 성격이라 Mock보다 실제 빈 권장. AssertJ는 예외 메시지 검증 품질 향상 |
 | 13 | `@Configuration` CGLIB 프록시 | Phase 1 포함 / Phase 2 연기 | **Phase 2 연기** | JDK Dynamic Proxy로는 불가능. Phase 2 AOP에서 ByteBuddy/CGLIB 도입 후 구현. "`@Bean` 메서드 간 호출은 일반 메서드 호출"이라는 한계를 문서화 |
