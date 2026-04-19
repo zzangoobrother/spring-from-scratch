@@ -32,7 +32,7 @@ assertThat(factory.getBean("userService", UserService.class)).isNotNull();
 - Create: `build.gradle.kts`
 - Create: `gradle/libs.versions.toml`
 
-- [ ] **Step 1: `settings.gradle.kts` 작성**
+- [x] **Step 1: `settings.gradle.kts` 작성**
 
 ```kotlin
 rootProject.name = "spring-from-scratch"
@@ -45,7 +45,7 @@ include(
 // sfs-samples는 Plan 1C에서 추가
 ```
 
-- [ ] **Step 2: `gradle/libs.versions.toml` 작성 (버전 카탈로그)**
+- [x] **Step 2: `gradle/libs.versions.toml` 작성 (버전 카탈로그)**
 
 ```toml
 [versions]
@@ -61,7 +61,7 @@ asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
 asm-commons = { module = "org.ow2.asm:asm-commons", version.ref = "asm" }
 ```
 
-- [ ] **Step 3: 루트 `build.gradle.kts` 작성**
+- [x] **Step 3: 루트 `build.gradle.kts` 작성**
 
 ```kotlin
 plugins {
@@ -105,7 +105,7 @@ subprojects {
 }
 ```
 
-- [ ] **Step 4: 검증 커맨드**
+- [x] **Step 4: 검증 커맨드**
 
 ```bash
 cd ~/IdeaProjects/spring-from-scratch
@@ -115,12 +115,16 @@ cd ~/IdeaProjects/spring-from-scratch
 
 (Gradle wrapper 부재 시 `gradle wrapper --gradle-version=9.4.1` 먼저 실행. Homebrew에 `gradle` 없으면 `brew install gradle`. 참고: Gradle 8.x는 Java 25 toolchain 미지원이므로 9.1.0+ 필수)
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add settings.gradle.kts build.gradle.kts gradle/libs.versions.toml gradle/wrapper/ gradlew gradlew.bat
 git commit -m "chore: Gradle 멀티모듈 루트 설정 (Java 25 toolchain)"
 ```
+
+> **실행 기록 (2026-04-20):** 커밋 `ac58004` on `feat/phase1a-scaffolding`. 구현 중 두 가지 편차 발생:
+> 1. `subprojects{}` 블록에서 `the<LibrariesForLibs>()` 접근자가 동작하지 않아(컨벤션 플러그인 밖에서는 미등록) `VersionCatalogsExtension` API로 전환: `rootProject.extensions.getByType<org.gradle.api.artifacts.VersionCatalogsExtension>().named("libs").findLibrary("junit-bom").get()` 형태.
+> 2. Gradle 9 breaking change로 `settings.gradle.kts`의 `include(...)` 대상 디렉토리가 물리적으로 존재해야 하므로, wrapper 부트스트랩 전에 `mkdir -p sfs-core sfs-beans sfs-context` 먼저 실행.
 
 ---
 
