@@ -6,7 +6,7 @@
 
 **Architecture:** 4-모듈 Gradle 프로젝트(`sfs-core`, `sfs-beans`, `sfs-context`, `sfs-samples`) 중 앞 2개만 구현. 공개 API는 Spring과 동일 시그니처, 내부는 Java 25 idioms(record, sealed interface, pattern matching switch). 3-level cache로 세터/필드 순환 참조 해결, `FactoryBean`·`BeanPostProcessor`·`BeanFactoryPostProcessor`·Aware·`InitializingBean`/`DisposableBean` 확장점 완비.
 
-**Tech Stack:** Java 25 LTS, Gradle 8.x (Kotlin DSL), ASM 9.x (애노테이션 메타데이터 스캔), JUnit 5, AssertJ 3.x.
+**Tech Stack:** Java 25 LTS, Gradle 9.4.1 (Kotlin DSL) — Java 25 toolchain 지원은 Gradle 9.1.0부터 도입됨, ASM 9.x (애노테이션 메타데이터 스캔), JUnit 5, AssertJ 3.x.
 
 **Selected Spec:** `docs/superpowers/specs/2026-04-19-ioc-container-design.md`
 
@@ -110,10 +110,10 @@ subprojects {
 ```bash
 cd ~/IdeaProjects/spring-from-scratch
 ./gradlew --version
-# 예상: Gradle 8.x 확인, Java toolchain 25로 인식
+# 예상: Gradle 9.4.1 확인, Java toolchain 25로 인식
 ```
 
-(Gradle wrapper 부재 시 `gradle wrapper --gradle-version=8.11` 먼저 실행. Homebrew에 `gradle` 없으면 `brew install gradle`)
+(Gradle wrapper 부재 시 `gradle wrapper --gradle-version=9.4.1` 먼저 실행. Homebrew에 `gradle` 없으면 `brew install gradle`. 참고: Gradle 8.x는 Java 25 toolchain 미지원이므로 9.1.0+ 필수)
 
 - [ ] **Step 5: 커밋**
 
