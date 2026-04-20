@@ -143,12 +143,17 @@ plugins {
 }
 
 dependencies {
-    api(libs.asm)
-    api(libs.asm.commons)
+    implementation(libs.asm)
+    implementation(libs.asm.commons)
 }
 ```
 
-> `api`로 노출하는 이유: `sfs-beans`가 `AnnotationMetadata`를 받을 때 ASM 타입이 메서드 시그니처에 나올 수 있어서. 내부 구현만 쓰면 `implementation`으로 내리기.
+> **의사결정 (2026-04-21):** 초기 초안은 `api(libs.asm)`이었으나 Gradle 공식 userguide "Prefer the `implementation` configuration over `api` when possible" 원칙에 맞춰 `implementation`으로 변경.
+>
+> - 근거 1: `AnnotationMetadata` record가 `String`/`List`/`Set`/`Map` 등 JDK 타입만 노출 — ASM의 `Type`, `ClassReader`가 공개 API(ABI)에 등장하지 않음.
+> - 근거 2: `implementation`이면 `sfs-beans`/`sfs-context`에서 ASM 타입을 실수로 import 시 **즉시 컴파일 에러**로 캡슐화 강제.
+> - 근거 3: ASM → ByteBuddy 같은 구현체 교체 시 소비자 모듈 재컴파일 불필요.
+> - 향후 `AnnotationMetadata`가 ASM `Type`을 노출하도록 변경되면 그때 `api`로 승격 (그때까지는 컴파일러가 위반 감지).
 
 - [x] **Step 2: `package-info.java` (모듈 의도 문서화)**
 

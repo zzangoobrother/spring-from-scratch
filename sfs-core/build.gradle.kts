@@ -3,6 +3,6 @@ plugins {
 }
 
 dependencies {
-    api(libs.asm)
-    api(libs.asm.commons)
+    implementation(libs.asm)
+    implementation(libs.asm.commons)
 }
