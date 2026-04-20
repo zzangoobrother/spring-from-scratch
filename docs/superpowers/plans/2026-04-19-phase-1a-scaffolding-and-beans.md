@@ -450,7 +450,7 @@ git commit -m "feat(sfs-core): BeansException sealed 예외 계층 추가"
 - Create: `sfs-core/src/main/java/com/choisk/sfs/core/Assert.java`
 - Create: `sfs-core/src/test/java/com/choisk/sfs/core/AssertTest.java`
 
-- [ ] **Step 1: 실패 테스트**
+- [x] **Step 1: 실패 테스트**
 
 ```java
 package com.choisk.sfs.core;
@@ -488,13 +488,13 @@ class AssertTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 FAIL 확인**
+- [x] **Step 2: 테스트 FAIL 확인**
 
 ```bash
 ./gradlew :sfs-core:test --tests AssertTest
 ```
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 ```java
 package com.choisk.sfs.core;
@@ -538,18 +538,20 @@ public final class Assert {
 }
 ```
 
-- [ ] **Step 4: 테스트 PASS 확인**
+- [x] **Step 4: 테스트 PASS 확인**
 
 ```bash
 ./gradlew :sfs-core:test --tests AssertTest
 ```
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-core/
 git commit -m "feat(sfs-core): Assert 검증 유틸리티 추가"
 ```
+
+> **실행 기록 (2026-04-21):** 편차 없이 한 번에 PASS. 플랜 그대로 적용 (notNull/hasText/isAssignable/isTrue 정적 메서드, private 생성자로 인스턴스화 차단).
 
 ---
 
