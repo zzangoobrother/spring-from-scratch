@@ -135,7 +135,7 @@ git commit -m "chore: Gradle 멀티모듈 루트 설정 (Java 25 toolchain)"
 - Create: `sfs-core/src/main/java/com/choisk/sfs/core/package-info.java`
 - Create: `sfs-core/src/test/java/com/choisk/sfs/core/PackageSmokeTest.java`
 
-- [ ] **Step 1: `sfs-core/build.gradle.kts`**
+- [x] **Step 1: `sfs-core/build.gradle.kts`**
 
 ```kotlin
 plugins {
@@ -150,7 +150,7 @@ dependencies {
 
 > `api`로 노출하는 이유: `sfs-beans`가 `AnnotationMetadata`를 받을 때 ASM 타입이 메서드 시그니처에 나올 수 있어서. 내부 구현만 쓰면 `implementation`으로 내리기.
 
-- [ ] **Step 2: `package-info.java` (모듈 의도 문서화)**
+- [x] **Step 2: `package-info.java` (모듈 의도 문서화)**
 
 ```java
 /**
@@ -165,7 +165,7 @@ dependencies {
 package com.choisk.sfs.core;
 ```
 
-- [ ] **Step 3: 스모크 테스트 작성 (모듈이 빌드되는지 확인용)**
+- [x] **Step 3: 스모크 테스트 작성 (모듈이 빌드되는지 확인용)**
 
 ```java
 package com.choisk.sfs.core;
@@ -181,19 +181,21 @@ class PackageSmokeTest {
 }
 ```
 
-- [ ] **Step 4: 빌드 실행**
+- [x] **Step 4: 빌드 실행**
 
 ```bash
 ./gradlew :sfs-core:test
 ```
 예상: BUILD SUCCESSFUL, 1 test passed.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-core/
 git commit -m "chore(sfs-core): 모듈 스캐폴딩 및 ASM 의존성 설정"
 ```
+
+> **실행 기록 (2026-04-20):** Task 2 실행 중 Gradle 9의 breaking change로 편차 발생. JUnit Platform launcher가 명시적 `testRuntimeOnly` 의존성으로 요구됨 (Gradle 9부터 자동 포함 중단). 해결: `gradle/libs.versions.toml`에 `junit-platform-launcher` 라이브러리 추가 + 루트 `build.gradle.kts`의 `subprojects{}` dependencies에 `"testRuntimeOnly"(catalog.findLibrary("junit-platform-launcher").get())` 추가. 이 수정은 본 태스크 커밋에 함께 포함.
 
 ---
 
