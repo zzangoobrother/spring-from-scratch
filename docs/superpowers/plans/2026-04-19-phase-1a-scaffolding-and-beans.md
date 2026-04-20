@@ -842,7 +842,7 @@ git commit -m "feat(sfs-core): ClassUtils 및 ReflectionUtils 추가"
 
 > 이 태스크의 책임은 **클래스 로드 없이** 특정 패키지 하위의 `.class` 파일 이름만 나열하는 것. 애노테이션 판단은 Task 8(ASM)에서.
 
-- [ ] **Step 1: 실패 테스트**
+- [x] **Step 1: 실패 테스트**
 
 ```java
 package com.choisk.sfs.core;
@@ -868,7 +868,7 @@ class ClassPathScannerTest {
 }
 ```
 
-- [ ] **Step 2: FAIL 확인 후 구현**
+- [x] **Step 2: FAIL 확인 후 구현**
 
 ```java
 package com.choisk.sfs.core;
@@ -925,19 +925,21 @@ public final class ClassPathScanner {
 }
 ```
 
-- [ ] **Step 3: 테스트 실행**
+- [x] **Step 3: 테스트 실행**
 
 ```bash
 ./gradlew :sfs-core:test --tests ClassPathScannerTest
 ```
 예상: PASS (현재 패키지에 `Assert`와 `BeansException`이 존재하므로).
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add sfs-core/
 git commit -m "feat(sfs-core): ClassPathScanner 구현 (file URL 기반)"
 ```
+
+> **실행 기록 (2026-04-21):** 편차 없이 한 번에 PASS. 테스트 코드에서 nested record `ClassInfo` 접근을 위해 `import com.choisk.sfs.core.ClassPathScanner.ClassInfo` 추가 (플랜에선 생략돼 있었음). JAR URL 분기는 Phase 1 범위 제외하고 경로 조기 return으로 처리.
 
 ---
 
