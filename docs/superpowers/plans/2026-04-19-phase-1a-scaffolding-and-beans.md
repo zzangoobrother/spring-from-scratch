@@ -206,7 +206,7 @@ git commit -m "chore(sfs-core): 모듈 스캐폴딩 및 ASM 의존성 설정"
 - Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/package-info.java`
 - Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/PackageSmokeTest.java`
 
-- [ ] **Step 1: `sfs-beans/build.gradle.kts`**
+- [x] **Step 1: `sfs-beans/build.gradle.kts`**
 
 ```kotlin
 plugins {
@@ -218,7 +218,7 @@ dependencies {
 }
 ```
 
-- [ ] **Step 2: `package-info.java`**
+- [x] **Step 2: `package-info.java`**
 
 ```java
 /**
@@ -230,7 +230,7 @@ dependencies {
 package com.choisk.sfs.beans;
 ```
 
-- [ ] **Step 3: 스모크 테스트**
+- [x] **Step 3: 스모크 테스트**
 
 ```java
 package com.choisk.sfs.beans;
@@ -246,19 +246,21 @@ class PackageSmokeTest {
 }
 ```
 
-- [ ] **Step 4: 빌드 실행**
+- [x] **Step 4: 빌드 실행**
 
 ```bash
 ./gradlew :sfs-beans:test
 ```
 예상: PASS.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-beans/
 git commit -m "chore(sfs-beans): 모듈 스캐폴딩 (sfs-core 의존)"
 ```
+
+> **실행 기록 (2026-04-20):** 편차 없이 한 번에 PASS. Task 2에서 해결한 Gradle 9 `junit-platform-launcher` 수정이 루트 `subprojects{}`에 있어 sfs-beans로 자동 상속됨을 확인 — "편차를 상위에서 한 번 고치면 하위 모듈이 자동 혜택"의 전형.
 
 ---
 
