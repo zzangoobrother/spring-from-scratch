@@ -277,7 +277,7 @@ git commit -m "chore(sfs-beans): 모듈 스캐폴딩 (sfs-core 의존)"
 - Create: `sfs-core/src/main/java/com/choisk/sfs/core/BeansException.java`
 - Create: `sfs-core/src/test/java/com/choisk/sfs/core/BeansExceptionTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.core;
@@ -301,14 +301,14 @@ class BeansExceptionTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (컴파일 실패)**
+- [x] **Step 2: 테스트 실행 (컴파일 실패)**
 
 ```bash
 ./gradlew :sfs-core:test --tests BeansExceptionTest
 ```
 예상: FAIL (BeansException 미존재).
 
-- [ ] **Step 3: `BeansException` 구현**
+- [x] **Step 3: `BeansException` 구현**
 
 ```java
 package com.choisk.sfs.core;
@@ -337,7 +337,7 @@ public abstract sealed class BeansException extends RuntimeException
 }
 ```
 
-- [ ] **Step 4: 모든 permit 서브타입 스텁 생성**
+- [x] **Step 4: 모든 permit 서브타입 스텁 생성**
 
 각각 별도 파일:
 
@@ -432,13 +432,15 @@ public final class BeanIsNotAFactoryException extends BeansException {
 }
 ```
 
-- [ ] **Step 5: 테스트 패스 확인 & 커밋**
+- [x] **Step 5: 테스트 패스 확인 & 커밋**
 
 ```bash
 ./gradlew :sfs-core:test --tests BeansExceptionTest
 git add sfs-core/
 git commit -m "feat(sfs-core): BeansException sealed 예외 계층 추가"
 ```
+
+> **실행 기록 (2026-04-21):** Step 1 초안의 테스트가 `new BeansException("boom") {}` 익명 서브클래스를 사용했는데, Java sealed 제약으로 **"anonymous classes must not extend sealed classes"** 컴파일 에러 발생. TDD 규율상 RED 이유가 의도와 달라 테스트를 수정: permit된 구체 서브타입 `BeanDefinitionStoreException`을 통해 동일 속성(RuntimeException 상속 + cause chain)을 검증하도록 변경. `BeansException extends BeansException` 관계도 함께 검증하는 추가 assertion 포함 → 더 강한 테스트가 됨.
 
 ---
 
