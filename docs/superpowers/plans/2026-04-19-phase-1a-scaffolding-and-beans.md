@@ -950,7 +950,7 @@ git commit -m "feat(sfs-core): ClassPathScanner 구현 (file URL 기반)"
 - Create: `sfs-core/src/main/java/com/choisk/sfs/core/AnnotationMetadataReader.java`
 - Create: `sfs-core/src/test/java/com/choisk/sfs/core/AnnotationMetadataReaderTest.java`
 
-- [ ] **Step 1: `AnnotationMetadata` record 정의**
+- [x] **Step 1: `AnnotationMetadata` record 정의**
 
 ```java
 package com.choisk.sfs.core;
@@ -983,7 +983,7 @@ public record AnnotationMetadata(
 }
 ```
 
-- [ ] **Step 2: 실패 테스트 작성 (ASM 리더)**
+- [x] **Step 2: 실패 테스트 작성 (ASM 리더)**
 
 ```java
 package com.choisk.sfs.core;
@@ -1033,7 +1033,7 @@ class AnnotationMetadataReaderTest {
 }
 ```
 
-- [ ] **Step 3: FAIL 확인 후 `AnnotationMetadataReader` 구현 (ASM)**
+- [x] **Step 3: FAIL 확인 후 `AnnotationMetadataReader` 구현 (ASM)**
 
 ```java
 package com.choisk.sfs.core;
@@ -1105,18 +1105,20 @@ public final class AnnotationMetadataReader {
 }
 ```
 
-- [ ] **Step 4: 테스트 PASS 확인**
+- [x] **Step 4: 테스트 PASS 확인**
 
 ```bash
 ./gradlew :sfs-core:test --tests AnnotationMetadataReaderTest
 ```
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-core/
 git commit -m "feat(sfs-core): ASM 기반 AnnotationMetadataReader 구현"
 ```
+
+> **실행 기록 (2026-04-21):** Step 3 초안의 ASM 9.7.1이 Java 25 바이트코드(major version 69)를 파싱하지 못해 `IllegalArgumentException: Unsupported class file major version 69` 발생. ASM은 9.8부터 Java 25 지원 — `libs.versions.toml`에서 `asm = "9.7.1"` → `asm = "9.9.1"`(당시 latest)로 업그레이드. ASM9 Opcodes 상수는 그대로 호환되므로 리더 코드 수정 불필요. 플랜 Tech Stack 섹션의 "ASM 9.x" 표기는 유효 범위 내지만, 최소 9.8+가 Java 25 baseline에 필수임을 기록.
 
 ---
 
