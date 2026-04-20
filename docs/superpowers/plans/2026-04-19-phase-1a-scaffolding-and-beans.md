@@ -592,7 +592,7 @@ spring-from-scratch/
 - Create: `sfs-core/src/test/java/com/choisk/sfs/core/ClassUtilsTest.java`
 - Create: `sfs-core/src/test/java/com/choisk/sfs/core/ReflectionUtilsTest.java`
 
-- [ ] **Step 1: `ClassUtilsTest` 실패 테스트**
+- [x] **Step 1: `ClassUtilsTest` 실패 테스트**
 
 ```java
 package com.choisk.sfs.core;
@@ -626,7 +626,7 @@ class ClassUtilsTest {
 }
 ```
 
-- [ ] **Step 2: FAIL 확인 후 `ClassUtils` 구현**
+- [x] **Step 2: FAIL 확인 후 `ClassUtils` 구현**
 
 ```java
 package com.choisk.sfs.core;
@@ -673,7 +673,7 @@ public final class ClassUtils {
 }
 ```
 
-- [ ] **Step 3: `ReflectionUtilsTest` 실패 테스트**
+- [x] **Step 3: `ReflectionUtilsTest` 실패 테스트**
 
 ```java
 package com.choisk.sfs.core;
@@ -719,7 +719,7 @@ class ReflectionUtilsTest {
 }
 ```
 
-- [ ] **Step 4: FAIL 확인 후 `ReflectionUtils` 구현**
+- [x] **Step 4: FAIL 확인 후 `ReflectionUtils` 구현**
 
 ```java
 package com.choisk.sfs.core;
@@ -822,13 +822,15 @@ public final class ReflectionUtils {
 }
 ```
 
-- [ ] **Step 5: 테스트 PASS 확인 & 커밋**
+- [x] **Step 5: 테스트 PASS 확인 & 커밋**
 
 ```bash
 ./gradlew :sfs-core:test --tests ClassUtilsTest --tests ReflectionUtilsTest
 git add sfs-core/
 git commit -m "feat(sfs-core): ClassUtils 및 ReflectionUtils 추가"
 ```
+
+> **실행 기록 (2026-04-21):** 편차 없이 TDD 2사이클 모두 RED → GREEN 성공. ClassUtils.forName은 `Class.forName(name, false, cl)`의 두 번째 인자 false로 **정적 초기화를 지연**(AnnotationMetadata 스캔 시 불필요한 side effect 회피). ReflectionUtils.findMethod는 `paramTypes.length == 0`을 오버로드 메타(sfs-core Assert 유틸과 맞물림)로 취급해 "이름만으로 찾기" 기능 제공.
 
 ---
 
