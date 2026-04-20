@@ -6,7 +6,7 @@
 
 **Architecture:** 4-모듈 Gradle 프로젝트(`sfs-core`, `sfs-beans`, `sfs-context`, `sfs-samples`) 중 앞 2개만 구현. 공개 API는 Spring과 동일 시그니처, 내부는 Java 25 idioms(record, sealed interface, pattern matching switch). 3-level cache로 세터/필드 순환 참조 해결, `FactoryBean`·`BeanPostProcessor`·`BeanFactoryPostProcessor`·Aware·`InitializingBean`/`DisposableBean` 확장점 완비.
 
-**Tech Stack:** Java 25 LTS, Gradle 8.x (Kotlin DSL), ASM 9.x (애노테이션 메타데이터 스캔), JUnit 5, AssertJ 3.x.
+**Tech Stack:** Java 25 LTS, Gradle 9.4.1 (Kotlin DSL) — Java 25 toolchain 지원은 Gradle 9.1.0부터 도입됨, ASM 9.x (애노테이션 메타데이터 스캔), JUnit 5, AssertJ 3.x.
 
 **Selected Spec:** `docs/superpowers/specs/2026-04-19-ioc-container-design.md`
 
@@ -32,7 +32,7 @@ assertThat(factory.getBean("userService", UserService.class)).isNotNull();
 - Create: `build.gradle.kts`
 - Create: `gradle/libs.versions.toml`
 
-- [ ] **Step 1: `settings.gradle.kts` 작성**
+- [x] **Step 1: `settings.gradle.kts` 작성**
 
 ```kotlin
 rootProject.name = "spring-from-scratch"
@@ -45,7 +45,7 @@ include(
 // sfs-samples는 Plan 1C에서 추가
 ```
 
-- [ ] **Step 2: `gradle/libs.versions.toml` 작성 (버전 카탈로그)**
+- [x] **Step 2: `gradle/libs.versions.toml` 작성 (버전 카탈로그)**
 
 ```toml
 [versions]
@@ -61,7 +61,7 @@ asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
 asm-commons = { module = "org.ow2.asm:asm-commons", version.ref = "asm" }
 ```
 
-- [ ] **Step 3: 루트 `build.gradle.kts` 작성**
+- [x] **Step 3: 루트 `build.gradle.kts` 작성**
 
 ```kotlin
 plugins {
@@ -105,22 +105,26 @@ subprojects {
 }
 ```
 
-- [ ] **Step 4: 검증 커맨드**
+- [x] **Step 4: 검증 커맨드**
 
 ```bash
 cd ~/IdeaProjects/spring-from-scratch
 ./gradlew --version
-# 예상: Gradle 8.x 확인, Java toolchain 25로 인식
+# 예상: Gradle 9.4.1 확인, Java toolchain 25로 인식
 ```
 
-(Gradle wrapper 부재 시 `gradle wrapper --gradle-version=8.11` 먼저 실행. Homebrew에 `gradle` 없으면 `brew install gradle`)
+(Gradle wrapper 부재 시 `gradle wrapper --gradle-version=9.4.1` 먼저 실행. Homebrew에 `gradle` 없으면 `brew install gradle`. 참고: Gradle 8.x는 Java 25 toolchain 미지원이므로 9.1.0+ 필수)
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add settings.gradle.kts build.gradle.kts gradle/libs.versions.toml gradle/wrapper/ gradlew gradlew.bat
 git commit -m "chore: Gradle 멀티모듈 루트 설정 (Java 25 toolchain)"
 ```
+
+> **실행 기록 (2026-04-20):** 커밋 `ac58004` on `feat/phase1a-scaffolding`. 구현 중 두 가지 편차 발생:
+> 1. `subprojects{}` 블록에서 `the<LibrariesForLibs>()` 접근자가 동작하지 않아(컨벤션 플러그인 밖에서는 미등록) `VersionCatalogsExtension` API로 전환: `rootProject.extensions.getByType<org.gradle.api.artifacts.VersionCatalogsExtension>().named("libs").findLibrary("junit-bom").get()` 형태.
+> 2. Gradle 9 breaking change로 `settings.gradle.kts`의 `include(...)` 대상 디렉토리가 물리적으로 존재해야 하므로, wrapper 부트스트랩 전에 `mkdir -p sfs-core sfs-beans sfs-context` 먼저 실행.
 
 ---
 
@@ -131,7 +135,7 @@ git commit -m "chore: Gradle 멀티모듈 루트 설정 (Java 25 toolchain)"
 - Create: `sfs-core/src/main/java/com/choisk/sfs/core/package-info.java`
 - Create: `sfs-core/src/test/java/com/choisk/sfs/core/PackageSmokeTest.java`
 
-- [ ] **Step 1: `sfs-core/build.gradle.kts`**
+- [x] **Step 1: `sfs-core/build.gradle.kts`**
 
 ```kotlin
 plugins {
@@ -139,14 +143,19 @@ plugins {
 }
 
 dependencies {
-    api(libs.asm)
-    api(libs.asm.commons)
+    implementation(libs.asm)
+    implementation(libs.asm.commons)
 }
 ```
 
-> `api`로 노출하는 이유: `sfs-beans`가 `AnnotationMetadata`를 받을 때 ASM 타입이 메서드 시그니처에 나올 수 있어서. 내부 구현만 쓰면 `implementation`으로 내리기.
+> **의사결정 (2026-04-21):** 초기 초안은 `api(libs.asm)`이었으나 Gradle 공식 userguide "Prefer the `implementation` configuration over `api` when possible" 원칙에 맞춰 `implementation`으로 변경.
+>
+> - 근거 1: `AnnotationMetadata` record가 `String`/`List`/`Set`/`Map` 등 JDK 타입만 노출 — ASM의 `Type`, `ClassReader`가 공개 API(ABI)에 등장하지 않음.
+> - 근거 2: `implementation`이면 `sfs-beans`/`sfs-context`에서 ASM 타입을 실수로 import 시 **즉시 컴파일 에러**로 캡슐화 강제.
+> - 근거 3: ASM → ByteBuddy 같은 구현체 교체 시 소비자 모듈 재컴파일 불필요.
+> - 향후 `AnnotationMetadata`가 ASM `Type`을 노출하도록 변경되면 그때 `api`로 승격 (그때까지는 컴파일러가 위반 감지).
 
-- [ ] **Step 2: `package-info.java` (모듈 의도 문서화)**
+- [x] **Step 2: `package-info.java` (모듈 의도 문서화)**
 
 ```java
 /**
@@ -161,7 +170,7 @@ dependencies {
 package com.choisk.sfs.core;
 ```
 
-- [ ] **Step 3: 스모크 테스트 작성 (모듈이 빌드되는지 확인용)**
+- [x] **Step 3: 스모크 테스트 작성 (모듈이 빌드되는지 확인용)**
 
 ```java
 package com.choisk.sfs.core;
@@ -177,19 +186,21 @@ class PackageSmokeTest {
 }
 ```
 
-- [ ] **Step 4: 빌드 실행**
+- [x] **Step 4: 빌드 실행**
 
 ```bash
 ./gradlew :sfs-core:test
 ```
 예상: BUILD SUCCESSFUL, 1 test passed.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-core/
 git commit -m "chore(sfs-core): 모듈 스캐폴딩 및 ASM 의존성 설정"
 ```
+
+> **실행 기록 (2026-04-20):** Task 2 실행 중 Gradle 9의 breaking change로 편차 발생. JUnit Platform launcher가 명시적 `testRuntimeOnly` 의존성으로 요구됨 (Gradle 9부터 자동 포함 중단). 해결: `gradle/libs.versions.toml`에 `junit-platform-launcher` 라이브러리 추가 + 루트 `build.gradle.kts`의 `subprojects{}` dependencies에 `"testRuntimeOnly"(catalog.findLibrary("junit-platform-launcher").get())` 추가. 이 수정은 본 태스크 커밋에 함께 포함.
 
 ---
 
@@ -200,7 +211,7 @@ git commit -m "chore(sfs-core): 모듈 스캐폴딩 및 ASM 의존성 설정"
 - Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/package-info.java`
 - Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/PackageSmokeTest.java`
 
-- [ ] **Step 1: `sfs-beans/build.gradle.kts`**
+- [x] **Step 1: `sfs-beans/build.gradle.kts`**
 
 ```kotlin
 plugins {
@@ -212,7 +223,7 @@ dependencies {
 }
 ```
 
-- [ ] **Step 2: `package-info.java`**
+- [x] **Step 2: `package-info.java`**
 
 ```java
 /**
@@ -224,7 +235,7 @@ dependencies {
 package com.choisk.sfs.beans;
 ```
 
-- [ ] **Step 3: 스모크 테스트**
+- [x] **Step 3: 스모크 테스트**
 
 ```java
 package com.choisk.sfs.beans;
@@ -240,19 +251,21 @@ class PackageSmokeTest {
 }
 ```
 
-- [ ] **Step 4: 빌드 실행**
+- [x] **Step 4: 빌드 실행**
 
 ```bash
 ./gradlew :sfs-beans:test
 ```
 예상: PASS.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-beans/
 git commit -m "chore(sfs-beans): 모듈 스캐폴딩 (sfs-core 의존)"
 ```
+
+> **실행 기록 (2026-04-20):** 편차 없이 한 번에 PASS. Task 2에서 해결한 Gradle 9 `junit-platform-launcher` 수정이 루트 `subprojects{}`에 있어 sfs-beans로 자동 상속됨을 확인 — "편차를 상위에서 한 번 고치면 하위 모듈이 자동 혜택"의 전형.
 
 ---
 
@@ -264,7 +277,7 @@ git commit -m "chore(sfs-beans): 모듈 스캐폴딩 (sfs-core 의존)"
 - Create: `sfs-core/src/main/java/com/choisk/sfs/core/BeansException.java`
 - Create: `sfs-core/src/test/java/com/choisk/sfs/core/BeansExceptionTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.core;
@@ -288,14 +301,14 @@ class BeansExceptionTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (컴파일 실패)**
+- [x] **Step 2: 테스트 실행 (컴파일 실패)**
 
 ```bash
 ./gradlew :sfs-core:test --tests BeansExceptionTest
 ```
 예상: FAIL (BeansException 미존재).
 
-- [ ] **Step 3: `BeansException` 구현**
+- [x] **Step 3: `BeansException` 구현**
 
 ```java
 package com.choisk.sfs.core;
@@ -324,7 +337,7 @@ public abstract sealed class BeansException extends RuntimeException
 }
 ```
 
-- [ ] **Step 4: 모든 permit 서브타입 스텁 생성**
+- [x] **Step 4: 모든 permit 서브타입 스텁 생성**
 
 각각 별도 파일:
 
@@ -419,13 +432,15 @@ public final class BeanIsNotAFactoryException extends BeansException {
 }
 ```
 
-- [ ] **Step 5: 테스트 패스 확인 & 커밋**
+- [x] **Step 5: 테스트 패스 확인 & 커밋**
 
 ```bash
 ./gradlew :sfs-core:test --tests BeansExceptionTest
 git add sfs-core/
 git commit -m "feat(sfs-core): BeansException sealed 예외 계층 추가"
 ```
+
+> **실행 기록 (2026-04-21):** Step 1 초안의 테스트가 `new BeansException("boom") {}` 익명 서브클래스를 사용했는데, Java sealed 제약으로 **"anonymous classes must not extend sealed classes"** 컴파일 에러 발생. TDD 규율상 RED 이유가 의도와 달라 테스트를 수정: permit된 구체 서브타입 `BeanDefinitionStoreException`을 통해 동일 속성(RuntimeException 상속 + cause chain)을 검증하도록 변경. `BeansException extends BeansException` 관계도 함께 검증하는 추가 assertion 포함 → 더 강한 테스트가 됨.
 
 ---
 
@@ -435,7 +450,7 @@ git commit -m "feat(sfs-core): BeansException sealed 예외 계층 추가"
 - Create: `sfs-core/src/main/java/com/choisk/sfs/core/Assert.java`
 - Create: `sfs-core/src/test/java/com/choisk/sfs/core/AssertTest.java`
 
-- [ ] **Step 1: 실패 테스트**
+- [x] **Step 1: 실패 테스트**
 
 ```java
 package com.choisk.sfs.core;
@@ -473,13 +488,13 @@ class AssertTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 FAIL 확인**
+- [x] **Step 2: 테스트 FAIL 확인**
 
 ```bash
 ./gradlew :sfs-core:test --tests AssertTest
 ```
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 ```java
 package com.choisk.sfs.core;
@@ -523,18 +538,20 @@ public final class Assert {
 }
 ```
 
-- [ ] **Step 4: 테스트 PASS 확인**
+- [x] **Step 4: 테스트 PASS 확인**
 
 ```bash
 ./gradlew :sfs-core:test --tests AssertTest
 ```
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-core/
 git commit -m "feat(sfs-core): Assert 검증 유틸리티 추가"
 ```
+
+> **실행 기록 (2026-04-21):** 편차 없이 한 번에 PASS. 플랜 그대로 적용 (notNull/hasText/isAssignable/isTrue 정적 메서드, private 생성자로 인스턴스화 차단).
 
 ---
 
@@ -575,7 +592,7 @@ spring-from-scratch/
 - Create: `sfs-core/src/test/java/com/choisk/sfs/core/ClassUtilsTest.java`
 - Create: `sfs-core/src/test/java/com/choisk/sfs/core/ReflectionUtilsTest.java`
 
-- [ ] **Step 1: `ClassUtilsTest` 실패 테스트**
+- [x] **Step 1: `ClassUtilsTest` 실패 테스트**
 
 ```java
 package com.choisk.sfs.core;
@@ -609,7 +626,7 @@ class ClassUtilsTest {
 }
 ```
 
-- [ ] **Step 2: FAIL 확인 후 `ClassUtils` 구현**
+- [x] **Step 2: FAIL 확인 후 `ClassUtils` 구현**
 
 ```java
 package com.choisk.sfs.core;
@@ -656,7 +673,7 @@ public final class ClassUtils {
 }
 ```
 
-- [ ] **Step 3: `ReflectionUtilsTest` 실패 테스트**
+- [x] **Step 3: `ReflectionUtilsTest` 실패 테스트**
 
 ```java
 package com.choisk.sfs.core;
@@ -702,7 +719,7 @@ class ReflectionUtilsTest {
 }
 ```
 
-- [ ] **Step 4: FAIL 확인 후 `ReflectionUtils` 구현**
+- [x] **Step 4: FAIL 확인 후 `ReflectionUtils` 구현**
 
 ```java
 package com.choisk.sfs.core;
@@ -805,13 +822,15 @@ public final class ReflectionUtils {
 }
 ```
 
-- [ ] **Step 5: 테스트 PASS 확인 & 커밋**
+- [x] **Step 5: 테스트 PASS 확인 & 커밋**
 
 ```bash
 ./gradlew :sfs-core:test --tests ClassUtilsTest --tests ReflectionUtilsTest
 git add sfs-core/
 git commit -m "feat(sfs-core): ClassUtils 및 ReflectionUtils 추가"
 ```
+
+> **실행 기록 (2026-04-21):** 편차 없이 TDD 2사이클 모두 RED → GREEN 성공. ClassUtils.forName은 `Class.forName(name, false, cl)`의 두 번째 인자 false로 **정적 초기화를 지연**(AnnotationMetadata 스캔 시 불필요한 side effect 회피). ReflectionUtils.findMethod는 `paramTypes.length == 0`을 오버로드 메타(sfs-core Assert 유틸과 맞물림)로 취급해 "이름만으로 찾기" 기능 제공.
 
 ---
 
@@ -823,7 +842,7 @@ git commit -m "feat(sfs-core): ClassUtils 및 ReflectionUtils 추가"
 
 > 이 태스크의 책임은 **클래스 로드 없이** 특정 패키지 하위의 `.class` 파일 이름만 나열하는 것. 애노테이션 판단은 Task 8(ASM)에서.
 
-- [ ] **Step 1: 실패 테스트**
+- [x] **Step 1: 실패 테스트**
 
 ```java
 package com.choisk.sfs.core;
@@ -849,7 +868,7 @@ class ClassPathScannerTest {
 }
 ```
 
-- [ ] **Step 2: FAIL 확인 후 구현**
+- [x] **Step 2: FAIL 확인 후 구현**
 
 ```java
 package com.choisk.sfs.core;
@@ -906,19 +925,21 @@ public final class ClassPathScanner {
 }
 ```
 
-- [ ] **Step 3: 테스트 실행**
+- [x] **Step 3: 테스트 실행**
 
 ```bash
 ./gradlew :sfs-core:test --tests ClassPathScannerTest
 ```
 예상: PASS (현재 패키지에 `Assert`와 `BeansException`이 존재하므로).
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add sfs-core/
 git commit -m "feat(sfs-core): ClassPathScanner 구현 (file URL 기반)"
 ```
+
+> **실행 기록 (2026-04-21):** 편차 없이 한 번에 PASS. 테스트 코드에서 nested record `ClassInfo` 접근을 위해 `import com.choisk.sfs.core.ClassPathScanner.ClassInfo` 추가 (플랜에선 생략돼 있었음). JAR URL 분기는 Phase 1 범위 제외하고 경로 조기 return으로 처리.
 
 ---
 
@@ -929,7 +950,7 @@ git commit -m "feat(sfs-core): ClassPathScanner 구현 (file URL 기반)"
 - Create: `sfs-core/src/main/java/com/choisk/sfs/core/AnnotationMetadataReader.java`
 - Create: `sfs-core/src/test/java/com/choisk/sfs/core/AnnotationMetadataReaderTest.java`
 
-- [ ] **Step 1: `AnnotationMetadata` record 정의**
+- [x] **Step 1: `AnnotationMetadata` record 정의**
 
 ```java
 package com.choisk.sfs.core;
@@ -962,7 +983,7 @@ public record AnnotationMetadata(
 }
 ```
 
-- [ ] **Step 2: 실패 테스트 작성 (ASM 리더)**
+- [x] **Step 2: 실패 테스트 작성 (ASM 리더)**
 
 ```java
 package com.choisk.sfs.core;
@@ -1012,7 +1033,7 @@ class AnnotationMetadataReaderTest {
 }
 ```
 
-- [ ] **Step 3: FAIL 확인 후 `AnnotationMetadataReader` 구현 (ASM)**
+- [x] **Step 3: FAIL 확인 후 `AnnotationMetadataReader` 구현 (ASM)**
 
 ```java
 package com.choisk.sfs.core;
@@ -1084,18 +1105,20 @@ public final class AnnotationMetadataReader {
 }
 ```
 
-- [ ] **Step 4: 테스트 PASS 확인**
+- [x] **Step 4: 테스트 PASS 확인**
 
 ```bash
 ./gradlew :sfs-core:test --tests AnnotationMetadataReaderTest
 ```
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-core/
 git commit -m "feat(sfs-core): ASM 기반 AnnotationMetadataReader 구현"
 ```
+
+> **실행 기록 (2026-04-21):** Step 3 초안의 ASM 9.7.1이 Java 25 바이트코드(major version 69)를 파싱하지 못해 `IllegalArgumentException: Unsupported class file major version 69` 발생. ASM은 9.8부터 Java 25 지원 — `libs.versions.toml`에서 `asm = "9.7.1"` → `asm = "9.9.1"`(당시 latest)로 업그레이드. ASM9 Opcodes 상수는 그대로 호환되므로 리더 코드 수정 불필요. 플랜 Tech Stack 섹션의 "ASM 9.x" 표기는 유효 범위 내지만, 최소 9.8+가 Java 25 baseline에 필수임을 기록.
 
 ---
 
