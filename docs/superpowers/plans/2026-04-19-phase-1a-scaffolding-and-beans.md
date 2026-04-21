@@ -2251,7 +2251,7 @@ git commit -m "feat(sfs-beans): 2차/3차 캐시 + CacheLookup 기반 lookup/pro
 - Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistry.java`
 - Modify: `sfs-beans/src/test/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistryTest.java`
 
-- [ ] **Step 1: 실패 테스트 추가**
+- [x] **Step 1: 실패 테스트 추가**
 
 ```java
     @Test
@@ -2274,7 +2274,7 @@ git commit -m "feat(sfs-beans): 2차/3차 캐시 + CacheLookup 기반 lookup/pro
     }
 ```
 
-- [ ] **Step 2: FAIL 확인 후 `DefaultSingletonBeanRegistry`에 추가**
+- [x] **Step 2: FAIL 확인 후 `DefaultSingletonBeanRegistry`에 추가**
 
 기존 클래스에 메서드 추가 (기존 필드 아래):
 
@@ -2303,7 +2303,7 @@ git commit -m "feat(sfs-beans): 2차/3차 캐시 + CacheLookup 기반 lookup/pro
     }
 ```
 
-- [ ] **Step 3: PASS 확인 & 커밋**
+- [x] **Step 3: PASS 확인 & 커밋**
 
 ```bash
 ./gradlew :sfs-beans:test --tests DefaultSingletonBeanRegistryTest
