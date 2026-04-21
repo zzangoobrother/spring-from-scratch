@@ -1,6 +1,8 @@
 package com.choisk.sfs.beans;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 
 public final class PropertyValues {
     private final LinkedHashMap<String, PropertyValue> values = new LinkedHashMap<>();
