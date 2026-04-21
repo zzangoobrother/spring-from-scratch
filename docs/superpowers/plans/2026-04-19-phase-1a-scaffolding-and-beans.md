@@ -1982,7 +1982,7 @@ git commit -m "feat(sfs-beans): Aware/InitializingBean/DisposableBean 콜백 인
 - Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistry.java`
 - Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistryTest.java`
 
-- [ ] **Step 1: 실패 테스트**
+- [x] **Step 1: 실패 테스트**
 
 ```java
 package com.choisk.sfs.beans;
@@ -2015,7 +2015,7 @@ class DefaultSingletonBeanRegistryTest {
 }
 ```
 
-- [ ] **Step 2: FAIL 확인 후 구현 (1차 캐시만)**
+- [x] **Step 2: FAIL 확인 후 구현 (1차 캐시만)**
 
 ```java
 package com.choisk.sfs.beans;
@@ -2056,13 +2056,13 @@ public class DefaultSingletonBeanRegistry {
 }
 ```
 
-- [ ] **Step 3: 테스트 PASS 확인**
+- [x] **Step 3: 테스트 PASS 확인**
 
 ```bash
 ./gradlew :sfs-beans:test --tests DefaultSingletonBeanRegistryTest
 ```
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add sfs-beans/
