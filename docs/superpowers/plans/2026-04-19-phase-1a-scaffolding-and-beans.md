@@ -1250,7 +1250,7 @@ git commit -m "feat(sfs-beans): AutowireMode enum 추가"
 - Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/PropertyValues.java`
 - Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/PropertyValuesTest.java`
 
-- [ ] **Step 1: 실패 테스트**
+- [x] **Step 1: 실패 테스트**
 
 ```java
 package com.choisk.sfs.beans;
@@ -1278,7 +1278,7 @@ class PropertyValuesTest {
 }
 ```
 
-- [ ] **Step 2: FAIL 확인 후 구현**
+- [x] **Step 2: FAIL 확인 후 구현**
 
 ```java
 // BeanReference.java
@@ -1334,7 +1334,7 @@ public final class PropertyValues {
 }
 ```
 
-- [ ] **Step 3: PASS 확인 & 커밋**
+- [x] **Step 3: PASS 확인 & 커밋**
 
 ```bash
 ./gradlew :sfs-beans:test --tests PropertyValuesTest
