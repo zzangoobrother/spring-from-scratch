@@ -1350,7 +1350,7 @@ git commit -m "feat(sfs-beans): BeanReference, PropertyValue, PropertyValues 추
 - Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/BeanDefinition.java`
 - Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/BeanDefinitionTest.java`
 
-- [ ] **Step 1: 실패 테스트**
+- [x] **Step 1: 실패 테스트**
 
 ```java
 package com.choisk.sfs.beans;
@@ -1405,7 +1405,7 @@ class BeanDefinitionTest {
 }
 ```
 
-- [ ] **Step 2: FAIL 확인 후 구현**
+- [x] **Step 2: FAIL 확인 후 구현**
 
 ```java
 package com.choisk.sfs.beans;
@@ -1477,7 +1477,7 @@ public class BeanDefinition {
 }
 ```
 
-- [ ] **Step 3: PASS 확인 & 커밋**
+- [x] **Step 3: PASS 확인 & 커밋**
 
 ```bash
 ./gradlew :sfs-beans:test --tests BeanDefinitionTest
