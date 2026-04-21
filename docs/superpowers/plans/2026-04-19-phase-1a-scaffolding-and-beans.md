@@ -1492,7 +1492,7 @@ git commit -m "feat(sfs-beans): BeanDefinition mutable 클래스 구현"
 **Files:**
 - Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/CacheLookup.java`
 
-- [ ] **Step 1: 구현 (별도 테스트 없이 Task 20~21 통합 테스트에서 검증)**
+- [x] **Step 1: 구현 (별도 테스트 없이 Task 20~21 통합 테스트에서 검증)**
 
 ```java
 package com.choisk.sfs.beans;
@@ -1519,12 +1519,14 @@ public sealed interface CacheLookup {
 }
 ```
 
-- [ ] **Step 2: 커밋**
+- [x] **Step 2: 커밋**
 
 ```bash
 git add sfs-beans/src/main/java/com/choisk/sfs/beans/CacheLookup.java
 git commit -m "feat(sfs-beans): CacheLookup sealed interface (3-level 캐시 결과)"
 ```
+
+> **실행 기록 (2026-04-21):** Task 13의 `CacheLookup.DeferredFactory(ObjectFactory<?>)`가 Task 14의 `ObjectFactory`를 참조하므로 두 Task를 한 커밋으로 묶어 구현했다. 원안의 Task 13/14 Step 구분은 그대로 유지(체크박스 기준).
 
 ---
 
@@ -1535,7 +1537,7 @@ git commit -m "feat(sfs-beans): CacheLookup sealed interface (3-level 캐시 결
 - Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/BeanCreationContext.java`
 - Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/CreationStage.java`
 
-- [ ] **Step 1: `ObjectFactory` 구현**
+- [x] **Step 1: `ObjectFactory` 구현**
 
 ```java
 package com.choisk.sfs.beans;
@@ -1550,7 +1552,7 @@ public interface ObjectFactory<T> {
 }
 ```
 
-- [ ] **Step 2: `CreationStage` sealed**
+- [x] **Step 2: `CreationStage` sealed**
 
 ```java
 package com.choisk.sfs.beans;
@@ -1562,7 +1564,7 @@ public sealed interface CreationStage {
 }
 ```
 
-- [ ] **Step 3: `BeanCreationContext` record**
+- [x] **Step 3: `BeanCreationContext` record**
 
 ```java
 package com.choisk.sfs.beans;
@@ -1584,7 +1586,7 @@ public record BeanCreationContext(
 }
 ```
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add sfs-beans/
