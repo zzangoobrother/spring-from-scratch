@@ -2,6 +2,7 @@ package com.choisk.sfs.beans;
 
 import com.choisk.sfs.core.Assert;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -37,7 +38,7 @@ public class BeanDefinition {
     public boolean isPrimary() { return primary; }
     public String getQualifier() { return qualifier; }
     public AutowireMode getAutowireMode() { return autowireMode; }
-    public List<Object> getConstructorArgs() { return constructorArgs; }
+    public List<Object> getConstructorArgs() { return Collections.unmodifiableList(constructorArgs); }
     public PropertyValues getPropertyValues() { return propertyValues; }
     public String getInitMethodName() { return initMethodName; }
     public String getDestroyMethodName() { return destroyMethodName; }
