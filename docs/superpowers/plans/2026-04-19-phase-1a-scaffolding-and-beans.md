@@ -2077,7 +2077,7 @@ git commit -m "feat(sfs-beans): DefaultSingletonBeanRegistry 1차 캐시 구현"
 - Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistry.java`
 - Modify: `sfs-beans/src/test/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistryTest.java`
 
-- [ ] **Step 1: 실패 테스트 추가**
+- [x] **Step 1: 실패 테스트 추가**
 
 기존 `DefaultSingletonBeanRegistryTest`에 아래 테스트 **추가**:
 
@@ -2126,7 +2126,7 @@ git commit -m "feat(sfs-beans): DefaultSingletonBeanRegistry 1차 캐시 구현"
     }
 ```
 
-- [ ] **Step 2: FAIL 확인 후 `DefaultSingletonBeanRegistry`에 2차/3차 추가**
+- [x] **Step 2: FAIL 확인 후 `DefaultSingletonBeanRegistry`에 2차/3차 추가**
 
 클래스 전체 교체:
 
@@ -2228,18 +2228,20 @@ public class DefaultSingletonBeanRegistry {
 }
 ```
 
-- [ ] **Step 3: 테스트 PASS 확인**
+- [x] **Step 3: 테스트 PASS 확인**
 
 ```bash
 ./gradlew :sfs-beans:test --tests DefaultSingletonBeanRegistryTest
 ```
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add sfs-beans/
 git commit -m "feat(sfs-beans): 2차/3차 캐시 + CacheLookup 기반 lookup/promote 구현"
 ```
+
+> **실행 기록 (2026-04-21):** 플랜 원문 `factoryLevelCacheExecutesExactlyOnce` 테스트(라인 2094~2103)가 `registerSingletonFactory` 직후 `lookup`에서 `CacheLookup.EarlyReference`를 기대하지만, 같은 섹션의 `lookup` 메서드 구현(라인 2189~2190) 및 주석(2178~2180 "3차 hit 시에도 여기서는 승격하지 않음")은 `DeferredFactory`를 반환한다고 명시되어 있어 **원문 테스트와 설계 주석이 모순**이다. `lookupOrderIs_CompleteThenEarlyThenFactory` 테스트(라인 2110~2115)는 후자(`DeferredFactory`)를 검증하므로 설계 의도가 후자임이 분명. 따라서 `factoryLevelCacheExecutesExactlyOnce`를 다음 시나리오로 수정해 구현과 일관되게 만들었다: `lookup` → `DeferredFactory` → `promoteToEarlyReference` → `lookup` → `EarlyReference` → 재조회 → `EarlyReference` → `counter == 1`. "조회와 승격 분리" 계약 및 "factory 정확히 1회 실행" 불변식은 모두 그대로 검증됨. 최종 커밋: `10a109a`.
 
 ---
 
