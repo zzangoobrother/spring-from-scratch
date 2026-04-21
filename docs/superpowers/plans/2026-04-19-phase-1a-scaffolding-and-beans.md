@@ -1912,7 +1912,7 @@ git commit -m "feat(sfs-beans): BeanPostProcessor 계층 + BeanFactoryPostProces
 - Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/InitializingBean.java`
 - Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/DisposableBean.java`
 
-- [ ] **Step 1~5: 각 인터페이스 파일 생성**
+- [x] **Step 1~5: 각 인터페이스 파일 생성**
 
 ```java
 // Aware.java - 마커 인터페이스
@@ -1952,7 +1952,7 @@ public interface DisposableBean {
 }
 ```
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add sfs-beans/
