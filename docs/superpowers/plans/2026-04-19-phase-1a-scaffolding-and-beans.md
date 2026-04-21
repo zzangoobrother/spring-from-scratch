@@ -1139,7 +1139,7 @@ git commit -m "feat(sfs-core): ASM 기반 AnnotationMetadataReader 구현"
 - Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/Scope.java`
 - Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/ScopeTest.java`
 
-- [ ] **Step 1: 실패 테스트**
+- [x] **Step 1: 실패 테스트**
 
 ```java
 package com.choisk.sfs.beans;
@@ -1167,7 +1167,7 @@ class ScopeTest {
 }
 ```
 
-- [ ] **Step 2: 구현**
+- [x] **Step 2: 구현**
 
 ```java
 package com.choisk.sfs.beans;
@@ -1200,13 +1200,15 @@ public sealed interface Scope permits Scope.Singleton, Scope.Prototype {
 }
 ```
 
-- [ ] **Step 3: PASS 확인 & 커밋**
+- [x] **Step 3: PASS 확인 & 커밋**
 
 ```bash
 ./gradlew :sfs-beans:test --tests ScopeTest
 git add sfs-beans/
 git commit -m "feat(sfs-beans): Scope sealed interface (Singleton/Prototype)"
 ```
+
+> **실행 기록 (2026-04-21):** 플랜의 `Scope` 인터페이스 구현 코드에서 `String name()` 추상 메서드를 정의하고 `enum` 내에서 `@Override`하도록 했으나, Java의 `Enum.name()`이 `final`이라 오버라이드 불가 컴파일 에러 발생. 인터페이스 추상 메서드를 `scopeName()`으로 변경하여 충돌 해결 — 테스트는 `byName()`과 `INSTANCE` 동등성만 검증하므로 동작에 영향 없음.
 
 ---
 
