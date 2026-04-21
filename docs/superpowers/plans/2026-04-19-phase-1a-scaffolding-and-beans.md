@@ -2431,7 +2431,7 @@ git commit -m "feat(sfs-beans): destroySingletons 역순 실행 + 실패 복원 
 
 > `support` 하위 패키지로 구현체를 분리. 공개 API(인터페이스·메타데이터)는 `com.choisk.sfs.beans` 루트 패키지에만 둠.
 
-- [ ] **Step 1: 클래스 구현 — 추상 뼈대 + `getBean` 템플릿**
+- [x] **Step 1: 클래스 구현 — 추상 뼈대 + `getBean` 템플릿**
 
 ```java
 package com.choisk.sfs.beans.support;
@@ -2646,13 +2646,18 @@ public abstract class AbstractBeanFactory
 }
 ```
 
-- [ ] **Step 2: 컴파일 확인 & 커밋 (단독 테스트는 서브클래스 필요해서 Task 29에서 통합 검증)**
+- [x] **Step 2: 컴파일 확인 & 커밋 (단독 테스트는 서브클래스 필요해서 Task 29에서 통합 검증)**
 
 ```bash
 ./gradlew :sfs-beans:compileJava
 git add sfs-beans/
 git commit -m "feat(sfs-beans): AbstractBeanFactory 골격 + getBean 템플릿 구현"
 ```
+
+> **실행 기록 (2026-04-22):**
+> - **편차 1 (와일드카드 import 명시화)**: 플랜 원문 `import com.choisk.sfs.beans.*; import com.choisk.sfs.core.*; import java.util.*;` 를 이전 리팩토링(`DefaultSingletonBeanRegistry`, `PropertyValues`) 스타일에 맞춰 명시적 import로 교체. 기능 동일.
+> - **편차 2 (`Miss()` 문법)**: 플랜 원문 `case CacheLookup.Miss ignored -> null;` 를 `case CacheLookup.Miss() -> null;` 로 교체. `CacheLookup.java` Javadoc 예시와 일관된 record 패턴 적용. 기능 동일.
+> - 컴파일: BUILD SUCCESSFUL. `:sfs-beans:test` 회귀 없음 (기존 전체 통과). 커밋: `e11eb66`.
 
 ---
 
