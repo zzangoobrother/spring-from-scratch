@@ -11,6 +11,10 @@ public record BeanCreationContext(
         CreationStage stage,
         List<String> creationChain
 ) {
+    public BeanCreationContext {
+        creationChain = List.copyOf(creationChain);
+    }
+
     public BeanCreationContext withStage(CreationStage newStage) {
         return new BeanCreationContext(beanName, beanClass, newStage, creationChain);
     }
