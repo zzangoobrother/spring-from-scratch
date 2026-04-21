@@ -2319,7 +2319,7 @@ git commit -m "feat(sfs-beans): ThreadLocal 기반 빈 생성 추적 (순환 감
 - Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistry.java`
 - Modify: `sfs-beans/src/test/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistryTest.java`
 
-- [ ] **Step 1: 실패 테스트 추가**
+- [x] **Step 1: 실패 테스트 추가**
 
 ```java
     @Test
@@ -2356,7 +2356,7 @@ git commit -m "feat(sfs-beans): ThreadLocal 기반 빈 생성 추적 (순환 감
     }
 ```
 
-- [ ] **Step 2: FAIL 확인 후 `DefaultSingletonBeanRegistry`에 추가**
+- [x] **Step 2: FAIL 확인 후 `DefaultSingletonBeanRegistry`에 추가**
 
 ```java
     /** destroy 콜백. 등록 순서의 역순으로 실행되도록 LinkedHashMap. */
@@ -2396,7 +2396,7 @@ git commit -m "feat(sfs-beans): ThreadLocal 기반 빈 생성 추적 (순환 감
     }
 ```
 
-- [ ] **Step 3: PASS 확인 & 커밋**
+- [x] **Step 3: PASS 확인 & 커밋**
 
 ```bash
 ./gradlew :sfs-beans:test --tests DefaultSingletonBeanRegistryTest
