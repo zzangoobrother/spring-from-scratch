@@ -2,6 +2,8 @@ package com.choisk.sfs.beans;
 
 import com.choisk.sfs.core.Assert;
 import java.util.*;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class DefaultSingletonBeanRegistry {
@@ -91,5 +93,28 @@ public class DefaultSingletonBeanRegistry {
 
     public Object getSingleton(String name) {
         return singletonObjects.get(name);
+    }
+
+    /** 현재 스레드에서 생성 중인 빈 이름들 (생성자 순환 감지용). 순서 유지를 위해 LinkedHashSet. */
+    private final ThreadLocal<LinkedHashSet<String>> currentlyInCreation =
+            ThreadLocal.withInitial(LinkedHashSet::new);
+
+    public void beforeSingletonCreation(String name) {
+        if (!currentlyInCreation.get().add(name)) {
+            throw new IllegalStateException(
+                    "Bean '%s' is already being created in this thread — circular reference".formatted(name));
+        }
+    }
+
+    public void afterSingletonCreation(String name) {
+        currentlyInCreation.get().remove(name);
+    }
+
+    public boolean isCurrentlyInCreation(String name) {
+        return currentlyInCreation.get().contains(name);
+    }
+
+    public List<String> getCurrentCreationChain() {
+        return List.copyOf(currentlyInCreation.get());
     }
 }

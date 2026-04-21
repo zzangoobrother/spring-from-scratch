@@ -75,4 +75,23 @@ class DefaultSingletonBeanRegistryTest {
         var registry = new DefaultSingletonBeanRegistry();
         assertThat(registry.lookup("nope")).isInstanceOf(CacheLookup.Miss.class);
     }
+
+    @Test
+    void creationTrackingDetectsRecursion() {
+        var registry = new DefaultSingletonBeanRegistry();
+        registry.beforeSingletonCreation("a");
+        assertThat(registry.isCurrentlyInCreation("a")).isTrue();
+        registry.afterSingletonCreation("a");
+        assertThat(registry.isCurrentlyInCreation("a")).isFalse();
+    }
+
+    @Test
+    void creationChainReturnsOrdered() {
+        var registry = new DefaultSingletonBeanRegistry();
+        registry.beforeSingletonCreation("a");
+        registry.beforeSingletonCreation("b");
+        assertThat(registry.getCurrentCreationChain()).containsExactly("a", "b");
+        registry.afterSingletonCreation("b");
+        registry.afterSingletonCreation("a");
+    }
 }
