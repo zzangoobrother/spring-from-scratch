@@ -1217,7 +1217,7 @@ git commit -m "feat(sfs-beans): Scope sealed interface (Singleton/Prototype)"
 **Files:**
 - Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/AutowireMode.java`
 
-- [ ] **Step 1: 구현 (단순 enum이라 테스트는 BeanDefinition에서 간접 검증)**
+- [x] **Step 1: 구현 (단순 enum이라 테스트는 BeanDefinition에서 간접 검증)**
 
 ```java
 package com.choisk.sfs.beans;
@@ -1233,7 +1233,7 @@ public enum AutowireMode {
 }
 ```
 
-- [ ] **Step 2: 커밋**
+- [x] **Step 2: 커밋**
 
 ```bash
 git add sfs-beans/src/main/java/com/choisk/sfs/beans/AutowireMode.java
