@@ -117,4 +117,40 @@ public class DefaultSingletonBeanRegistry {
     public List<String> getCurrentCreationChain() {
         return List.copyOf(currentlyInCreation.get());
     }
+
+    /** destroy 콜백. 등록 순서의 역순으로 실행되도록 LinkedHashMap. */
+    private final LinkedHashMap<String, Runnable> disposableBeans = new LinkedHashMap<>();
+
+    public void registerDisposableBean(String name, Runnable callback) {
+        synchronized (singletonLock) {
+            disposableBeans.put(name, callback);
+        }
+    }
+
+    public void destroySingletons() {
+        String[] names;
+        synchronized (singletonLock) {
+            names = disposableBeans.keySet().toArray(new String[0]);
+        }
+        // 역순 실행 (LIFO)
+        for (int i = names.length - 1; i >= 0; i--) {
+            String name = names[i];
+            Runnable callback;
+            synchronized (singletonLock) {
+                callback = disposableBeans.remove(name);
+            }
+            if (callback == null) continue;
+            try {
+                callback.run();
+            } catch (Throwable t) {
+                // 한 개 실패가 전체 destroy를 막지 않도록 로그만 (System.err 사용 - 로깅 프레임워크 의존 회피)
+                System.err.println("[sfs-beans] Failed to destroy singleton '" + name + "': " + t);
+            }
+        }
+        synchronized (singletonLock) {
+            singletonObjects.clear();
+            earlySingletonObjects.clear();
+            singletonFactories.clear();
+        }
+    }
 }

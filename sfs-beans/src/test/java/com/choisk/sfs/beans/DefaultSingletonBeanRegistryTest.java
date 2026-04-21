@@ -94,4 +94,37 @@ class DefaultSingletonBeanRegistryTest {
         registry.afterSingletonCreation("b");
         registry.afterSingletonCreation("a");
     }
+
+    @Test
+    void destroySingletonsInvokesCallbacksInReverseOrder() {
+        var registry = new DefaultSingletonBeanRegistry();
+        var order = new java.util.ArrayList<String>();
+
+        registry.registerSingleton("first", "bean1");
+        registry.registerDisposableBean("first", () -> order.add("first"));
+        registry.registerSingleton("second", "bean2");
+        registry.registerDisposableBean("second", () -> order.add("second"));
+
+        registry.destroySingletons();
+
+        assertThat(order).containsExactly("second", "first");
+        assertThat(registry.containsSingleton("first")).isFalse();
+    }
+
+    @Test
+    void destroyContinuesOnFailure() {
+        var registry = new DefaultSingletonBeanRegistry();
+        var invoked = new java.util.ArrayList<String>();
+        registry.registerSingleton("a", "a");
+        registry.registerDisposableBean("a", () -> invoked.add("a"));
+        registry.registerSingleton("b", "b");
+        registry.registerDisposableBean("b", () -> { throw new RuntimeException("boom"); });
+        registry.registerSingleton("c", "c");
+        registry.registerDisposableBean("c", () -> invoked.add("c"));
+
+        registry.destroySingletons();
+
+        // b는 실패했지만 a와 c는 역순으로 실행됨 (c → [b 실패] → a)
+        assertThat(invoked).containsExactly("c", "a");
+    }
 }
