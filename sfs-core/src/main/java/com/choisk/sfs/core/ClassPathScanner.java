@@ -1,6 +1,8 @@
 package com.choisk.sfs.core;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -8,7 +10,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * 클래스패스에서 특정 패키지 하위 {@code .class} 파일을 나열한다.
@@ -44,20 +45,28 @@ public final class ClassPathScanner {
             // JAR 등은 Phase 1 범위 제외.
             return;
         }
-        Path dir = Paths.get(root.getPath().replace("%20", " "));
+        Path dir;
+        try {
+            dir = Paths.get(root.toURI());
+        } catch (URISyntaxException e) {
+            throw new IOException("Invalid URI: " + root, e);
+        }
         if (!Files.isDirectory(dir)) return;
         try (var stream = Files.walk(dir)) {
-            var classFiles = stream
-                    .filter(p -> p.toString().endsWith(".class"))
-                    .collect(Collectors.toList());
-            for (Path classFile : classFiles) {
-                String relative = dir.relativize(classFile).toString()
-                        .replace('/', '.').replace('\\', '.');
-                String className = basePackage + '.'
-                        + relative.substring(0, relative.length() - ".class".length());
-                byte[] bytes = Files.readAllBytes(classFile);
-                out.add(new ClassInfo(className, bytes));
-            }
+            stream.filter(p -> p.toString().endsWith(".class"))
+                    .forEach(classFile -> {
+                        String relative = dir.relativize(classFile).toString()
+                                .replace('/', '.').replace('\\', '.');
+                        String className = basePackage + '.'
+                                + relative.substring(0, relative.length() - ".class".length());
+                        try {
+                            out.add(new ClassInfo(className, Files.readAllBytes(classFile)));
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    });
+        } catch (UncheckedIOException e) {
+            throw e.getCause();
         }
     }
 }
