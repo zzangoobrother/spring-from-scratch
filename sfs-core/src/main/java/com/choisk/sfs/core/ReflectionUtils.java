@@ -2,7 +2,6 @@ package com.choisk.sfs.core;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.function.Consumer;
 
@@ -65,11 +64,7 @@ public final class ReflectionUtils {
     }
 
     public static void makeAccessible(Field field) {
-        if (!field.canAccess(null) && Modifier.isPrivate(field.getModifiers())) {
-            field.setAccessible(true);
-        } else {
-            field.setAccessible(true);
-        }
+        field.setAccessible(true);
     }
 
     public static void makeAccessible(Method method) {
