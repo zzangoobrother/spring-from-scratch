@@ -1615,7 +1615,7 @@ git commit -m "feat(sfs-beans): ObjectFactory, BeanCreationContext, CreationStag
 
 > 인터페이스는 동작이 없어 단독 테스트 의미가 작다. `DefaultListableBeanFactory` 통합 테스트(Task 29)에서 합쳐 검증.
 
-- [ ] **Step 1: `BeanFactory` 정의**
+- [x] **Step 1: `BeanFactory` 정의**
 
 ```java
 package com.choisk.sfs.beans;
@@ -1644,7 +1644,7 @@ public interface BeanFactory {
 }
 ```
 
-- [ ] **Step 2: `HierarchicalBeanFactory`**
+- [x] **Step 2: `HierarchicalBeanFactory`**
 
 ```java
 package com.choisk.sfs.beans;
@@ -1656,7 +1656,7 @@ public interface HierarchicalBeanFactory extends BeanFactory {
 }
 ```
 
-- [ ] **Step 3: `ListableBeanFactory`**
+- [x] **Step 3: `ListableBeanFactory`**
 
 ```java
 package com.choisk.sfs.beans;
@@ -1677,7 +1677,7 @@ public interface ListableBeanFactory extends BeanFactory {
 }
 ```
 
-- [ ] **Step 4: 컴파일 확인 & 커밋**
+- [x] **Step 4: 컴파일 확인 & 커밋**
 
 ```bash
 ./gradlew :sfs-beans:compileJava
