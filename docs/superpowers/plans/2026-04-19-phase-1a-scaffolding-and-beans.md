@@ -3309,7 +3309,7 @@ git commit -m "feat(sfs-beans): DefaultListableBeanFactory 구현 (Primary/Quali
 **Files:**
 - Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/integration/CircularReferenceSetterTest.java`
 
-- [ ] **Step 1: 통합 테스트 작성**
+- [x] **Step 1: 통합 테스트 작성**
 
 ```java
 package com.choisk.sfs.beans.integration;
@@ -3350,19 +3350,21 @@ class CircularReferenceSetterTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행**
+- [x] **Step 2: 테스트 실행**
 
 ```bash
 ./gradlew :sfs-beans:test --tests CircularReferenceSetterTest
 ```
 예상: PASS. 이 하나가 통과하면 **3-level cache의 핵심 기능이 증명됨**.
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add sfs-beans/
 git commit -m "test(sfs-beans): 세터 주입 순환 참조 해결 통합 테스트"
 ```
+
+> **실행 기록 (2026-04-22):** 테스트 즉시 PASS. 3-level cache 인프라(Task 24~29)가 이미 세터 순환을 해결하고 있음을 확인. 명시 import로 변환 (와일드카드 금지 규약 적용). 커밋 `304cba0`.
 
 ---
 
@@ -3371,7 +3373,7 @@ git commit -m "test(sfs-beans): 세터 주입 순환 참조 해결 통합 테스
 **Files:**
 - Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/integration/CircularReferenceConstructorTest.java`
 
-- [ ] **Step 1: 통합 테스트**
+- [x] **Step 1: 통합 테스트**
 
 ```java
 package com.choisk.sfs.beans.integration;
@@ -3402,13 +3404,15 @@ class CircularReferenceConstructorTest {
 }
 ```
 
-- [ ] **Step 2: PASS 확인 & 커밋**
+- [x] **Step 2: PASS 확인 & 커밋**
 
 ```bash
 ./gradlew :sfs-beans:test --tests CircularReferenceConstructorTest
 git add sfs-beans/
 git commit -m "test(sfs-beans): 생성자 순환 참조 예외 통합 테스트"
 ```
+
+> **실행 기록 (2026-04-22):** 테스트 즉시 PASS. `beforeSingletonCreation` ThreadLocal이 생성자 순환을 감지하여 `IllegalStateException("...circular reference")`를 던지고, 이 예외가 `BeanCreationException`으로 래핑됨. 명시 import 적용. 커밋 `10534cd`.
 
 ---
 
@@ -3418,7 +3422,7 @@ git commit -m "test(sfs-beans): 생성자 순환 참조 예외 통합 테스트"
 - Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/integration/FactoryBeanTest.java`
 - Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/integration/BeanPostProcessorOrderTest.java`
 
-- [ ] **Step 1: `FactoryBeanTest`**
+- [x] **Step 1: `FactoryBeanTest`**
 
 ```java
 package com.choisk.sfs.beans.integration;
@@ -3475,7 +3479,7 @@ class FactoryBeanTest {
 }
 ```
 
-- [ ] **Step 2: `BeanPostProcessorOrderTest`**
+- [x] **Step 2: `BeanPostProcessorOrderTest`**
 
 ```java
 package com.choisk.sfs.beans.integration;
@@ -3526,13 +3530,15 @@ class BeanPostProcessorOrderTest {
 }
 ```
 
-- [ ] **Step 3: 두 테스트 PASS 확인 & 커밋**
+- [x] **Step 3: 두 테스트 PASS 확인 & 커밋**
 
 ```bash
 ./gradlew :sfs-beans:test --tests FactoryBeanTest --tests BeanPostProcessorOrderTest
 git add sfs-beans/
 git commit -m "test(sfs-beans): FactoryBean + BeanPostProcessor 호출 순서 통합 테스트"
 ```
+
+> **실행 기록 (2026-04-22):** FactoryBeanTest 4케이스 + BeanPostProcessorOrderTest 1케이스 즉시 PASS. 명시 import 적용 (와일드카드 금지). BPP before 타입 체크에 Java 16+ pattern matching (`instanceof Widget w`) 사용. 커밋 `7d7d809`.
 
 ---
 
