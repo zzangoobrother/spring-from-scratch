@@ -2,8 +2,12 @@ package com.choisk.sfs.beans.support;
 
 import com.choisk.sfs.beans.AutowireCapableBeanFactory;
 import com.choisk.sfs.beans.BeanDefinition;
+import com.choisk.sfs.beans.BeanFactoryAware;
+import com.choisk.sfs.beans.BeanNameAware;
 import com.choisk.sfs.beans.BeanPostProcessor;
 import com.choisk.sfs.beans.BeanReference;
+import com.choisk.sfs.beans.DisposableBean;
+import com.choisk.sfs.beans.InitializingBean;
 import com.choisk.sfs.beans.InstantiationAwareBeanPostProcessor;
 import com.choisk.sfs.beans.ObjectFactory;
 import com.choisk.sfs.beans.PropertyValues;
@@ -169,10 +173,59 @@ public abstract class AbstractAutowireCapableBeanFactory
         }
     }
 
-    // --- Task 28에서 구현 ---
-    protected abstract Object initializeBean(String beanName, BeanDefinition definition, Object bean);
+    // --- Task 28: initializeBean + destroy 등록 구현 ---
+    protected Object initializeBean(String beanName, BeanDefinition definition, Object bean) {
+        // B-5 (a) Aware 콜백
+        invokeAwareCallbacks(beanName, bean);
 
-    protected abstract void registerDisposableIfNeeded(String beanName, BeanDefinition definition, Object bean);
+        // B-5 (b) BPP before
+        Object current = applyBeanPostProcessorsBeforeInitialization(bean, beanName);
+        if (current == null) return null;
+
+        // B-5 (c) InitializingBean + init-method
+        try {
+            if (current instanceof InitializingBean ib) {
+                ib.afterPropertiesSet();
+            }
+            if (definition.getInitMethodName() != null) {
+                Method m = ReflectionUtils.findMethod(current.getClass(), definition.getInitMethodName());
+                if (m == null) {
+                    throw new BeanCreationException(beanName,
+                            "Init method '%s' not found on %s".formatted(definition.getInitMethodName(), current.getClass().getName()));
+                }
+                ReflectionUtils.invokeMethod(m, current);
+            }
+        } catch (Exception e) {
+            throw new BeanCreationException(beanName, "Initialization callback failed", e);
+        }
+
+        // B-5 (d) BPP after (AOP 프록시는 여기서 - Phase 2)
+        return applyBeanPostProcessorsAfterInitialization(current, beanName);
+    }
+
+    private void invokeAwareCallbacks(String beanName, Object bean) {
+        if (bean instanceof BeanNameAware bna) bna.setBeanName(beanName);
+        if (bean instanceof BeanFactoryAware bfa) bfa.setBeanFactory(this);
+    }
+
+    protected void registerDisposableIfNeeded(String beanName, BeanDefinition definition, Object bean) {
+        if (!definition.isSingleton()) return;
+        boolean hasDisposable = bean instanceof DisposableBean;
+        boolean hasDestroyMethod = definition.getDestroyMethodName() != null;
+        if (!hasDisposable && !hasDestroyMethod) return;
+
+        registerDisposableBean(beanName, () -> {
+            try {
+                if (bean instanceof DisposableBean db) db.destroy();
+                if (definition.getDestroyMethodName() != null) {
+                    Method m = ReflectionUtils.findMethod(bean.getClass(), definition.getDestroyMethodName());
+                    if (m != null) ReflectionUtils.invokeMethod(m, bean);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Destroy failed for " + beanName, e);
+            }
+        });
+    }
 
     // --- AutowireCapableBeanFactory 수동 API ---
     @Override
