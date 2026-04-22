@@ -6,11 +6,15 @@ import com.choisk.sfs.beans.BeanPostProcessor;
 import com.choisk.sfs.beans.BeanReference;
 import com.choisk.sfs.beans.InstantiationAwareBeanPostProcessor;
 import com.choisk.sfs.beans.ObjectFactory;
+import com.choisk.sfs.beans.PropertyValues;
 import com.choisk.sfs.beans.Scope;
 import com.choisk.sfs.beans.SmartInstantiationAwareBeanPostProcessor;
 import com.choisk.sfs.core.BeanCreationException;
+import com.choisk.sfs.core.ReflectionUtils;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.List;
 
@@ -117,9 +121,55 @@ public abstract class AbstractAutowireCapableBeanFactory
         return exposed;
     }
 
-    // --- Task 27/28에서 구현 ---
-    protected abstract void populateBean(String beanName, BeanDefinition definition, Object bean);
+    // --- Task 27: populateBean 구현 ---
+    protected void populateBean(String beanName, BeanDefinition definition, Object bean) {
+        // InstantiationAwareBPP 후킹 (Plan 1B에서 @Autowired 주입이 여기에 꽂힘)
+        boolean continuePopulation = true;
+        for (BeanPostProcessor bpp : getBeanPostProcessors()) {
+            if (bpp instanceof InstantiationAwareBeanPostProcessor iabpp) {
+                if (!iabpp.postProcessAfterInstantiation(bean, beanName)) {
+                    continuePopulation = false;
+                    break;
+                }
+            }
+        }
+        if (!continuePopulation) return;
 
+        PropertyValues pvs = definition.getPropertyValues();
+        for (BeanPostProcessor bpp : getBeanPostProcessors()) {
+            if (bpp instanceof InstantiationAwareBeanPostProcessor iabpp) {
+                pvs = iabpp.postProcessProperties(pvs, bean, beanName);
+                if (pvs == null) return;
+            }
+        }
+
+        // BeanDefinition에 명시된 propertyValues를 리플렉션으로 적용
+        applyPropertyValues(beanName, bean, pvs);
+    }
+
+    private void applyPropertyValues(String beanName, Object bean, PropertyValues pvs) {
+        if (pvs == null || pvs.isEmpty()) return;
+        for (var pv : pvs.all()) {
+            Object value = pv.value() instanceof BeanReference ref
+                    ? getBean(ref.beanName())
+                    : pv.value();
+            Field field = ReflectionUtils.findField(bean.getClass(), pv.name());
+            if (field != null) {
+                ReflectionUtils.setField(field, bean, value);
+                continue;
+            }
+            String setter = "set" + Character.toUpperCase(pv.name().charAt(0)) + pv.name().substring(1);
+            Method method = ReflectionUtils.findMethod(bean.getClass(), setter, value == null ? Object.class : value.getClass());
+            if (method != null) {
+                ReflectionUtils.invokeMethod(method, bean, value);
+                continue;
+            }
+            throw new BeanCreationException(beanName,
+                    "No property '%s' found on %s".formatted(pv.name(), bean.getClass().getName()));
+        }
+    }
+
+    // --- Task 28에서 구현 ---
     protected abstract Object initializeBean(String beanName, BeanDefinition definition, Object bean);
 
     protected abstract void registerDisposableIfNeeded(String beanName, BeanDefinition definition, Object bean);
