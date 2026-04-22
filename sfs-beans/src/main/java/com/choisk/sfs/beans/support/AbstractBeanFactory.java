@@ -8,6 +8,7 @@ import com.choisk.sfs.beans.ConfigurableBeanFactory;
 import com.choisk.sfs.beans.DefaultSingletonBeanRegistry;
 import com.choisk.sfs.beans.FactoryBean;
 import com.choisk.sfs.beans.ObjectFactory;
+import com.choisk.sfs.core.Assert;
 import com.choisk.sfs.core.BeanCreationException;
 import com.choisk.sfs.core.BeanIsNotAFactoryException;
 import com.choisk.sfs.core.BeanNotOfRequiredTypeException;
@@ -16,8 +17,8 @@ import com.choisk.sfs.core.FactoryBeanNotInitializedException;
 import com.choisk.sfs.core.NoSuchBeanDefinitionException;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 /**
@@ -38,8 +39,10 @@ public abstract class AbstractBeanFactory
 
     @Override
     public <T> T getBean(String name, Class<T> requiredType) {
+        // requiredType=null 케이스는 getBean(String) 오버로드가 담당하므로 여기서는 금지.
+        Assert.notNull(requiredType, "requiredType");
         Object bean = doGetBean(name, requiredType);
-        if (requiredType != null && !requiredType.isInstance(bean)) {
+        if (!requiredType.isInstance(bean)) {
             throw new BeanNotOfRequiredTypeException(name, requiredType, bean.getClass());
         }
         return requiredType.cast(bean);
@@ -90,31 +93,11 @@ public abstract class AbstractBeanFactory
     }
 
     /**
-     * 싱글톤 캐시 조회 + 미존재 시 factory 실행 + 캐시 승격을 원자적으로.
+     * 싱글톤 생성 위임. 동시성 정합성과 2차 캐시 승격은 레지스트리에서 처리.
+     * @see DefaultSingletonBeanRegistry#getOrCreateSingleton(String, ObjectFactory)
      */
     protected Object getSingletonOrCreate(String beanName, ObjectFactory<?> factory) {
-        Object existing = getSingleton(beanName);
-        if (existing != null) return existing;
-
-        beforeSingletonCreation(beanName);
-        try {
-            Object created = factory.getObject();
-            addSingletonCommitted(beanName, created);
-            return created;
-        } finally {
-            afterSingletonCreation(beanName);
-        }
-    }
-
-    private void addSingletonCommitted(String name, Object bean) {
-        // 이미 3-level 캐시의 2차에 있을 수 있음 (조기 참조로 노출됨).
-        // 그 경우 기존 earlyReference를 신뢰하고 1차로 그대로 승격해야 동일 인스턴스 보장.
-        Object early = earlySingletonObjects.get(name);
-        if (early != null) {
-            registerSingleton(name, early);
-        } else {
-            registerSingleton(name, bean);
-        }
+        return getOrCreateSingleton(beanName, factory);
     }
 
     public String transformBeanName(String name) {
@@ -173,7 +156,12 @@ public abstract class AbstractBeanFactory
     protected abstract Object createBean(String beanName, BeanDefinition definition);
 
     private String buildNoSuchBeanMessage(String name, Class<?> requiredType) {
-        var candidates = Arrays.asList(getSingletonNames());
+        // 등록된 BeanDefinition 이름과 직접 등록된 싱글톤 이름을 모두 후보로.
+        // 미생성 빈 이름의 오타는 BeanDefinition만 알 수 있으므로 누락하면 제안이 비어버린다.
+        var candidates = new LinkedHashSet<String>();
+        Collections.addAll(candidates, getBeanDefinitionNames());
+        Collections.addAll(candidates, getSingletonNames());
+
         var similar = candidates.stream()
                 .filter(existing -> levenshtein(existing, name) <= 3)
                 .limit(3)
@@ -190,6 +178,9 @@ public abstract class AbstractBeanFactory
           .append("\n  - Check bean name spelling");
         return sb.toString();
     }
+
+    /** 등록된 모든 BeanDefinition 이름 — 후보 제안과 향후 타입 매칭에서 사용. */
+    protected abstract String[] getBeanDefinitionNames();
 
     private static int levenshtein(String a, String b) {
         int[][] dp = new int[a.length() + 1][b.length() + 1];
@@ -214,6 +205,10 @@ public abstract class AbstractBeanFactory
     @Override
     public boolean isSingleton(String name) {
         String beanName = transformBeanName(name);
+        // 직접 등록된 싱글톤(BeanDefinition 없이 registerSingleton으로 등록): 항상 싱글톤.
+        if (containsSingleton(beanName) && !containsBeanDefinition(beanName)) {
+            return true;
+        }
         BeanDefinition def = getBeanDefinition(beanName);
         return def != null && def.isSingleton();
     }
@@ -221,6 +216,10 @@ public abstract class AbstractBeanFactory
     @Override
     public boolean isPrototype(String name) {
         String beanName = transformBeanName(name);
+        // 직접 등록된 싱글톤은 prototype이 아니므로 false.
+        if (containsSingleton(beanName) && !containsBeanDefinition(beanName)) {
+            return false;
+        }
         BeanDefinition def = getBeanDefinition(beanName);
         return def != null && def.isPrototype();
     }
