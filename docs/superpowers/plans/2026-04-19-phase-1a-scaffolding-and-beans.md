@@ -3070,7 +3070,7 @@ git commit -m "feat(sfs-beans): initializeBean + destroy 등록 구현 (Aware/BP
 - ~~Modify (선결 #3): `DefaultSingletonBeanRegistry.java`~~ — 사전 처리 완료
 - ~~Modify (선결 #1, #2, #4): `AbstractBeanFactory.java`~~ — 사전 처리 완료
 
-- [ ] **Step 1: 실패 테스트**
+- [x] **Step 1: 실패 테스트**
 
 ```java
 package com.choisk.sfs.beans.support;
@@ -3148,7 +3148,7 @@ class DefaultListableBeanFactoryTest {
 }
 ```
 
-- [ ] **Step 2: FAIL 확인 후 구현**
+- [x] **Step 2: FAIL 확인 후 구현**
 
 ```java
 package com.choisk.sfs.beans.support;
@@ -3269,18 +3269,23 @@ public class DefaultListableBeanFactory
 }
 ```
 
-- [ ] **Step 3: 테스트 PASS 확인**
+- [x] **Step 3: 테스트 PASS 확인**
 
 ```bash
 ./gradlew :sfs-beans:test --tests DefaultListableBeanFactoryTest
 ```
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add sfs-beans/
 git commit -m "feat(sfs-beans): DefaultListableBeanFactory 구현 (Primary/Qualifier 해결 포함)"
 ```
+
+> **실행 기록 (2026-04-22):**
+> - **편차 1** — Plan 명세에 `containsBeanDefinition`이 `@Override protected`(AbstractBeanFactory)와 `@Override public`(ListableBeanFactory) 두 개로 중복 선언됨. Java에서 동일 시그니처의 두 `@Override`는 컴파일 에러이므로, 단일 `public @Override boolean containsBeanDefinition(String name)` 으로 통합 (부모 abstract + 인터페이스 둘 다 충족).
+> - **편차 2** — Plan 명세의 import는 와일드카드(`import com.choisk.sfs.beans.*` 등)였으나, CLAUDE.md 규약에 따라 모두 명시 import로 교체.
+> - **결과** — `DefaultListableBeanFactoryTest` 7개 PASS, `:sfs-beans:test` 전체 32개 PASS (회귀 없음). 커밋: `a582aaa`
 
 ---
 
