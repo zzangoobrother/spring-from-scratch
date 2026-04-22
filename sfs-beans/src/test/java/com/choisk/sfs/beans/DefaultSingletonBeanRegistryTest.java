@@ -1,6 +1,14 @@
 package com.choisk.sfs.beans;
 
 import org.junit.jupiter.api.Test;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DefaultSingletonBeanRegistryTest {
@@ -126,5 +134,73 @@ class DefaultSingletonBeanRegistryTest {
 
         // b는 실패했지만 a와 c는 역순으로 실행됨 (c → [b 실패] → a)
         assertThat(invoked).containsExactly("c", "a");
+    }
+
+    /**
+     * Task 24 코드리뷰 #3: 다중 스레드가 동시에 같은 빈을 요청해도
+     * factory는 정확히 한 번만 실행되고, 모든 스레드가 동일 인스턴스를 받는다.
+     * <p>{@code beforeSingletonCreation}의 ThreadLocal만으로는 막을 수 없는 케이스.
+     */
+    @Test
+    void getOrCreateSingletonExecutesFactoryExactlyOnceUnderConcurrency() throws Exception {
+        var registry = new DefaultSingletonBeanRegistry();
+        var counter = new AtomicInteger();
+        int threads = 16;
+        var startLatch = new CountDownLatch(1);
+        var doneLatch = new CountDownLatch(threads);
+        var results = new ConcurrentHashMap<Integer, Object>();
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+
+        try {
+            for (int i = 0; i < threads; i++) {
+                final int idx = i;
+                pool.submit(() -> {
+                    try {
+                        startLatch.await();
+                        Object instance = registry.getOrCreateSingleton("shared", () -> {
+                            counter.incrementAndGet();
+                            try {
+                                Thread.sleep(20); // 의도적으로 경합 윈도우 확장
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                            }
+                            return new Object();
+                        });
+                        results.put(idx, instance);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    } finally {
+                        doneLatch.countDown();
+                    }
+                });
+            }
+
+            startLatch.countDown();
+            assertThat(doneLatch.await(5, TimeUnit.SECONDS)).isTrue();
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertThat(counter).hasValue(1);
+        assertThat(results).hasSize(threads);
+        Object first = results.values().iterator().next();
+        assertThat(results.values()).allMatch(o -> o == first);
+        assertThat(registry.getSingleton("shared")).isSameAs(first);
+    }
+
+    /** getOrCreateSingleton: 이미 1차 캐시에 있으면 factory 미실행, 기존 인스턴스 반환. */
+    @Test
+    void getOrCreateSingletonReturnsCachedWithoutInvokingFactory() {
+        var registry = new DefaultSingletonBeanRegistry();
+        registry.registerSingleton("foo", "cached");
+        var counter = new AtomicInteger();
+
+        Object result = registry.getOrCreateSingleton("foo", () -> {
+            counter.incrementAndGet();
+            return "newlyMade";
+        });
+
+        assertThat(result).isEqualTo("cached");
+        assertThat(counter).hasValue(0);
     }
 }

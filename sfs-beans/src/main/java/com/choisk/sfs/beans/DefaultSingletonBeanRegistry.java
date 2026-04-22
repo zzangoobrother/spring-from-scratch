@@ -96,6 +96,45 @@ public class DefaultSingletonBeanRegistry {
         return singletonObjects.get(name);
     }
 
+    /**
+     * 1차 캐시 조회 + 미존재 시 factory 1회 실행 + 캐시 승격을 원자적으로.
+     * <p>
+     * {@link #beforeSingletonCreation}의 ThreadLocal은 <b>같은 스레드</b>의 재진입(생성자 순환)만 막는다.
+     * 서로 다른 스레드가 동시에 같은 이름을 요청하면 {@code ThreadLocal}로는 막을 수 없으므로
+     * {@code synchronized(singletonLock)} 안에서 check-then-act 시퀀스의 원자성을 보장한다.
+     * <p>
+     * 2차 캐시({@code earlySingletonObjects})에 조기 노출된 참조가 있으면 단일 인스턴스 보장을 위해
+     * 그것을 1차로 승격한다 (순환 참조 시나리오에서 동일 인스턴스가 보장되어야 하기 때문).
+     */
+    public Object getOrCreateSingleton(String name, ObjectFactory<?> factory) {
+        Assert.hasText(name, "name");
+        Assert.notNull(factory, "factory");
+
+        Object existing = singletonObjects.get(name);
+        if (existing != null) return existing;
+
+        synchronized (singletonLock) {
+            existing = singletonObjects.get(name);
+            if (existing != null) return existing;
+
+            beforeSingletonCreation(name);
+            Object created;
+            try {
+                created = factory.getObject();
+            } finally {
+                afterSingletonCreation(name);
+            }
+
+            // 2차에 조기 노출된 참조가 있으면 그것을 신뢰 (단일 인스턴스 보장)
+            Object early = earlySingletonObjects.get(name);
+            Object toStore = (early != null) ? early : created;
+            singletonObjects.put(name, toStore);
+            earlySingletonObjects.remove(name);
+            singletonFactories.remove(name);
+            return toStore;
+        }
+    }
+
     /** 현재 스레드에서 생성 중인 빈 이름들 (생성자 순환 감지용). 순서 유지를 위해 LinkedHashSet. */
     private final ThreadLocal<LinkedHashSet<String>> currentlyInCreation =
             ThreadLocal.withInitial(LinkedHashSet::new);
