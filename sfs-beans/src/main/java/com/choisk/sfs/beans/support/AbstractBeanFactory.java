@@ -6,8 +6,13 @@ import com.choisk.sfs.beans.BeanPostProcessor;
 import com.choisk.sfs.beans.CacheLookup;
 import com.choisk.sfs.beans.ConfigurableBeanFactory;
 import com.choisk.sfs.beans.DefaultSingletonBeanRegistry;
+import com.choisk.sfs.beans.FactoryBean;
 import com.choisk.sfs.beans.ObjectFactory;
+import com.choisk.sfs.core.BeanCreationException;
+import com.choisk.sfs.core.BeanIsNotAFactoryException;
 import com.choisk.sfs.core.BeanNotOfRequiredTypeException;
+import com.choisk.sfs.core.BeansException;
+import com.choisk.sfs.core.FactoryBeanNotInitializedException;
 import com.choisk.sfs.core.NoSuchBeanDefinitionException;
 
 import java.util.ArrayList;
@@ -120,9 +125,47 @@ public abstract class AbstractBeanFactory
         return name != null && name.startsWith(FACTORY_BEAN_PREFIX);
     }
 
-    /** & 접두사 처리는 Task 25에서 완성. */
+    /**
+     * FactoryBean 분기 처리.
+     * <ul>
+     *   <li>{@code &name} 조회: FactoryBean 자신을 반환</li>
+     *   <li>{@code name} 조회: FactoryBean이면 {@code getObject()} 결과(싱글톤은 캐시), 아니면 그대로</li>
+     * </ul>
+     */
     protected Object resolveFactoryBean(String beanName, Object sharedInstance, boolean isFactoryDereference) {
-        return sharedInstance;
+        // & 접두사: FactoryBean 자신을 반환
+        if (isFactoryDereference) {
+            if (!(sharedInstance instanceof FactoryBean<?>)) {
+                throw new BeanIsNotAFactoryException(beanName, sharedInstance.getClass());
+            }
+            return sharedInstance;
+        }
+
+        // 일반 조회: FactoryBean이면 getObject() 결과, 아니면 그대로
+        if (!(sharedInstance instanceof FactoryBean<?> factory)) {
+            return sharedInstance;
+        }
+
+        // FactoryBean 결과 캐시 (싱글톤 FactoryBean의 경우)
+        // 사용자 노출 이름과 충돌하지 않도록 "&__fb_obj__" 네임스페이스 사용
+        String cacheKey = "&__fb_obj__" + beanName;
+        Object cached = getSingleton(cacheKey);
+        if (cached != null) return cached;
+
+        try {
+            Object produced = factory.getObject();
+            if (produced == null) {
+                throw new FactoryBeanNotInitializedException(beanName);
+            }
+            if (factory.isSingleton()) {
+                registerSingleton(cacheKey, produced);
+            }
+            return produced;
+        } catch (BeansException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BeanCreationException(beanName, "FactoryBean.getObject() threw exception", e);
+        }
     }
 
     protected abstract BeanDefinition getBeanDefinition(String beanName);
