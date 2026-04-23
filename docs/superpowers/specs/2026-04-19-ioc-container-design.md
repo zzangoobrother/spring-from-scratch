@@ -49,7 +49,7 @@ Spring Framework의 핵심 구조를 **순수 Java 25로 직접 구현**하여, 
 | 6 | 테스트 전략 | 단위만 / 샘플만 / 이중 검증 | **이중 (JUnit 5 + 샘플 앱)** | 샘플 앱이 Spring과 교차 검증 가능 → "같은 코드가 두 컨테이너에서 동일하게 돈다"가 학습의 정점 |
 | 7 | 내부 구현 스타일 | Legacy Faithful / Modern Native / Hybrid | **Hybrid** | 공개 API는 Spring과 동일(호환성), 내부는 Java 25 idioms(record, sealed, pattern matching) 활용. 주석에 Spring 원본 매핑 |
 | 8 | `BeanDefinition` 형태 | record (immutable) / class (mutable) | **mutable class** | BeanFactoryPostProcessor가 인스턴스화 전에 definition을 수정할 수 있어야 함. Spring 철학 그대로 |
-| 9 | `@PostConstruct`/`@PreDestroy` | Jakarta / 직접 정의 | **직접 정의** | 외부 의존 제로, "Spring이 왜 자기 애노테이션 쓰다가 Jakarta로 넘어갔는지"의 맥락까지 학습 |
+| 9 | `@PostConstruct`/`@PreDestroy` | Jakarta / 직접 정의 | **직접 정의** | 외부 런타임 의존: ASM(클래스패스 스캔), byte-buddy(`@Configuration` 클래스 enhance). 그 외 의존 추가는 spec 개정을 요구한다. "Spring이 왜 자기 애노테이션 쓰다가 Jakarta로 넘어갔는지"의 맥락까지 학습 |
 | 10 | 확장점 전체 (BPP/IABPP/SIABPP/BFPP/Aware/InitializingBean·DisposableBean 6종) | Phase 1 포함 / Phase 2로 지연 | **Phase 1 포함** | 모든 후속 Phase가 여기 꽂히므로 지금 안 만들면 Phase 2 진입 시 대규모 리팩토링 필요. 특히 `SmartInstantiationAwareBeanPostProcessor`는 3-level cache의 `getEarlyBeanReference` 훅으로 Phase 2 AOP 프록시 조기 생성에 필수 |
 | 11 | "생성 중" 추적 | ThreadLocal / ScopedValue | **ThreadLocal (Phase 1), ScopedValue 옵션(Phase 3+)** | Spring과 동일 출발점 확보 후 비교 학습 |
 | 12 | 테스트 도구 | JUnit+AssertJ / +Mockito | **JUnit 5 + AssertJ (Mockito 제외)** | 컨테이너 테스트는 통합 성격이라 Mock보다 실제 빈 권장. AssertJ는 예외 메시지 검증 품질 향상 |

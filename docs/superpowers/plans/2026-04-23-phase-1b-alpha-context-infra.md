@@ -40,7 +40,7 @@ ctx.close();   // idempotent + shutdown hook 정리
 - Modify: `docs/superpowers/specs/2026-04-19-ioc-container-design.md` (line 47 부근)
 - Modify: `gradle/libs.versions.toml`
 
-- [ ] **Step 1: spec line 47 amendment**
+- [x] **Step 1: spec line 47 amendment**
 
 `docs/superpowers/specs/2026-04-19-ioc-container-design.md`의 "ASM 외 외부 의존이 없다" 문장을 다음으로 교체:
 
@@ -51,7 +51,7 @@ ctx.close();   // idempotent + shutdown hook 정리
 
 > 정확한 라인은 spec 작성 시점과 다를 수 있으므로 grep으로 "ASM 외 외부 의존" 위치를 먼저 확인 후 수정.
 
-- [ ] **Step 2: `gradle/libs.versions.toml`에 byte-buddy 추가**
+- [x] **Step 2: `gradle/libs.versions.toml`에 byte-buddy 추가**
 
 ```toml
 [versions]
@@ -70,19 +70,24 @@ asm-commons = { module = "org.ow2.asm:asm-commons", version.ref = "asm" }
 bytebuddy = { module = "net.bytebuddy:byte-buddy", version.ref = "bytebuddy" }
 ```
 
-- [ ] **Step 3: 빌드 확인 (회귀)**
+- [x] **Step 3: 빌드 확인 (회귀)**
 
 ```bash
 ./gradlew build -x test
 ```
 예상: BUILD SUCCESSFUL (catalog 추가만으로 컴파일 깨지면 안 됨).
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add docs/superpowers/specs/2026-04-19-ioc-container-design.md gradle/libs.versions.toml
 git commit -m "docs+chore: spec 의존성 정책 amendment + byte-buddy 카탈로그 등록"
 ```
+
+> **실행 기록 (2026-04-24):**
+> - Plan이 grep 패턴으로 "ASM 외 외부 의존이 없다"를 지정했으나, 실제 spec 파일(line 52)의 표현은 "외부 의존 제로"였음 (테이블 셀 근거 컬럼). 동일 라인을 grep -n "외부 의존 제로"로 확인하여 정상 수정.
+> - `gradle/libs.versions.toml`의 bytebuddy 키는 기존에 없었으므로 누락 키만 추가.
+> - `./gradlew build -x test` → BUILD SUCCESSFUL (599ms).
 
 ---
 
