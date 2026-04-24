@@ -31,6 +31,17 @@ public class DefaultSingletonBeanRegistry {
             earlySingletonObjects.remove(name);
             singletonFactories.remove(name);
         }
+        // DisposableBean을 직접 등록한 경우에도 destroy 콜백이 실행되도록 자동 등록
+        if (bean instanceof DisposableBean disposable) {
+            registerDisposableBean(name, () -> {
+                try {
+                    disposable.destroy();
+                } catch (Exception e) {
+                    // Runnable이 체크 예외를 허용하지 않아 어댑팅 — destroySingletons의 개별 실패 격리 정책과 맞물림
+                    throw new RuntimeException("DisposableBean.destroy failed for '" + name + "'", e);
+                }
+            });
+        }
     }
 
     public void registerSingletonFactory(String name, ObjectFactory<?> factory) {
