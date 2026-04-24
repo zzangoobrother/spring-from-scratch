@@ -2298,7 +2298,7 @@ git commit -m "feat(sfs-context): AnnotationConfigApplicationContext — registe
 **Files:**
 - Create: `sfs-context/src/test/java/com/choisk/sfs/context/integration/ComponentScanIntegrationTest.java`
 
-- [ ] **Step 1: 테스트 작성**
+- [x] **Step 1: 테스트 작성**
 
 ```java
 package com.choisk.sfs.context.integration;
@@ -2332,19 +2332,25 @@ class ComponentScanIntegrationTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행**
+- [x] **Step 2: 테스트 실행**
 
 ```bash
 ./gradlew :sfs-context:test --tests ComponentScanIntegrationTest
 ```
 예상: 2/2 PASS.
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add sfs-context/
 git commit -m "test(sfs-context): AnnotationConfigApplicationContext 두 진입점 End-to-end 통합 검증"
 ```
+
+> **실행 기록 (2026-04-24):**
+> - **TDD 판단:** TDD 적용 대상이나 선행 구현(Task 13/14/15/16/18) 완료로 특성화 통합 테스트 방식 — 전체 파이프라인 계약 잠금 목적. RED 단계 성립 불가.
+> - **테스트 결과:** 2건 최초 실행부터 PASS. `scanRegistersAndGetBeanWorks` (String... 진입점) + `registerEntrypointAlsoWorks` (Class<?>... 진입점) 모두 즉시 통과.
+> - **전체 테스트 수 변화:** sfs-context 27건 → 29건 (2건 추가). 전 모듈(`sfs-core`, `sfs-beans`, `sfs-context`) BUILD SUCCESSFUL.
+> - **편차 없음.** 샘플 클래스(`SimpleService`, `MetaTaggedService`, `PlainPojo`)가 test 소스(`com.choisk.sfs.context.samples.basic`)에 위치함을 확인 — Plan 기술과 동일한 패키지 경로로 정상 참조됨.
 
 ---
 
