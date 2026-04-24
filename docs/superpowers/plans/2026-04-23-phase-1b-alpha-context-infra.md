@@ -1496,7 +1496,7 @@ git commit -m "feat(sfs-context): close()/registerShutdownHook() — idempotent 
 - Create: `sfs-context/src/main/java/com/choisk/sfs/context/support/GenericApplicationContext.java`
 - Create: `sfs-context/src/test/java/com/choisk/sfs/context/support/GenericApplicationContextTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -1540,14 +1540,14 @@ class GenericApplicationContextTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (FAIL — 클래스 미존재)**
+- [x] **Step 2: 테스트 실행 (FAIL — 클래스 미존재)**
 
 ```bash
 ./gradlew :sfs-context:test --tests GenericApplicationContextTest
 ```
 예상: 컴파일 에러.
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -1599,19 +1599,26 @@ public class GenericApplicationContext extends AbstractApplicationContext {
 }
 ```
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-context:test --tests GenericApplicationContextTest
 ```
 예상: 3/3 PASS.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-context/
 git commit -m "feat(sfs-context): GenericApplicationContext — single-shot refresh + 외부 BF 주입 옵션"
 ```
+
+> **실행 기록 (2026-04-24):**
+> - TDD 적용 근거: `refreshBeanFactory()` 내 `AtomicBoolean.compareAndSet` single-shot 가드가 핵심 분기 동작 — 제외 대상 아님, TDD 필수 적용
+> - RED: `GenericApplicationContext` 클래스 미존재로 컴파일 에러 3건 (3/3 컴파일 실패)
+> - GREEN: 3/3 PASS (`registerBeanDefinitionThenRefreshSucceeds`, `refreshTwiceThrows`, `externalBeanFactoryConstructorAccepted`)
+> - sfs-context 전체 테스트 수: 12 → 15건 (전 모듈 BUILD SUCCESSFUL)
+> - 편차 없음 — Plan 코드 그대로 사용
 
 ---
 
