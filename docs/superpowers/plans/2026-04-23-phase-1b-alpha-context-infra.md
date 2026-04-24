@@ -173,7 +173,7 @@ git commit -m "chore(sfs-context): 모듈 스캐폴딩 (sfs-beans 의존, byte-b
 **Files:**
 - Create: `sfs-context/README.md`
 
-- [ ] **Step 1: README 초안 작성**
+- [x] **Step 1: README 초안 작성**
 
 ````markdown
 # sfs-context
@@ -215,7 +215,7 @@ ctx.close();                  // OK (idempotent)
 ```
 ````
 
-- [ ] **Step 2: 커밋**
+- [x] **Step 2: 커밋**
 
 ```bash
 git add sfs-context/README.md
