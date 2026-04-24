@@ -312,7 +312,7 @@ git commit -m "feat(sfs-beans): BeanDefinitionRegistry 인터페이스 신설 + 
 - Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistry.java`
 - Create: `sfs-beans/src/test/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistryDestroyTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.beans;
@@ -397,14 +397,14 @@ class DefaultSingletonBeanRegistryDestroyTest {
 
 > **참고:** `DefaultSingletonBeanRegistry`는 abstract가 아니지만 생성자가 보호되어 있지 않으므로 `new DefaultSingletonBeanRegistry() {}` 익명 서브클래스로 인스턴스화. 1A 테스트에서 동일 패턴 사용 여부를 확인하고, 1A가 다른 방식(예: 테스트 fixture 클래스)을 쓰면 그에 맞춘다.
 
-- [ ] **Step 2: 테스트 실행 (FAIL 확인)**
+- [x] **Step 2: 테스트 실행 (FAIL 확인)**
 
 ```bash
 ./gradlew :sfs-beans:test --tests DefaultSingletonBeanRegistryDestroyTest
 ```
 예상: `registerSingletonWithDisposableTriggersDestroyCallback` FAIL (log 비어있음). 나머지 3건은 PASS 가능.
 
-- [ ] **Step 3: `registerSingleton` 보강 — `DefaultSingletonBeanRegistry`**
+- [x] **Step 3: `registerSingleton` 보강 — `DefaultSingletonBeanRegistry`**
 
 기존 `registerSingleton` 본문 끝에 DisposableBean 감지 분기 추가:
 
@@ -438,19 +438,27 @@ public void registerSingleton(String name, Object bean) {
 
 > **정책 노트 (주석 금지 규칙과의 조화):** 위 `try/catch` 래핑은 `Runnable`이 체크 예외를 허용하지 않아서 강제되는 어댑팅이며, `destroySingletons`의 `catch (Throwable t)` 블록이 개별 실패를 격리하는 정책과 맞물려 있다. 이 이유가 코드만 봐서는 명확하지 않으므로 주석 한 줄은 남긴다 (CLAUDE.md "WHY가 non-obvious" 예외).
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-beans:test
 ```
 예상: 신규 4개 PASS + 1A 64개 그대로 PASS.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-beans/
 git commit -m "feat(sfs-beans): registerSingleton에 DisposableBean 자동 감지 및 destroy 콜백 등록"
 ```
+
+> **실행 기록 (2026-04-24):**
+> - 선행 조건 확인: `DisposableBean`, `registerDisposableBean`, `destroySingletons` 모두 1A에서 완성됨.
+> - 인스턴스화 패턴: 기존 `DefaultSingletonBeanRegistryTest`가 `new DefaultSingletonBeanRegistry()`로 직접 인스턴스화하므로, Plan 코드의 익명 서브클래스 패턴 대신 직접 인스턴스화로 작성.
+> - RED: 3건 FAIL (registerSingletonWithDisposableTriggersDestroyCallback, destroyIsExecutedInReverseRegistrationOrder, checkedExceptionFromDestroyIsSwallowedAndOthersStillRun), 1건 PASS.
+> - GREEN: `registerSingleton` 끝에 `instanceof DisposableBean` 분기 + `try/catch` 어댑터 추가.
+> - 전체 결과: 신규 4건 + 기존 44건 = 총 48건 PASS (Plan 예상 68건 대비 차이는 선행 Task A2-1 기록의 "65건" 시점과 일치하는 기존 편차).
+> - TDD 판단: 적용 대상 — 등록 시점 분기(instanceof 체크 + 체크 예외 래핑)가 본질적 분기 로직.
 
 ---
 
