@@ -43,8 +43,26 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
     @Override
     public abstract ConfigurableListableBeanFactory getBeanFactory();
 
-    // refresh()/close() 본문은 Task 10/12에서 구현
-    @Override public void refresh() { throw new UnsupportedOperationException("Task 10에서 구현"); }
+    @Override
+    public void refresh() {
+        synchronized (startupShutdownMonitor) {
+            prepareRefresh();                                   // 1
+            ConfigurableListableBeanFactory bf = obtainFreshBeanFactory(); // 2
+            prepareBeanFactory(bf);                             // 3
+            try {
+                postProcessBeanFactory(bf);                     // 4
+                invokeBeanFactoryPostProcessors(bf);            // 5
+                registerBeanPostProcessors(bf);                 // 6
+                finishBeanFactoryInitialization(bf);            // 7
+                finishRefresh();                                // 8
+                active = true;
+            } catch (RuntimeException ex) {
+                destroyBeans();
+                cancelRefresh(ex);
+                throw ex;
+            }
+        }
+    }
     @Override public void close() { throw new UnsupportedOperationException("Task 12에서 구현"); }
     @Override public void registerShutdownHook() { throw new UnsupportedOperationException("Task 12에서 구현"); }
 

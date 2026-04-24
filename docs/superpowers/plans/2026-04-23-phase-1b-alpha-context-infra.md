@@ -1129,7 +1129,7 @@ git commit -m "feat(sfs-context): AbstractApplicationContext 골격 + 단계 메
 - Modify: `sfs-context/src/main/java/com/choisk/sfs/context/support/AbstractApplicationContext.java`
 - Create: `sfs-context/src/test/java/com/choisk/sfs/context/support/AbstractApplicationContextTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -1197,14 +1197,14 @@ class AbstractApplicationContextTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (FAIL 확인)**
+- [x] **Step 2: 테스트 실행 (FAIL 확인)**
 
 ```bash
 ./gradlew :sfs-context:test --tests AbstractApplicationContextTest
 ```
 예상: FAIL (refresh가 UnsupportedOperationException을 던짐).
 
-- [ ] **Step 3: `refresh()` 본문 구현 — `AbstractApplicationContext.refresh()`**
+- [x] **Step 3: `refresh()` 본문 구현 — `AbstractApplicationContext.refresh()`**
 
 ```java
 @Override
@@ -1229,19 +1229,26 @@ public void refresh() {
 }
 ```
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-context:test --tests AbstractApplicationContextTest
 ```
 예상: 2/2 PASS.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-context/
 git commit -m "feat(sfs-context): refresh() 8단계 정상 흐름 + single-shot 가드"
 ```
+
+> **실행 기록 (2026-04-24):**
+> - **TDD 적용 근거:** `refresh()` 8단계 호출 순서 + single-shot 정책(2회 호출 시 `IllegalStateException`)이 본질적 동작 분기 — 테스트 없이는 순서 뒤바뀜과 가드 누락을 감지할 안전망이 없음.
+> - **RED:** 2/2 FAIL (`UnsupportedOperationException` — 예상된 이유로 실패)
+> - **GREEN:** 2/2 PASS (`refresh()` 8단계 템플릿 + `active = true` 할당 구현 후)
+> - **sfs-context 전체 테스트 수 변화:** 6건 → 8건 (기존 `PackageSmokeTest` 1건 + `StereotypeMetaTest` 5건 + 신규 `AbstractApplicationContextTest` 2건)
+> - **편차:** 없음. Plan 문서 코드 그대로 적용.
 
 ---
 
