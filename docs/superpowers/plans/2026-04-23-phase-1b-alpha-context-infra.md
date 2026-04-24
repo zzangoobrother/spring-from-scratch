@@ -1633,7 +1633,7 @@ git commit -m "feat(sfs-context): GenericApplicationContext — single-shot refr
 - Create: `sfs-context/src/main/java/com/choisk/sfs/context/support/AnnotationBeanNameGenerator.java`
 - Create: `sfs-context/src/test/java/com/choisk/sfs/context/support/AnnotationBeanNameGeneratorTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -1680,14 +1680,14 @@ class AnnotationBeanNameGeneratorTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (FAIL 확인)**
+- [x] **Step 2: 테스트 실행 (FAIL 확인)**
 
 ```bash
 ./gradlew :sfs-context:test --tests AnnotationBeanNameGeneratorTest
 ```
 예상: 컴파일 에러.
 
-- [ ] **Step 3: 인터페이스 + 구현 작성**
+- [x] **Step 3: 인터페이스 + 구현 작성**
 
 `BeanNameGenerator.java`:
 
@@ -1746,19 +1746,26 @@ public class AnnotationBeanNameGenerator implements BeanNameGenerator {
 }
 ```
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-context:test --tests AnnotationBeanNameGeneratorTest
 ```
 예상: 5/5 PASS.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-context/
 git commit -m "feat(sfs-context): BeanNameGenerator + AnnotationBeanNameGenerator (명시 value 우선, FQN→camelCase 폴백)"
 ```
+
+> **실행 기록 (2026-04-24):**
+> - **TDD 적용 근거:** 명시 value 우선 분기 (`explicitName`) + `getSimpleName()` camelCase 변환 알고리즘이 본질적 동작. 분기/알고리즘 모두 TDD 적용 대상.
+> - **RED 결과:** `AnnotationBeanNameGenerator` 클래스 미존재로 컴파일 에러 2건 발생 (FAIL 확인 완료).
+> - **GREEN 결과:** `BeanNameGenerator` 인터페이스 + `AnnotationBeanNameGenerator` 구현 신설 후 5/5 PASS.
+> - **회귀 테스트:** sfs-context 전체 테스트 15건 → 20건 (5건 추가). 전 모듈(:sfs-core, :sfs-beans, :sfs-context) BUILD SUCCESSFUL.
+> - **편차:** 없음 — Plan 코드와 동일하게 구현, 모든 Step 정상 완료.
 
 ---
 
