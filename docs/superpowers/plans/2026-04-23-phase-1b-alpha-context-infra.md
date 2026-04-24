@@ -1777,7 +1777,7 @@ git commit -m "feat(sfs-context): BeanNameGenerator + AnnotationBeanNameGenerato
 - Create: `sfs-context/src/main/java/com/choisk/sfs/context/support/AnnotatedBeanDefinitionReader.java`
 - Create: `sfs-context/src/test/java/com/choisk/sfs/context/support/AnnotatedBeanDefinitionReaderTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -1844,14 +1844,14 @@ class AnnotatedBeanDefinitionReaderTest {
 
 > **선결 조건:** 섹션 A2-1에서 `BeanDefinitionRegistry` 신설 완료. `BeanDefinition`은 1A에서 이미 `setLazyInit(boolean)`/`isLazyInit()`/`setPrimary(boolean)`/`isPrimary()`/`setScope(Scope)`을 노출하므로 추가 보강 불필요.
 
-- [ ] **Step 2: 테스트 실행 (FAIL 확인)**
+- [x] **Step 2: 테스트 실행 (FAIL 확인)**
 
 ```bash
 ./gradlew :sfs-context:test --tests AnnotatedBeanDefinitionReaderTest
 ```
 예상: 컴파일 에러.
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -1910,19 +1910,26 @@ public class AnnotatedBeanDefinitionReader {
 
 > **이름 충돌 노트:** `com.choisk.sfs.context.annotation.Scope`(애노테이션)와 `com.choisk.sfs.beans.Scope`(sealed 인터페이스) 이름이 같아 FQN을 명시. `import com.choisk.sfs.context.annotation.Scope;` 방식을 택하면 `bd.setScope(Scope.byName(...))` 호출부에서 `beans.Scope`를 FQN으로 써도 동일.
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-context:test --tests AnnotatedBeanDefinitionReaderTest
 ```
 예상: 4/4 PASS.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-context/
 git commit -m "feat(sfs-context): AnnotatedBeanDefinitionReader — @Scope/@Lazy/@Primary 추출 + 등록"
 ```
+
+> **실행 기록 (2026-04-24):**
+> - TDD 적용 근거: `@Scope`/`@Lazy`/`@Primary` 3개 추출 분기가 본질적 동작이며, `BeanDefinition` 상태 변경 경로를 단독 테스트 없이는 안전망이 없음.
+> - RED: `AnnotatedBeanDefinitionReader` 클래스 미존재로 컴파일 에러 4건 (4개 테스트 메서드 모두 동일 원인).
+> - GREEN: 4/4 PASS.
+> - sfs-context 전체 테스트 수: 20 → 24건.
+> - 편차: 없음. Plan 문서 코드 그대로 적용.
 
 ---
 
