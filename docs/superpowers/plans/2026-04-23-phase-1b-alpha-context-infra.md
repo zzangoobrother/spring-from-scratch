@@ -808,7 +808,7 @@ git commit -m "feat(sfs-context): 애노테이션 10종 정의 (@Component, @Ser
 **Files:**
 - Create: `sfs-context/src/test/java/com/choisk/sfs/context/annotation/StereotypeMetaTest.java`
 
-- [ ] **Step 1: 테스트 작성**
+- [x] **Step 1: 테스트 작성**
 
 ```java
 package com.choisk.sfs.context.annotation;
@@ -856,19 +856,24 @@ class StereotypeMetaTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (PASS 확인)**
+- [x] **Step 2: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-context:test --tests StereotypeMetaTest
 ```
 예상: 5/5 PASS.
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add sfs-context/
 git commit -m "test(sfs-context): @Service/@Repository/@Controller/@Configuration 메타 인식 검증"
 ```
+
+> **실행 기록 (2026-04-24):**
+> - TDD 적용 판단: TDD 적용 대상(메타-인식 동작이 본질)이나 Task 4(`AnnotationUtils` 구현)와 Task 5(애노테이션 10종 정의)가 선행 완료된 상태라 RED 단계가 성립하지 않음. 특성화 테스트(characterization test / regression safety net) 방식으로 진행 — "테스트 작성 → 즉시 PASS 확인 → 커밋" 순서.
+> - Step 2 결과: `./gradlew :sfs-context:test --tests StereotypeMetaTest` → 5/5 최초 실행부터 PASS (편차 없음).
+> - sfs-context 전체 회귀 확인: `./gradlew :sfs-context:test` → 6건 PASS (PackageSmokeTest 1건 + StereotypeMetaTest 5건). 1 → 6으로 증가.
 
 ---
 
