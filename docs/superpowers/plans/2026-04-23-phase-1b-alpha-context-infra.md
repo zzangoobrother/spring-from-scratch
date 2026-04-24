@@ -1005,7 +1005,7 @@ git commit -m "feat(sfs-context): ConfigurableApplicationContext (refresh/close/
 **Files:**
 - Create: `sfs-context/src/main/java/com/choisk/sfs/context/support/AbstractApplicationContext.java`
 
-- [ ] **Step 1: 골격 작성**
+- [x] **Step 1: 골격 작성**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -1098,19 +1098,26 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
 
 > **선결 조건 확인:** `BeanFactory`는 1A에서 `sfs-beans`에 정의되어 있다. `ConfigurableListableBeanFactory`가 `preInstantiateSingletons()`/`destroySingletons()`를 노출하는지 확인. 없으면 sfs-beans에 추가하고 별도 커밋(`feat(sfs-beans): ConfigurableListableBeanFactory에 preInstantiateSingletons/destroySingletons 노출`)으로 분리.
 
-- [ ] **Step 2: 컴파일 확인**
+- [x] **Step 2: 컴파일 확인**
 
 ```bash
 ./gradlew :sfs-context:compileJava
 ```
 예상: BUILD SUCCESSFUL.
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add sfs-context/
 git commit -m "feat(sfs-context): AbstractApplicationContext 골격 + 단계 메서드 시그니처"
 ```
+
+> **실행 기록 (2026-04-24):**
+> - **TDD 제외 근거:** 추상 골격 클래스 + 시그니처 선언 전용. CLAUDE.md "TDD 적용 가이드"의 "추상 골격 클래스" 범주 ("서브클래스 없이 인스턴스화 불가, 통합 테스트로 간접 검증"). 동작별 TDD는 Task 10(`refresh()`) / Task 12(`close()` + shutdown hook)에서 적용 예정.
+> - **선결 조건 확인:** `ConfigurableListableBeanFactory`에 `preInstantiateSingletons()` 직접 선언 (라인 6) 확인. `ConfigurableBeanFactory`를 상속하므로 `destroySingletons()` 전이 노출 확인 (라인 11). sfs-beans 추가 수정 불필요 — Plan 문서의 "없으면 sfs-beans에 추가" 분기 발생하지 않음.
+> - **컴파일 결과:** BUILD SUCCESSFUL (`this-escape` 경고 1건 — `System.identityHashCode(this)` Plan 문서 의도 설계로 허용).
+> - **회귀 테스트 결과:** sfs-core / sfs-beans / sfs-context 전 모듈 BUILD SUCCESSFUL. sfs-context 기존 테스트 변화 없음 (전체 PASS).
+> - **편차:** 없음. Plan 문서 코드 그대로 적용.
 
 ---
 
