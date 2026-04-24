@@ -935,7 +935,7 @@ git commit -m "feat(sfs-context): ApplicationContext 인터페이스 (BeanFactor
 **Files:**
 - Create: `sfs-context/src/main/java/com/choisk/sfs/context/ConfigurableApplicationContext.java`
 
-- [ ] **Step 1: 인터페이스 작성**
+- [x] **Step 1: 인터페이스 작성**
 
 ```java
 package com.choisk.sfs.context;
@@ -974,19 +974,25 @@ public interface ConfigurableApplicationContext extends ApplicationContext, Auto
 
 > **참고:** `ConfigurableListableBeanFactory`는 Plan 1A에서 `sfs-beans`에 정의되어 있어야 한다. 누락된 경우 본 Task 진행을 멈추고 sfs-beans에 추가 후 진행.
 
-- [ ] **Step 2: 컴파일 확인**
+- [x] **Step 2: 컴파일 확인**
 
 ```bash
 ./gradlew :sfs-context:compileJava
 ```
 예상: BUILD SUCCESSFUL.
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add sfs-context/
 git commit -m "feat(sfs-context): ConfigurableApplicationContext (refresh/close/shutdown hook)"
 ```
+
+> **실행 기록 (2026-04-24):**
+> - TDD 제외 근거: 메서드 선언(시그니처)만 존재하는 인터페이스 — 동작(분기/상태/알고리즘) 없음. Task 9~12의 `AbstractApplicationContext` 구현 시 간접 검증.
+> - 컴파일 결과: `./gradlew :sfs-context:compileJava` → BUILD SUCCESSFUL (392ms)
+> - 회귀 테스트 결과: `./gradlew :sfs-core:test :sfs-beans:test :sfs-context:test` → BUILD SUCCESSFUL (변화 없음, 기존 테스트 모두 UP-TO-DATE/PASS 유지)
+> - 편차: 없음. Plan 문서 코드와 동일하게 작성.
 
 ---
 
