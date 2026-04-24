@@ -1350,7 +1350,7 @@ git commit -m "test(sfs-context): refresh() 실패 시 destroyBeans + cancelRefr
 - Modify: `sfs-context/src/main/java/com/choisk/sfs/context/support/AbstractApplicationContext.java`
 - Create: `sfs-context/src/test/java/com/choisk/sfs/context/integration/CloseAndShutdownHookTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.context.integration;
@@ -1414,14 +1414,14 @@ class CloseAndShutdownHookTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (FAIL 확인)**
+- [x] **Step 2: 테스트 실행 (FAIL 확인)**
 
 ```bash
 ./gradlew :sfs-context:test --tests CloseAndShutdownHookTest
 ```
 예상: FAIL (close()/registerShutdownHook이 UnsupportedOperationException).
 
-- [ ] **Step 3: `close()` + `registerShutdownHook()` 구현 — `AbstractApplicationContext`**
+- [x] **Step 3: `close()` + `registerShutdownHook()` 구현 — `AbstractApplicationContext`**
 
 ```java
 @Override
@@ -1463,19 +1463,26 @@ private void doClose() {
 }
 ```
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-context:test --tests CloseAndShutdownHookTest
 ```
 예상: 3/3 PASS.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-context/
 git commit -m "feat(sfs-context): close()/registerShutdownHook() — idempotent + JVM 진행 중 예외 무시"
 ```
+
+> **실행 기록 (2026-04-24):**
+> - TDD 적용 근거: `close()`의 idempotent 동작(이미 닫힌 컨텍스트에 재호출)과 JVM shutdown 진행 중 `IllegalStateException` 예외 처리가 본질적 분기 — 자동 안전망이 없으므로 TDD 필수.
+> - RED: 3/3 FAIL — 원인: `UnsupportedOperationException` (Task 9 placeholder, 예상 일치)
+> - GREEN: 3/3 PASS — `close()`, `closeWithoutRefreshIsNoOp`, `registerShutdownHookIsIdempotent` 모두 통과
+> - sfs-context 전체 테스트: 9 → 12건 (3건 추가)
+> - 편차 없음 — Plan 문서 코드 그대로 적용
 
 ---
 

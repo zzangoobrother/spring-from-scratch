@@ -63,8 +63,43 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
             }
         }
     }
-    @Override public void close() { throw new UnsupportedOperationException("Task 12에서 구현"); }
-    @Override public void registerShutdownHook() { throw new UnsupportedOperationException("Task 12에서 구현"); }
+    @Override
+    public void close() {
+        synchronized (startupShutdownMonitor) {
+            if (!active) {
+                // refresh 안 했거나 이미 close 호출됨 — idempotent
+                if (shutdownHook != null) {
+                    tryRemoveShutdownHook();
+                }
+                return;
+            }
+            doClose();
+            if (shutdownHook != null) {
+                tryRemoveShutdownHook();
+            }
+        }
+    }
+
+    @Override
+    public void registerShutdownHook() {
+        if (shutdownHook != null) return;  // idempotent
+        shutdownHook = new Thread(this::doClose, "sfs-context-shutdown");
+        Runtime.getRuntime().addShutdownHook(shutdownHook);
+    }
+
+    private void tryRemoveShutdownHook() {
+        try {
+            Runtime.getRuntime().removeShutdownHook(shutdownHook);
+        } catch (IllegalStateException ignore) {
+            // JVM shutdown 진행 중이면 정상 — 무시
+        }
+        shutdownHook = null;
+    }
+
+    private void doClose() {
+        active = false;
+        destroyBeans();
+    }
 
     // BeanFactory 위임 (1A 인터페이스 만족용 — 실제 구현은 getBeanFactory() 위임)
     @Override public Object getBean(String name) { return getBeanFactory().getBean(name); }
