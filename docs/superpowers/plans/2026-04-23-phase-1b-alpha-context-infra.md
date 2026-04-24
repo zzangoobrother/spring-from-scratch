@@ -1946,7 +1946,7 @@ git commit -m "feat(sfs-context): AnnotatedBeanDefinitionReader — @Scope/@Lazy
 - Create: `sfs-context/src/test/java/com/choisk/sfs/context/samples/basic/MetaTaggedService.java`
 - Create: `sfs-context/src/test/java/com/choisk/sfs/context/samples/basic/PlainPojo.java`
 
-- [ ] **Step 1: 샘플 클래스 작성**
+- [x] **Step 1: 샘플 클래스 작성**
 
 `SimpleService.java`:
 ```java
@@ -1975,7 +1975,7 @@ package com.choisk.sfs.context.samples.basic;
 public class PlainPojo {}  // 애노테이션 없음 — 스캐너가 등록하면 안 됨
 ```
 
-- [ ] **Step 2: 실패 테스트 작성**
+- [x] **Step 2: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -2011,14 +2011,14 @@ class ClassPathBeanDefinitionScannerTest {
 
 > **선결 조건 확인:** `sfs-core`의 `ClassPathScanner.scan(String basePackage)`가 `Iterable<Class<?>>` 또는 그에 상응하는 형태로 클래스를 반환해야 한다. Plan 1A에서 정의된 시그니처를 그대로 사용.
 
-- [ ] **Step 3: 테스트 실행 (FAIL — 스캐너 미존재)**
+- [x] **Step 3: 테스트 실행 (FAIL — 스캐너 미존재)**
 
 ```bash
 ./gradlew :sfs-context:test --tests ClassPathBeanDefinitionScannerTest
 ```
 예상: 컴파일 에러.
 
-- [ ] **Step 4: 구현**
+- [x] **Step 4: 구현**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -2084,19 +2084,26 @@ public class ClassPathBeanDefinitionScanner {
 }
 ```
 
-- [ ] **Step 5: 테스트 실행 (PASS 확인)**
+- [x] **Step 5: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-context:test --tests ClassPathBeanDefinitionScannerTest
 ```
 예상: 2/2 PASS.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add sfs-context/
 git commit -m "feat(sfs-context): ClassPathBeanDefinitionScanner — 메타 인식 패키지 스캔 + scope/lazy/primary 적용"
 ```
+
+> **실행 기록 (2026-04-24):**
+> - **TDD 적용 근거:** 패키지 스캔 + `@Component` 메타-인식 필터(isInterface/isAnnotation 제외, AnnotationUtils.isAnnotated 분기)가 본질적 분기이므로 TDD 필수 적용 대상.
+> - **RED:** 컴파일 에러 2건 — `ClassPathBeanDefinitionScanner` 클래스 미존재.
+> - **GREEN:** 2/2 PASS (`scanRegistersComponentsAndMetaAnnotated`, `scanReturnsZeroForEmptyPackage`).
+> - **sfs-context 전체 테스트 수:** 24 → 26건.
+> - **편차 상세:** Plan 라인 2056의 `ClassPathScanner.scan(pkg)` static Iterable 전제가 실제 인스턴스 메서드 `List<ClassInfo>` 반환과 불일치. `new ClassPathScanner()` 인스턴스 필드로 보유 + `Class.forName(info.className())`으로 로드하는 adapter 추가. `ClassNotFoundException`/`NoClassDefFoundError`는 skip 처리. `scanReturnsZeroForEmptyPackage` 테스트에서 존재하지 않는 패키지에 대해 `ClassPathScanner.scan()`이 `getResources()`로 빈 Enumeration을 반환하므로 추가 예외 처리 없이 빈 리스트가 정상 반환됨 — 부가 편차 없음.
 
 ---
 
