@@ -1259,7 +1259,7 @@ git commit -m "feat(sfs-context): refresh() 8단계 정상 흐름 + single-shot 
 **Files:**
 - Create: `sfs-context/src/test/java/com/choisk/sfs/context/integration/RefreshFailureCleanupTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.context.integration;
@@ -1320,19 +1320,25 @@ class RefreshFailureCleanupTest {
 
 > **선결 조건:** 섹션 A2-2에서 `registerSingleton`이 `DisposableBean`을 자동 감지해 `registerDisposableBean` 콜백을 등록하도록 보강 완료. 본 Task는 그 동작을 컨텍스트 레벨에서 통합 검증.
 
-- [ ] **Step 2: 테스트 실행**
+- [x] **Step 2: 테스트 실행**
 
 ```bash
 ./gradlew :sfs-context:test --tests RefreshFailureCleanupTest
 ```
 예상: PASS (Task 10에서 try-catch + destroyBeans 이미 구현됨). 만약 destroy가 호출 안되면 sfs-beans `registerSingleton` 측 보강 필요.
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add sfs-context/
 git commit -m "test(sfs-context): refresh() 실패 시 destroyBeans + cancelRefresh 자동 호출 검증"
 ```
+
+> **실행 기록 (2026-04-24):**
+> - **TDD 적용 판단:** TDD 적용 대상이나 선행 구현(Task A2-2 `registerSingleton` DisposableBean 자동 감지 + Task 10 refresh try-catch) 완료로 RED 단계 성립 불가 — 특성화 통합 테스트 방식으로 진행. "테스트 작성 → 즉시 PASS 확인 → 커밋" 순서로 처리.
+> - **테스트 결과:** 1건 최초 실행부터 PASS (`refreshFailureTriggersDestroyBeans`). 원본 예외 전파(`boom in BFPP`), `log.containsExactly("destroyed")`, `ctx.isActive() == false` 모두 통과.
+> - **sfs-context 전체 테스트 수 변화:** 8건 → 9건 (`RefreshFailureCleanupTest` 1건 신규 추가, XML 집계: 5+1+1+2=9).
+> - **편차:** Plan 라인 1267의 사용되지 않는 `BeanDefinition` import 제거 1건 — 실제 테스트 본문에서 미사용이므로 IDE 경고 방지 및 CLAUDE.md 명시 import 원칙 준수 차원에서 제거.
 
 ---
 
