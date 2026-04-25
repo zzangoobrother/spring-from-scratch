@@ -567,7 +567,7 @@ git commit -m "feat(sfs-beans): doCreateBean factoryMethod 분기 + 매개변수
 - Create: `sfs-context/src/main/java/com/choisk/sfs/context/annotation/PostConstruct.java`
 - Create: `sfs-context/src/main/java/com/choisk/sfs/context/annotation/PreDestroy.java`
 
-- [ ] **Step 1: 구현**
+- [x] **Step 1: 구현**
 
 ```java
 // Autowired.java
@@ -613,14 +613,14 @@ import java.lang.annotation.Target;
 public @interface PreDestroy {}
 ```
 
-- [ ] **Step 2: 컴파일 + 회귀**
+- [x] **Step 2: 컴파일 + 회귀**
 
 ```bash
 ./gradlew :sfs-context:compileJava :sfs-context:test
 ```
 예상: PASS.
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add sfs-context/src/main/java/com/choisk/sfs/context/annotation/Autowired.java \
@@ -628,6 +628,8 @@ git add sfs-context/src/main/java/com/choisk/sfs/context/annotation/Autowired.ja
         sfs-context/src/main/java/com/choisk/sfs/context/annotation/PreDestroy.java
 git commit -m "feat(sfs-context): @Autowired/@PostConstruct/@PreDestroy 애노테이션 정의"
 ```
+
+> **실행 기록 (2026-04-25):** 3개 애노테이션 생성 + sfs-context 31 PASS / 0 FAIL 회귀 유지 (1B-α 시점과 동일 카운트). `Autowired#required`에 비-자명 동작(false → null 주입)을 한 줄 Javadoc으로 명시. 메인 스레드에서 직접 처리(D1은 trivial하여 Sonnet 위임 오버헤드가 작업보다 큼).
 
 ---
 
