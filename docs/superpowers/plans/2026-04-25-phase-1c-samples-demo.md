@@ -274,7 +274,7 @@ git commit -m "feat(sfs-samples): IdGenerator — Clock 의존 ID 발급 유틸 
 - Create: `sfs-samples/src/main/java/com/choisk/sfs/samples/todo/repository/UserRepository.java`
 - Create: `sfs-samples/src/main/java/com/choisk/sfs/samples/todo/repository/TodoRepository.java`
 
-- [ ] **Step 1: `AppConfig.java` 작성**
+- [x] **Step 1: `AppConfig.java` 작성**
 
 ```java
 // sfs-samples/src/main/java/com/choisk/sfs/samples/todo/config/AppConfig.java
@@ -303,7 +303,7 @@ public class AppConfig {
 
 > **시연 요점:** `systemClock()`은 *no-arg* `@Bean` (가장 단순한 형태), `idGenerator(Clock clock)`은 *매개변수 자동 주입*을 받는 `@Bean` (Phase 1B-β Task C1의 핵심 시연). 컨테이너가 `Clock` 빈을 찾아 인자로 채워준다.
 
-- [ ] **Step 2: `UserRepository.java` 작성**
+- [x] **Step 2: `UserRepository.java` 작성**
 
 ```java
 // sfs-samples/src/main/java/com/choisk/sfs/samples/todo/repository/UserRepository.java
@@ -341,7 +341,7 @@ public class UserRepository {
 
 > **시연 요점:** `@Repository`는 1A에서 정의된 메타애노테이션 (`@Component` 메타). 컴포넌트 스캐너가 `@Component` 보유로 인식한다. UserRepository는 *자체* `AtomicLong`으로 ID 발급 (TodoRepository와 다른 패턴 — 두 가지 ID 발급 패턴을 학습용으로 보여줌).
 
-- [ ] **Step 3: `TodoRepository.java` 작성**
+- [x] **Step 3: `TodoRepository.java` 작성**
 
 ```java
 // sfs-samples/src/main/java/com/choisk/sfs/samples/todo/repository/TodoRepository.java
@@ -385,7 +385,7 @@ public class TodoRepository {
 
 > **시연 요점:** `@Autowired IdGenerator idGen` 필드 주입 (F1 시연). `findByOwnerId`가 id 순서로 정렬 — 통합 테스트 출력에서 `[id=1] 장보기, [id=2] 운동` 순서를 보장.
 
-- [ ] **Step 4: 컴파일 + 회귀 검증**
+- [x] **Step 4: 컴파일 + 회귀 검증**
 
 ```bash
 ./gradlew :sfs-samples:compileJava :sfs-samples:test
@@ -394,7 +394,7 @@ public class TodoRepository {
 
 예상: BUILD SUCCESSFUL. IdGeneratorTest 2 PASS 유지. 회귀 변동 없음.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-samples/src/main/java/com/choisk/sfs/samples/todo/config/AppConfig.java \
