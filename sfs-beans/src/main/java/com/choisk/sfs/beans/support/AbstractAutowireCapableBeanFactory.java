@@ -6,6 +6,7 @@ import com.choisk.sfs.beans.BeanFactoryAware;
 import com.choisk.sfs.beans.BeanNameAware;
 import com.choisk.sfs.beans.BeanPostProcessor;
 import com.choisk.sfs.beans.BeanReference;
+import com.choisk.sfs.beans.DependencyDescriptor;
 import com.choisk.sfs.beans.DisposableBean;
 import com.choisk.sfs.beans.InitializingBean;
 import com.choisk.sfs.beans.InstantiationAwareBeanPostProcessor;
@@ -52,6 +53,11 @@ public abstract class AbstractAutowireCapableBeanFactory
     }
 
     protected Object doCreateBean(String beanName, BeanDefinition definition) {
+        // factoryMethod 분기 — BD에 factoryMethodName이 있으면 생성자 대신 팩토리 메서드로 인스턴스화
+        if (definition.getFactoryMethodName() != null) {
+            return createBeanViaFactoryMethod(beanName, definition);
+        }
+
         // B-2: 인스턴스화
         Object bean = instantiateBean(beanName, definition);
 
@@ -67,10 +73,45 @@ public abstract class AbstractAutowireCapableBeanFactory
         // B-5: 초기화
         Object exposed = initializeBean(beanName, definition, bean);
 
-        // B-7: destroy 등록 (Task 28에서 확장)
+        // B-7: destroy 등록
         registerDisposableIfNeeded(beanName, definition, exposed);
 
         return exposed;
+    }
+
+    /**
+     * factoryMethod 경로로 빈을 생성한다.
+     * <p>BD의 factoryBeanName으로 팩토리 빈을 가져온 후, factoryMethodName과 일치하는 메서드를
+     * 찾아 인자를 {@link DefaultListableBeanFactory#resolveDependency}로 해석하여 호출한다.
+     * 동일 이름 오버로드는 하나만 있다고 가정 (학습용 단순화).
+     */
+    private Object createBeanViaFactoryMethod(String beanName, BeanDefinition definition) {
+        Object factoryBean = getBean(definition.getFactoryBeanName());
+        // ReflectionUtils.findMethod은 상속 계층까지 탐색 (부모 @Configuration 클래스에 정의된 @Bean도 처리 가능)
+        Method m = ReflectionUtils.findMethod(factoryBean.getClass(), definition.getFactoryMethodName());
+        if (m == null) {
+            throw new BeanCreationException(beanName,
+                    "factoryMethod not found: " + definition.getFactoryMethodName());
+        }
+        Object[] args = resolveFactoryMethodArguments(m, beanName);
+        return ReflectionUtils.invokeMethod(m, factoryBean, args);
+    }
+
+    /**
+     * 메서드 매개변수마다 {@link DefaultListableBeanFactory#resolveDependency}를 호출하여
+     * 인자 배열을 구성한다.
+     * <p>dependency name은 {@code paramType.getSimpleName()} 사용 — {@code -parameters} 컴파일 옵션 의존 회피.
+     */
+    private Object[] resolveFactoryMethodArguments(Method m, String requestingBeanName) {
+        Class<?>[] paramTypes = m.getParameterTypes();
+        Object[] args = new Object[paramTypes.length];
+        for (int i = 0; i < paramTypes.length; i++) {
+            DependencyDescriptor desc = new DependencyDescriptor(
+                    paramTypes[i], true, paramTypes[i].getSimpleName());
+            // AbstractAutowireCapableBeanFactory의 구체 구현체는 DefaultListableBeanFactory이므로 캐스팅
+            args[i] = ((DefaultListableBeanFactory) this).resolveDependency(desc, requestingBeanName);
+        }
+        return args;
     }
 
     protected Object instantiateBean(String beanName, BeanDefinition definition) {
@@ -125,9 +166,9 @@ public abstract class AbstractAutowireCapableBeanFactory
         return exposed;
     }
 
-    // --- Task 27: populateBean 구현 ---
+    // ── 프로퍼티 주입 ────
     protected void populateBean(String beanName, BeanDefinition definition, Object bean) {
-        // InstantiationAwareBPP 후킹 (Plan 1B에서 @Autowired 주입이 여기에 꽂힘)
+        // InstantiationAwareBPP가 @Autowired 등 프로퍼티 주입을 여기에 꽂음
         boolean continuePopulation = true;
         for (BeanPostProcessor bpp : getBeanPostProcessors()) {
             if (bpp instanceof InstantiationAwareBeanPostProcessor iabpp) {
@@ -173,7 +214,7 @@ public abstract class AbstractAutowireCapableBeanFactory
         }
     }
 
-    // --- Task 28: initializeBean + destroy 등록 구현 ---
+    // ── 초기화 + destroy 등록 ────
     protected Object initializeBean(String beanName, BeanDefinition definition, Object bean) {
         // B-5 (a) Aware 콜백
         invokeAwareCallbacks(beanName, bean);

@@ -2,6 +2,7 @@ package com.choisk.sfs.beans.support;
 
 import com.choisk.sfs.beans.BeanDefinition;
 import com.choisk.sfs.beans.ConfigurableListableBeanFactory;
+import com.choisk.sfs.beans.DependencyDescriptor;
 import com.choisk.sfs.core.Assert;
 import com.choisk.sfs.core.NoSuchBeanDefinitionException;
 import com.choisk.sfs.core.NoUniqueBeanDefinitionException;
@@ -134,6 +135,66 @@ public class DefaultListableBeanFactory
                 "Multiple beans of type " + type.getName() + ": " + Arrays.asList(matches)
                         + "\nPossible solutions: annotate one with @Primary or inject by name",
                 Arrays.asList(matches));
+    }
+
+    // ── 의존성 해석 ──────────────────────────────────────────────────────────
+
+    /**
+     * 타입 기반 의존성 해석 단순판.
+     * <p>
+     * 4분기:
+     * <ol>
+     *   <li>단일 매칭 → 해당 빈 반환</li>
+     *   <li>0매칭 + required=false → null</li>
+     *   <li>0매칭 + required=true → {@link NoSuchBeanDefinitionException}</li>
+     *   <li>다수 후보 → 명시적 {@link IllegalStateException} (@Primary/@Qualifier 안내 포함)</li>
+     * </ol>
+     * BeanDefinition 기반 빈과 registerSingleton으로 직접 등록된 빈 모두 검색한다.
+     *
+     * @param desc               주입 요청 디스크립터 (타입, required, 이름)
+     * @param requestingBeanName 요청 빈 이름 (순환 참조 감지용, 현재 미사용)
+     * @return 해석된 빈 인스턴스 또는 null (required=false + 미매칭)
+     */
+    public Object resolveDependency(DependencyDescriptor desc, String requestingBeanName) {
+        // BeanDefinition 기반 + 직접 등록 싱글톤을 모두 포함한 타입 매칭 맵 구성
+        Map<String, Object> matches = resolveBeansOfType(desc.getDependencyType());
+        if (matches.isEmpty()) {
+            if (desc.isRequired()) {
+                throw new NoSuchBeanDefinitionException(
+                        "No bean of type " + desc.getDependencyType().getName()
+                        + " found for '" + desc.getDependencyName() + "'");
+            }
+            return null;
+        }
+        if (matches.size() == 1) {
+            return matches.values().iterator().next();
+        }
+        // 다수 후보 폴백(@Primary/@Qualifier/이름)은 학습 범위 축소판 보류 —
+        // 발견 시 명시적 예외로 *왜 정책이 필요한지* 학습
+        throw new IllegalStateException(
+                "Multiple beans of type " + desc.getDependencyType().getName()
+                + " found: " + matches.keySet()
+                + ". This learning-scope plan does not implement multi-candidate resolution. "
+                + "Real Spring resolves this with @Primary → @Qualifier → field/parameter name fallback.");
+    }
+
+    /**
+     * BeanDefinition 맵과 직접 등록 싱글톤 레지스트리를 합쳐 타입에 맞는 빈을 반환한다.
+     * <p>{@link #getBeansOfType}은 BeanDefinition 기반만 검색하므로 별도 메서드로 분리.
+     */
+    private Map<String, Object> resolveBeansOfType(Class<?> type) {
+        // 1) BeanDefinition 기반 빈
+        Map<String, Object> result = new LinkedHashMap<>(getBeansOfType(type));
+        // 2) 직접 등록된 싱글톤 (BeanDefinition 없이 registerSingleton으로 등록된 빈)
+        for (String name : getSingletonNames()) {
+            if (!result.containsKey(name)) {
+                Object singleton = getSingleton(name);
+                if (singleton != null && type.isInstance(singleton)) {
+                    result.put(name, singleton);
+                }
+            }
+        }
+        return result;
     }
 
     // ── ConfigurableBeanFactory.destroySingletons 위임 ────────────────────

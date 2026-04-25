@@ -33,7 +33,8 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
         bfpps.add(postProcessor);
     }
 
-    protected List<BeanFactoryPostProcessor> getBeanFactoryPostProcessors() {
+    @Override
+    public List<BeanFactoryPostProcessor> getBeanFactoryPostProcessors() {
         return bfpps;
     }
 
