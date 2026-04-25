@@ -35,28 +35,19 @@ public class AutowiredAnnotationBeanPostProcessor implements InstantiationAwareB
      */
     @Override
     public PropertyValues postProcessProperties(PropertyValues pvs, Object bean, String beanName) {
-        // doWithFields: 자기 클래스 + 상속 계층 전체를 Object 직전까지 탐색
         ReflectionUtils.doWithFields(bean.getClass(), field -> {
             Autowired autowired = field.getAnnotation(Autowired.class);
             if (autowired == null) {
-                // @Autowired가 없는 필드는 건너뜀
                 return;
             }
             DependencyDescriptor desc = new DependencyDescriptor(
                     field.getType(), autowired.required(), field.getName());
             Object dep = beanFactory.resolveDependency(desc, beanName);
             if (dep == null) {
-                // required=false + 매칭 빈 없음 → 건너뜀 (예외 없이 다음 필드로)
+                // required=false + 미매칭은 null 반환이 정상 — 이 필드는 건드리지 않음
                 return;
             }
-            try {
-                field.setAccessible(true);
-                field.set(bean, dep);
-            } catch (IllegalAccessException e) {
-                throw new RuntimeException(
-                        "Failed to inject @Autowired field '" + field.getName()
-                        + "' in " + bean.getClass().getName(), e);
-            }
+            ReflectionUtils.setField(field, bean, dep);
         });
         return pvs;
     }

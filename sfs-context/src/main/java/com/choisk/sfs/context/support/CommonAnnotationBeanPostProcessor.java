@@ -34,22 +34,16 @@ public class CommonAnnotationBeanPostProcessor implements BeanPostProcessor {
     /**
      * 빈 초기화 전, 상속 계층 전체에서 {@code @PostConstruct} 애노테이션이 붙은 메서드를 리플렉션으로 호출한다.
      * {@link ReflectionUtils#doWithMethods}를 사용해 자기 클래스 및 부모 클래스 메서드를 모두 처리한다.
-     * 호출 실패 시 빈 생성 자체가 실패해야 하므로 {@link RuntimeException}으로 래핑하여 던진다.
+     * 호출 실패 시 {@link ReflectionUtils#invokeMethod}가 {@link IllegalStateException}으로 래핑하여 던지므로
+     * 빈 생성이 중단된다.
      */
     @Override
     public Object postProcessBeforeInitialization(Object bean, String beanName) {
-        // doWithMethods: 자기 클래스 + 상속 계층 전체를 Object 직전까지 탐색
         ReflectionUtils.doWithMethods(bean.getClass(), m -> {
             if (!m.isAnnotationPresent(PostConstruct.class)) {
                 return;
             }
-            m.setAccessible(true);
-            try {
-                m.invoke(bean);
-            } catch (ReflectiveOperationException e) {
-                throw new RuntimeException(
-                        "@PostConstruct 호출 실패 — beanName=" + beanName + ", method=" + m.getName(), e);
-            }
+            ReflectionUtils.invokeMethod(m, bean);
         });
         return bean;
     }
@@ -63,7 +57,6 @@ public class CommonAnnotationBeanPostProcessor implements BeanPostProcessor {
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) {
         List<Method> preDestroyMethods = new ArrayList<>();
-        // doWithMethods: 자기 클래스 + 상속 계층 전체를 Object 직전까지 탐색
         ReflectionUtils.doWithMethods(bean.getClass(), m -> {
             if (m.isAnnotationPresent(PreDestroy.class)) {
                 m.setAccessible(true);

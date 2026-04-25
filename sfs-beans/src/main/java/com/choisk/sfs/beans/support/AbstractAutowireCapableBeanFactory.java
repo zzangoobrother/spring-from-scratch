@@ -73,7 +73,7 @@ public abstract class AbstractAutowireCapableBeanFactory
         // B-5: 초기화
         Object exposed = initializeBean(beanName, definition, bean);
 
-        // B-7: destroy 등록 (Task 28에서 확장)
+        // B-7: destroy 등록
         registerDisposableIfNeeded(beanName, definition, exposed);
 
         return exposed;
@@ -87,31 +87,14 @@ public abstract class AbstractAutowireCapableBeanFactory
      */
     private Object createBeanViaFactoryMethod(String beanName, BeanDefinition definition) {
         Object factoryBean = getBean(definition.getFactoryBeanName());
-        Method m = findFactoryMethod(factoryBean.getClass(), definition.getFactoryMethodName());
+        // ReflectionUtils.findMethod은 상속 계층까지 탐색 (부모 @Configuration 클래스에 정의된 @Bean도 처리 가능)
+        Method m = ReflectionUtils.findMethod(factoryBean.getClass(), definition.getFactoryMethodName());
         if (m == null) {
             throw new BeanCreationException(beanName,
                     "factoryMethod not found: " + definition.getFactoryMethodName());
         }
         Object[] args = resolveFactoryMethodArguments(m, beanName);
-        try {
-            m.setAccessible(true);
-            return m.invoke(factoryBean, args);
-        } catch (ReflectiveOperationException e) {
-            throw new BeanCreationException(beanName, "factoryMethod invocation failed", e);
-        }
-    }
-
-    /**
-     * 주어진 클래스에서 이름이 일치하는 첫 번째 메서드를 반환한다.
-     * 동일 이름 오버로드는 첫 번째 발견 메서드를 사용한다 (학습용 단순화).
-     */
-    private Method findFactoryMethod(Class<?> type, String methodName) {
-        for (Method m : type.getDeclaredMethods()) {
-            if (m.getName().equals(methodName)) {
-                return m;
-            }
-        }
-        return null;
+        return ReflectionUtils.invokeMethod(m, factoryBean, args);
     }
 
     /**
@@ -183,9 +166,9 @@ public abstract class AbstractAutowireCapableBeanFactory
         return exposed;
     }
 
-    // --- Task 27: populateBean 구현 ---
+    // ── 프로퍼티 주입 ────
     protected void populateBean(String beanName, BeanDefinition definition, Object bean) {
-        // InstantiationAwareBPP 후킹 (Plan 1B에서 @Autowired 주입이 여기에 꽂힘)
+        // InstantiationAwareBPP가 @Autowired 등 프로퍼티 주입을 여기에 꽂음
         boolean continuePopulation = true;
         for (BeanPostProcessor bpp : getBeanPostProcessors()) {
             if (bpp instanceof InstantiationAwareBeanPostProcessor iabpp) {
@@ -231,7 +214,7 @@ public abstract class AbstractAutowireCapableBeanFactory
         }
     }
 
-    // --- Task 28: initializeBean + destroy 등록 구현 ---
+    // ── 초기화 + destroy 등록 ────
     protected Object initializeBean(String beanName, BeanDefinition definition, Object bean) {
         // B-5 (a) Aware 콜백
         invokeAwareCallbacks(beanName, bean);
