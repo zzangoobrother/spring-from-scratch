@@ -6,6 +6,7 @@ import com.choisk.sfs.beans.BeanFactoryAware;
 import com.choisk.sfs.beans.BeanNameAware;
 import com.choisk.sfs.beans.BeanPostProcessor;
 import com.choisk.sfs.beans.BeanReference;
+import com.choisk.sfs.beans.DependencyDescriptor;
 import com.choisk.sfs.beans.DisposableBean;
 import com.choisk.sfs.beans.InitializingBean;
 import com.choisk.sfs.beans.InstantiationAwareBeanPostProcessor;
@@ -52,6 +53,11 @@ public abstract class AbstractAutowireCapableBeanFactory
     }
 
     protected Object doCreateBean(String beanName, BeanDefinition definition) {
+        // factoryMethod 분기 — BD에 factoryMethodName이 있으면 생성자 대신 팩토리 메서드로 인스턴스화
+        if (definition.getFactoryMethodName() != null) {
+            return createBeanViaFactoryMethod(beanName, definition);
+        }
+
         // B-2: 인스턴스화
         Object bean = instantiateBean(beanName, definition);
 
@@ -71,6 +77,58 @@ public abstract class AbstractAutowireCapableBeanFactory
         registerDisposableIfNeeded(beanName, definition, exposed);
 
         return exposed;
+    }
+
+    /**
+     * factoryMethod 경로로 빈을 생성한다.
+     * <p>BD의 factoryBeanName으로 팩토리 빈을 가져온 후, factoryMethodName과 일치하는 메서드를
+     * 찾아 인자를 {@link DefaultListableBeanFactory#resolveDependency}로 해석하여 호출한다.
+     * 동일 이름 오버로드는 하나만 있다고 가정 (학습용 단순화).
+     */
+    private Object createBeanViaFactoryMethod(String beanName, BeanDefinition definition) {
+        Object factoryBean = getBean(definition.getFactoryBeanName());
+        Method m = findFactoryMethod(factoryBean.getClass(), definition.getFactoryMethodName());
+        if (m == null) {
+            throw new BeanCreationException(beanName,
+                    "factoryMethod not found: " + definition.getFactoryMethodName());
+        }
+        Object[] args = resolveFactoryMethodArguments(m, beanName);
+        try {
+            m.setAccessible(true);
+            return m.invoke(factoryBean, args);
+        } catch (ReflectiveOperationException e) {
+            throw new BeanCreationException(beanName, "factoryMethod invocation failed", e);
+        }
+    }
+
+    /**
+     * 주어진 클래스에서 이름이 일치하는 첫 번째 메서드를 반환한다.
+     * 동일 이름 오버로드는 첫 번째 발견 메서드를 사용한다 (학습용 단순화).
+     */
+    private Method findFactoryMethod(Class<?> type, String methodName) {
+        for (Method m : type.getDeclaredMethods()) {
+            if (m.getName().equals(methodName)) {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 메서드 매개변수마다 {@link DefaultListableBeanFactory#resolveDependency}를 호출하여
+     * 인자 배열을 구성한다.
+     * <p>dependency name은 {@code paramType.getSimpleName()} 사용 — {@code -parameters} 컴파일 옵션 의존 회피.
+     */
+    private Object[] resolveFactoryMethodArguments(Method m, String requestingBeanName) {
+        Class<?>[] paramTypes = m.getParameterTypes();
+        Object[] args = new Object[paramTypes.length];
+        for (int i = 0; i < paramTypes.length; i++) {
+            DependencyDescriptor desc = new DependencyDescriptor(
+                    paramTypes[i], true, paramTypes[i].getSimpleName());
+            // AbstractAutowireCapableBeanFactory의 구체 구현체는 DefaultListableBeanFactory이므로 캐스팅
+            args[i] = ((DefaultListableBeanFactory) this).resolveDependency(desc, requestingBeanName);
+        }
+        return args;
     }
 
     protected Object instantiateBean(String beanName, BeanDefinition definition) {
