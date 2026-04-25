@@ -8,7 +8,6 @@ import com.choisk.sfs.samples.todo.support.IdGenerator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 @Repository
 public class TodoRepository {
@@ -31,6 +30,6 @@ public class TodoRepository {
         return store.values().stream()
                 .filter(t -> t.ownerId.equals(ownerId))
                 .sorted((a, b) -> Long.compare(a.id, b.id))
-                .collect(Collectors.toList());
+                .toList();
     }
 }
