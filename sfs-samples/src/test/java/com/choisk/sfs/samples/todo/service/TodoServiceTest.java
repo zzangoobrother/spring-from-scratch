@@ -40,4 +40,17 @@ class TodoServiceTest {
             assertThat(created.status).isEqualTo(Todo.Status.DONE);
         }
     }
+
+    @Test
+    void completeRejectsUnknownTodo() {
+        try (var ctx = new AnnotationConfigApplicationContext(
+                AppConfig.class, UserRepository.class, TodoRepository.class,
+                UserService.class, TodoService.class)) {
+
+            TodoService todoService = ctx.getBean(TodoService.class);
+            assertThatThrownBy(() -> todoService.complete(999L))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Unknown todo id=999");
+        }
+    }
 }
