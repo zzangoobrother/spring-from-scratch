@@ -891,7 +891,7 @@ git commit -m "feat(sfs-context): AutowiredAnnotationBeanPostProcessor — @Auto
 - Create: `sfs-context/src/main/java/com/choisk/sfs/context/support/CommonAnnotationBeanPostProcessor.java`
 - Test: `sfs-context/src/test/java/com/choisk/sfs/context/support/PostConstructInvokeTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -921,13 +921,13 @@ class PostConstructInvokeTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (FAIL 확인)**
+- [x] **Step 2: 테스트 실행 (FAIL 확인)**
 
 ```bash
 ./gradlew :sfs-context:test --tests "com.choisk.sfs.context.support.PostConstructInvokeTest"
 ```
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -964,19 +964,26 @@ public class CommonAnnotationBeanPostProcessor implements BeanPostProcessor {
 }
 ```
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-context:test
 ```
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-context/src/main/java/com/choisk/sfs/context/support/CommonAnnotationBeanPostProcessor.java \
         sfs-context/src/test/java/com/choisk/sfs/context/support/PostConstructInvokeTest.java
 git commit -m "feat(sfs-context): CommonAnnotationBeanPostProcessor — @PostConstruct 호출 (BPP:before)"
 ```
+
+> **실행 기록 (2026-04-25):** 커밋 `8a05dbb` — PASS 1/1 (PostConstructInvokeTest). 회귀 34 → 35 전체 PASS.
+>
+> **편차 기록:**
+> - plan의 import `com.choisk.sfs.beans.DefaultListableBeanFactory` → 실제 `com.choisk.sfs.beans.support.DefaultListableBeanFactory` (구조 차이 표 기존 항목 동일 적용).
+> - `BeanDefinition` 생성자: `BeanDefinition(Class<?> beanClass)` 단일 생성자 사용 (plan 코드와 동일, 실제 코드도 동일).
+> - plan 구현 코드와 실제 구현 일치. 추가로 한국어 Javadoc 주석 및 `beanFactory` 필드 목적 주석 보강.
 
 ---
 
