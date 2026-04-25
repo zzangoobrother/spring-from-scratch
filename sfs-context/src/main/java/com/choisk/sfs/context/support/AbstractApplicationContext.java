@@ -136,9 +136,4 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
     protected void cancelRefresh(RuntimeException ex) { active = false; }
     protected void destroyBeans() { getBeanFactory().destroySingletons(); }
 
-    // setter for active (Task 10에서 사용)
-    protected void setActive(boolean active) { this.active = active; }
-    protected Object getStartupShutdownMonitor() { return startupShutdownMonitor; }
-    protected Thread getShutdownHook() { return shutdownHook; }
-    protected void setShutdownHook(Thread t) { this.shutdownHook = t; }
 }
