@@ -415,7 +415,7 @@ git commit -m "feat(sfs-samples): AppConfig (@Bean 2종) + UserRepository + Todo
 - Create: `sfs-samples/src/main/java/com/choisk/sfs/samples/todo/service/UserService.java`
 - Test: `sfs-samples/src/test/java/com/choisk/sfs/samples/todo/service/UserServiceTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 // sfs-samples/src/test/java/com/choisk/sfs/samples/todo/service/UserServiceTest.java
@@ -448,13 +448,13 @@ class UserServiceTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (FAIL — UserService 미존재)**
+- [x] **Step 2: 테스트 실행 (FAIL — UserService 미존재)**
 
 ```bash
 ./gradlew :sfs-samples:test --tests "com.choisk.sfs.samples.todo.service.UserServiceTest"
 ```
 
-- [ ] **Step 3: `UserService.java` 구현**
+- [x] **Step 3: `UserService.java` 구현**
 
 ```java
 // sfs-samples/src/main/java/com/choisk/sfs/samples/todo/service/UserService.java
@@ -499,7 +499,7 @@ public class UserService {
 
 > **시연 요점:** `@Autowired Clock` 필드 주입 — `Clock`은 도메인이 아니라 `@Bean`으로 등록된 외부 객체. 처리기는 BeanDefinition 출처를 묻지 않고 *타입 매칭만* 한다. `@PostConstruct seedDefaultUser`는 컨테이너 라이프사이클의 일부이므로 `main()`의 첫 호출보다 *먼저* 실행 (G1의 BPP:before 시점).
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-samples:test
@@ -507,7 +507,7 @@ public class UserService {
 
 예상: IdGeneratorTest 2 + UserServiceTest 1 = 3 PASS. 회귀 변동 없음.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-samples/src/main/java/com/choisk/sfs/samples/todo/service/UserService.java \
