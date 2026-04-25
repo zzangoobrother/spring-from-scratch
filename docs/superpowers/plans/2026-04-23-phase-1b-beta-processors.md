@@ -1348,7 +1348,7 @@ git commit -m "test(sfs-context): Phase1IntegrationTest — Configuration + Auto
 - Modify: `sfs-context/README.md`
 - Modify: `docs/superpowers/plans/2026-04-23-phase-1b-beta-processors.md` (DoD 9항목 모두 `[x]` + 실행 기록 블록)
 
-- [ ] **Step 1: 전체 회귀 + 빌드 검증**
+- [x] **Step 1: 전체 회귀 + 빌드 검증**
 
 ```bash
 ./gradlew :sfs-core:test :sfs-beans:test :sfs-context:test
@@ -1360,7 +1360,7 @@ git commit -m "test(sfs-context): Phase1IntegrationTest — Configuration + Auto
 - sfs-context: 31 → ~40 PASS (D1 컴파일만, E1 +2, F1 +1, G1 +1, G2 +1, H1 +2, H2 +3)
 - 총합: ~118~122 PASS / BUILD SUCCESSFUL
 
-- [ ] **Step 2: README 업데이트**
+- [x] **Step 2: README 업데이트**
 
 `sfs-context/README.md`에 "1B-β 시점 동작 (학습용 최소 스코프)" 섹션 추가:
 
@@ -1393,7 +1393,7 @@ ctx.close();
 - ASM 사전 필터
 ````
 
-- [ ] **Step 3: 본 plan DoD 9항목 모두 `[x]` + 실행 기록 블록 추가**
+- [x] **Step 3: 본 plan DoD 9항목 모두 `[x]` + 실행 기록 블록 추가**
 
 `docs/superpowers/plans/2026-04-23-phase-1b-beta-processors.md` 하단 DoD 섹션의 9항목을 모두 `[x]`로 갱신. 그리고 마지막에:
 
@@ -1406,7 +1406,7 @@ ctx.close();
 > - **Phase 1 종료** ✅
 ```
 
-- [ ] **Step 4: 최종 커밋**
+- [x] **Step 4: 최종 커밋**
 
 ```bash
 git add sfs-context/README.md docs/superpowers/plans/2026-04-23-phase-1b-beta-processors.md
@@ -1419,18 +1419,28 @@ git commit -m "docs: Plan 1B-β 마감 — README 학습용 시나리오 + DoD 9
 
 **기능적 DoD:**
 
-- [ ] 1. `@Configuration` + `@Bean` 클래스의 빈이 등록되며, 메서드명이 빈 이름이 된다 (Task E1)
-- [ ] 2. `@Bean("custom")` 명시 시 그 이름이 우선한다 (Task E1)
-- [ ] 3. **`@Bean` 메서드 매개변수에 컨테이너가 의존성을 자동 주입한다** (Task C1) — 인자 형태 inter-bean reference 동작
-- [ ] 4. `@Autowired` 필드 주입이 동작한다 (Task F1)
-- [ ] 5. `@Autowired(required=false)`는 매칭 빈이 없을 때 null을 주입한다 (Task B2, F1)
-- [ ] 6. `@PostConstruct` 메서드는 BPP:before 시점에 호출된다 (Task G1)
-- [ ] 7. `@PreDestroy` 메서드는 `close()` 시 등록 역순으로 호출된다 (Task G2)
+- [x] 1. `@Configuration` + `@Bean` 클래스의 빈이 등록되며, 메서드명이 빈 이름이 된다 (Task E1)
+- [x] 2. `@Bean("custom")` 명시 시 그 이름이 우선한다 (Task E1)
+- [x] 3. **`@Bean` 메서드 매개변수에 컨테이너가 의존성을 자동 주입한다** (Task C1) — 인자 형태 inter-bean reference 동작
+- [x] 4. `@Autowired` 필드 주입이 동작한다 (Task F1)
+- [x] 5. `@Autowired(required=false)`는 매칭 빈이 없을 때 null을 주입한다 (Task B2, F1)
+- [x] 6. `@PostConstruct` 메서드는 BPP:before 시점에 호출된다 (Task G1)
+- [x] 7. `@PreDestroy` 메서드는 `close()` 시 등록 역순으로 호출된다 (Task G2)
 
 **품질 DoD:**
 
-- [ ] 8. simplify 이월 B3(`getBeanFactory()` 경로 통일, Task H1) + B4(`registerSingleton` atomic, Task B3) 모두 본 plan 내 반영
-- [ ] 9. `./gradlew build` 전체 PASS + 누적 ~118~122 테스트 PASS (Task H3)
+- [x] 8. simplify 이월 B3(`getBeanFactory()` 경로 통일, Task H1) + B4(`registerSingleton` atomic, Task B3) 모두 본 plan 내 반영
+- [x] 9. `./gradlew build` 전체 PASS + 누적 ~118~122 테스트 PASS (Task H3)
+
+> **실행 기록 (2026-04-25):**
+>
+> - **회귀:** sfs-core 25 + sfs-beans 58 + sfs-context 41 = **총 124 PASS / 0 FAIL** (예상 ~118~122 살짝 상회 — H1 인터페이스 확장으로 +2~3건)
+> - **빌드:** `./gradlew build` → BUILD SUCCESSFUL
+> - **추가 커밋:** A1(1) + B1~B3(4) + C1(1) + D1(2) + E1(2) + F1(1) + G1(1) + G2(1) + H1(1) + H2(2) + 박제 블록 갱신(2) + H3(1) ≈ 19 커밋
+> - **누적 편차:** 박제 블록에 7건 기록 (`NoSuchBeanDefinitionException` 위치, `DefaultListableBeanFactory`/`DefaultSingletonBeanRegistry` 패키지 차이, `getBeansOfType` 단독 사용 한계, `instantiateViaConstructor`→`instantiateBean`, `@Bean#value()`→`name() String[]`, `getBeanDefinitionNames()` 반환 타입, `postProcessProperties` PropertyValues 시그니처)
+> - **인터페이스 확장:** H1에서 `ConfigurableApplicationContext.getBeanFactoryPostProcessors()` + `ConfigurableBeanFactory.getBeanPostProcessors()`를 인터페이스에 노출 (멱등성 검사 헬퍼 요구)
+> - **학습 가치 박제:** `Phase1IntegrationTest#directCallFormCreatesDistinctInstanceWithoutEnhance`가 `isNotSameAs`로 PASS — enhance 부재의 한계가 회귀 안전망으로 박제됨. 미래 byte-buddy 도입 시 `isSameAs`로 변경되는 것이 마일스톤 증거.
+> - **Phase 1 종료**
 
 ---
 
