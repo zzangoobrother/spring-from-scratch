@@ -1005,7 +1005,7 @@ git commit -m "feat(sfs-samples): EnhanceAbsenceDemo.main() — inter-bean refer
 - Create: `sfs-samples/README.md`
 - Modify: `docs/superpowers/plans/2026-04-25-phase-1c-samples-demo.md` (DoD 12항목 모두 `[x]` + 실행 기록 블록)
 
-- [ ] **Step 1: 전체 회귀 + 빌드 검증**
+- [x] **Step 1: 전체 회귀 + 빌드 검증**
 
 ```bash
 ./gradlew :sfs-core:test :sfs-beans:test :sfs-context:test :sfs-samples:test
@@ -1021,7 +1021,7 @@ git commit -m "feat(sfs-samples): EnhanceAbsenceDemo.main() — inter-bean refer
 
 > **메모:** spec 7.3은 ~135를 예상했으나 D2가 2 테스트로 늘어나 ~137. 예상 범위 내.
 
-- [ ] **Step 2: `sfs-samples/README.md` 작성**
+- [x] **Step 2: `sfs-samples/README.md` 작성**
 
 ```markdown
 # sfs-samples
@@ -1096,7 +1096,7 @@ com.choisk.sfs.samples.todo/
 ```
 ```
 
-- [ ] **Step 3: 본 plan DoD 12항목 모두 `[x]` + 실행 기록 블록 추가**
+- [x] **Step 3: 본 plan DoD 12항목 모두 `[x]` + 실행 기록 블록 추가**
 
 `docs/superpowers/plans/2026-04-25-phase-1c-samples-demo.md` 하단 DoD 섹션의 12항목을 모두 `[x]`로 갱신. 그리고 마지막에:
 
@@ -1109,7 +1109,7 @@ com.choisk.sfs.samples.todo/
 > - **Phase 1C 종료** — main 머지 준비 완료
 ```
 
-- [ ] **Step 4: 최종 커밋**
+- [x] **Step 4: 최종 커밋**
 
 ```bash
 git add sfs-samples/README.md docs/superpowers/plans/2026-04-25-phase-1c-samples-demo.md
@@ -1122,27 +1122,34 @@ git commit -m "docs: Plan 1C 마감 — sfs-samples README + DoD 12항목 [x] + 
 
 **모듈/구조:**
 
-- [ ] 1. `settings.gradle.kts`에 `sfs-samples` 등록 (Task A1)
-- [ ] 2. `sfs-samples/build.gradle.kts` 작성 — sfs-context 의존만 (Task A1)
-- [ ] 3. 도메인 POJO 2종 (`User`, `Todo`) (Task A1)
+- [x] 1. `settings.gradle.kts`에 `sfs-samples` 등록 (Task A1)
+- [x] 2. `sfs-samples/build.gradle.kts` 작성 — sfs-context 의존만 (Task A1)
+- [x] 3. 도메인 POJO 2종 (`User`, `Todo`) (Task A1)
 
 **컴포넌트:**
 
-- [ ] 4. `IdGenerator` + 단위 테스트 (Task B1)
-- [ ] 5. `AppConfig` (`@Bean` 2종: no-arg + 매개변수 자동 주입) (Task C1)
-- [ ] 6. Repository 2종 (`UserRepository`, `TodoRepository`) — `@Repository` 메타애노테이션 + `@Autowired idGen` 시연 (Task C1)
-- [ ] 7. Service 2종 — `UserService`(`@PostConstruct` 시드) + `TodoService`(다중 의존 + 분기) (Task D1, D2)
-- [ ] 8. Controller 2종 — `UserController`(`@PreDestroy`) + `TodoController` (Task E1)
+- [x] 4. `IdGenerator` + 단위 테스트 (Task B1)
+- [x] 5. `AppConfig` (`@Bean` 2종: no-arg + 매개변수 자동 주입) (Task C1)
+- [x] 6. Repository 2종 (`UserRepository`, `TodoRepository`) — `@Repository` 메타애노테이션 + `@Autowired idGen` 시연 (Task C1)
+- [x] 7. Service 2종 — `UserService`(`@PostConstruct` 시드) + `TodoService`(다중 의존 + 분기) (Task D1, D2)
+- [x] 8. Controller 2종 — `UserController`(`@PreDestroy`) + `TodoController` (Task E1)
 
 **시연:**
 
-- [ ] 9. `TodoDemoApplication.main()` — 8 라인 콘솔 출력 시퀀스 (Task F1)
-- [ ] 10. `EnhanceAbsenceDemo.main()` — 두 줄 비교 출력, `→ false`로 enhance 부재 박제 (Task G1)
+- [x] 9. `TodoDemoApplication.main()` — 8 라인 콘솔 출력 시퀀스 (Task F1)
+- [x] 10. `EnhanceAbsenceDemo.main()` — 두 줄 비교 출력, `→ false`로 enhance 부재 박제 (Task G1)
 
 **품질:**
 
-- [ ] 11. 통합 테스트 2건 — `TodoDemoApplicationTest` + `EnhanceAbsenceDemoTest` 모두 PASS (Task F1, G1)
-- [ ] 12. `./gradlew build` 전체 PASS + 누적 ~137 테스트 PASS (Task H1)
+- [x] 11. 통합 테스트 2건 — `TodoDemoApplicationTest` + `EnhanceAbsenceDemoTest` 모두 PASS (Task F1, G1)
+- [x] 12. `./gradlew build` 전체 PASS + 누적 ~137 테스트 PASS (Task H1)
+
+> **실행 기록 (2026-04-25):**
+>
+> - **회귀:** sfs-core 28 + sfs-beans 58 + sfs-context 44 + sfs-samples 7 = **총 137 PASS / 0 FAIL**
+> - **빌드:** `./gradlew build` → BUILD SUCCESSFUL
+> - **추가 커밋:** A1 + B1 + C1 + D1 + D2 + E1 + F1 + G1 + H1 = 9 커밋
+> - **Phase 1C 종료** — main 머지 준비 완료
 
 ---
 
