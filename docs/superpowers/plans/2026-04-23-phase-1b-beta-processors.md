@@ -643,7 +643,7 @@ git commit -m "feat(sfs-context): @Autowired/@PostConstruct/@PreDestroy 애노�
 - Create: `sfs-context/src/main/java/com/choisk/sfs/context/support/ConfigurationClassPostProcessor.java`
 - Test: `sfs-context/src/test/java/com/choisk/sfs/context/support/ConfigurationClassPostProcessorTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -686,13 +686,13 @@ class ConfigurationClassPostProcessorTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (FAIL 확인)**
+- [x] **Step 2: 테스트 실행 (FAIL 확인)**
 
 ```bash
 ./gradlew :sfs-context:test --tests "com.choisk.sfs.context.support.ConfigurationClassPostProcessorTest"
 ```
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -733,19 +733,26 @@ public class ConfigurationClassPostProcessor implements BeanFactoryPostProcessor
 > - **인자 형태** (`@Bean Service service(Repo repo)`) → C1의 `resolveDependency` 라우팅으로 동작 ✅
 > - **직접 호출 형태** (`@Bean Service service() { return new Service(repo()); }`) → 매번 새 인스턴스 ❌ (H2에서 시연)
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-context:test
 ```
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-context/src/main/java/com/choisk/sfs/context/support/ConfigurationClassPostProcessor.java \
         sfs-context/src/test/java/com/choisk/sfs/context/support/ConfigurationClassPostProcessorTest.java
 git commit -m "feat(sfs-context): ConfigurationClassPostProcessor 단순판 (@Bean → factoryMethod BD, enhance 없이)"
 ```
+
+> **실행 기록 (2026-04-25):** 커밋 `35f16f4` — PASS 2/2 (ConfigurationClassPostProcessorTest). 회귀 전체 33 PASS (31→33).
+>
+> **편차 기록:**
+> - `@Bean` 애노테이션 `value()` 속성 없음 → 실제 코드는 `name() String[]` 속성 사용. `name()[0]`이 비어있지 않은 경우 해당 값을 빈 이름으로 사용하도록 구현.
+> - `DefaultListableBeanFactory`는 `com.choisk.sfs.beans.support` 패키지 → 테스트 import 수정.
+> - `getBeanDefinitionNames()`가 `String[]` 반환 → `.clone()`으로 배열 복사 후 순회 (`.toArray()` 대신).
 
 ---
 
