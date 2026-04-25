@@ -30,17 +30,19 @@ public class DefaultSingletonBeanRegistry {
             singletonObjects.put(name, bean);
             earlySingletonObjects.remove(name);
             singletonFactories.remove(name);
-        }
-        // DisposableBean을 직접 등록한 경우에도 destroy 콜백이 실행되도록 자동 등록
-        if (bean instanceof DisposableBean disposable) {
-            registerDisposableBean(name, () -> {
-                try {
-                    disposable.destroy();
-                } catch (Exception e) {
-                    // Runnable이 체크 예외를 허용하지 않아 어댑팅 — destroySingletons의 개별 실패 격리 정책과 맞물림
-                    throw new RuntimeException("DisposableBean.destroy failed for '" + name + "'", e);
-                }
-            });
+            // DisposableBean 감지를 같은 lock 안에서 처리 — singletonObjects.put과 disposableBeans.put이
+            // 분리된 critical section에 있으면 그 사이에 destroySingletons이 끼어들어 destroy 콜백 누락 가능.
+            // atomic하게 등록함으로써 race condition 제거.
+            if (bean instanceof DisposableBean disposable) {
+                disposableBeans.put(name, () -> {
+                    try {
+                        disposable.destroy();
+                    } catch (Exception e) {
+                        // Runnable이 체크 예외를 허용하지 않아 어댑팅 — destroySingletons의 개별 실패 격리 정책과 맞물림
+                        System.err.println("[sfs-beans] DisposableBean.destroy failed for '" + name + "': " + e);
+                    }
+                });
+            }
         }
     }
 
