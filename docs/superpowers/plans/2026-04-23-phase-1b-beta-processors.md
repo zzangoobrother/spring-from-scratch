@@ -1453,6 +1453,22 @@ git commit -m "docs: Plan 1B-β 마감 — README 학습용 시나리오 + DoD 9
 
 ---
 
+## 품질 게이트 발견 — Phase 2 진입 전 / 다음 plan 처리 항목
+
+다관점 코드리뷰(2026-04-25, `feature-dev:code-reviewer` + `code-quality-reporter` 교차 검증)에서 발견된 이슈 중 *현재 학습 시나리오 영향이 0인 항목*은 본 plan에서 처리하지 않고 박제. 영향이 즉시 있는 항목 1건(상속 reflection)은 품질 게이트 2단계 리팩토링에서 처리됨 (`ReflectionUtils.doWithFields/doWithMethods`로 F1/G1/G2 일원화).
+
+| 우선순위 | 이슈 | 위치 | 처리 방향 |
+|---|---|---|---|
+| 🔵 Phase 2 직전 | `(DefaultListableBeanFactory) this` 다운캐스팅 | `AbstractAutowireCapableBeanFactory#resolveFactoryMethodArguments` (C1) | `resolveDependency`를 상위 인터페이스(`ConfigurableListableBeanFactory` 또는 `AutowireCapableBeanFactory`)로 승격 후 인터페이스 호출로 변환. AOP 서브클래스 등장 시 `ClassCastException` 위험 차단. |
+| 🔵 Phase 2 직전 | BPP 처리기의 `DefaultListableBeanFactory` 직접 의존 (위 항목과 묶음) | F1, G1 처리기 생성자 | 위 항목 처리 후 처리기 생성자도 인터페이스 타입으로 변경. 모듈 결합도 감소. |
+| 🟣 다음 plan | `DisposableBean` 이중 등록 가능성 (가설 경로) | B3 `registerSingleton` + `doCreateBean#registerDisposableIfNeeded` | `registerDisposableBean`에 이미 등록된 이름 가드 추가 또는 외부 API 코멘트 박제 (`// 외부 직접 등록 전용`). |
+| 🟣 다음 plan | `getBeanNamesForType` 반환 타입 매칭 한계 | E1 BD 생성 (`new BeanDefinition(m.getReturnType())`) | 인터페이스/Object 반환 시 과매칭 가능 (현재 테스트 범위 내 영향 0). 컬렉션 주입 추가 시점에 인스턴스 후 실제 타입 추적 도입. |
+| ⚪ 가벼움 | WHAT 주석 2건 (CLAUDE.md 위반) | F1 라인 39-41, 46-48 | "@Autowired 없는 필드 건너뜀" → 삭제. "required=false + null" → WHY 재작성("선택적 의존성이라 누락이 정상"). 즉시 cleanup 또는 다음 plan 흡수. |
+
+> **참고:** 두 리뷰가 *우선순위에서 직접 충돌*한 항목 2건은 *현재 학습 시나리오 영향 유무*를 결정 기준으로 사용. 다운캐스팅(영향 0)은 Phase 2 직전, 상속 reflection(영향 즉시)은 본 plan 내 처리. quality-reporter 종합 등급: **B+ (84/100)** — 학습 가치 95(A) / 가독성 90(A) / 테스트 87(B) / 안전성 85(B) / 유지보수성 80(B) / 아키텍처 78(C). main 머지 적합.
+
+---
+
 ## 보류 — 추후 학습 (deep version `75842e5` 참조)
 
 본 plan은 학습 동기 부여를 위해 의도적으로 축소되었다. 아래 항목들은 *Spring을 더 깊이 이해하고 싶을 때* 점진적으로 추가 가능. deep version plan(2026-04-23 시점 1417 LOC, 30 task)에 본문이 보존되어 있음.
