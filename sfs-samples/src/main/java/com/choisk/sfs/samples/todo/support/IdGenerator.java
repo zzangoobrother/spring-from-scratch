@@ -18,12 +18,10 @@ public class IdGenerator {
         this.clock = clock;
     }
 
-    /** 1부터 시작하는 단조증가 ID를 반환한다. */
     public long next() {
         return seq.incrementAndGet();
     }
 
-    /** 주입된 Clock의 현재 Instant를 반환한다. */
     public Instant nowInstant() {
         return clock.instant();
     }
