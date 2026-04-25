@@ -3,16 +3,25 @@ package com.choisk.sfs.context.support;
 import com.choisk.sfs.beans.BeanPostProcessor;
 import com.choisk.sfs.beans.support.DefaultListableBeanFactory;
 import com.choisk.sfs.context.annotation.PostConstruct;
+import com.choisk.sfs.context.annotation.PreDestroy;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * {@link PostConstruct} 애노테이션이 붙은 메서드를 BPP:before 시점에 호출하는 처리기.
- * G2에서 {@code @PreDestroy} 처리가 추가될 예정.
+ * {@link PostConstruct} / {@link PreDestroy} 애노테이션 처리기.
+ *
+ * <ul>
+ *   <li>BPP:before — {@code @PostConstruct} 메서드를 리플렉션으로 즉시 호출</li>
+ *   <li>BPP:after  — {@code @PreDestroy} 메서드를 {@code registerDisposableBean}에 등록.
+ *       소멸 순서(LIFO)는 {@code DefaultSingletonBeanRegistry.destroySingletons}가 보장하므로
+ *       본 처리기는 <em>등록만</em> 책임진다.</li>
+ * </ul>
  */
 public class CommonAnnotationBeanPostProcessor implements BeanPostProcessor {
 
-    /** G2에서 registerDisposableBean 호출에 활용 */
+    /** @PreDestroy 등록 시 beanFactory.registerDisposableBean 호출에 활용 */
     private final DefaultListableBeanFactory beanFactory;
 
     public CommonAnnotationBeanPostProcessor(DefaultListableBeanFactory beanFactory) {
@@ -41,10 +50,31 @@ public class CommonAnnotationBeanPostProcessor implements BeanPostProcessor {
     }
 
     /**
-     * G2에서 {@code @PreDestroy} 처리로 보강 예정. 현재는 빈을 그대로 반환.
+     * 빈 초기화 후, {@code @PreDestroy} 애노테이션이 붙은 메서드들을 소멸 콜백으로 등록한다.
+     * LIFO 순서는 {@code DefaultSingletonBeanRegistry.destroySingletons}가 보장하므로
+     * 본 메서드는 등록만 수행한다.
      */
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) {
+        List<Method> preDestroyMethods = new ArrayList<>();
+        for (Method m : bean.getClass().getDeclaredMethods()) {
+            if (m.isAnnotationPresent(PreDestroy.class)) {
+                m.setAccessible(true);
+                preDestroyMethods.add(m);
+            }
+        }
+        if (!preDestroyMethods.isEmpty()) {
+            beanFactory.registerDisposableBean(beanName, () -> {
+                for (Method m : preDestroyMethods) {
+                    try {
+                        m.invoke(bean);
+                    } catch (ReflectiveOperationException e) {
+                        System.err.println("@PreDestroy 호출 실패 — beanName=" + beanName
+                                + ", method=" + m.getName() + ": " + e);
+                    }
+                }
+            });
+        }
         return bean;
     }
 }
