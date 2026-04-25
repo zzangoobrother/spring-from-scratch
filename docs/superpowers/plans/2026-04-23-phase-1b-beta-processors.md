@@ -46,6 +46,20 @@ ctx.close();  // @PreDestroy 호출 + shutdown hook 정리
 
 ---
 
+## 실행 시 발견된 구조 차이 (2026-04-25, B1~B2 진행 중 발견)
+
+plan 본문은 학습 가독성을 위해 일부 import 경로 / 파일 위치를 단순화했지만, 실제 1B-α 결과물의 구조와 아래 차이가 있다. 후속 task의 Sonnet 위임 시 plan 코드 블록을 *그대로* 복사하지 말고 본 매핑을 적용하라. (위임 프롬프트에 "plan 본문 + 본 블록을 함께 참조하라" 한 줄을 추가하는 형태로 활용한다.)
+
+| plan 표기 | 실제 코드 (1A/1B-α 산출물) | 영향 받는 task | 상태 |
+|---|---|---|---|
+| `com.choisk.sfs.beans.NoSuchBeanDefinitionException` | `com.choisk.sfs.core.NoSuchBeanDefinitionException` | B2, F1, 그 외 의존 해석 분기 호출처 | B2 반영 완료 |
+| `sfs-beans/.../beans/DefaultListableBeanFactory.java` | `sfs-beans/.../beans/support/DefaultListableBeanFactory.java` (`support/` 하위) | B2, B3, C1, F1, G1, H1 등 modify 대상 전부 | B2 반영 완료 |
+| `getBeansOfType()` 단독 사용 | `BeanDefinition` 기반 빈과 `registerSingleton` 직접 등록 빈이 분리 → 합산 헬퍼 필요 | B2에서 `resolveBeansOfType` private 헬퍼 신설로 해결. F1의 `resolveDependency` 호출은 본 헬퍼 경로를 그대로 사용하므로 추가 작업 불요 | B2 반영 완료 |
+
+> **Sonnet 위임 가이드:** 본 plan의 modify 대상 코드 블록을 보낼 때, "이 plan 본문은 학습 가독성을 위해 단순화되어 있으니, 실제 시그니처/import는 grep으로 확인하라. 특히 위 표의 매핑을 우선 적용하라"는 한 줄을 항상 포함할 것. 이렇게 하면 위임이 자기 보정(self-correcting)된다.
+
+---
+
 ## 섹션 구조 (Task 한 줄 요약)
 
 | 섹션 | 범위 | Task | TDD |
