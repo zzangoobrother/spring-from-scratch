@@ -74,7 +74,7 @@ Direct call (본문 호출, enhance 부재): account.user == ctx.user → false
 - Create: `sfs-samples/src/main/java/com/choisk/sfs/samples/todo/domain/User.java`
 - Create: `sfs-samples/src/main/java/com/choisk/sfs/samples/todo/domain/Todo.java`
 
-- [ ] **Step 1: `settings.gradle.kts` 수정**
+- [x] **Step 1: `settings.gradle.kts` 수정**
 
 기존 `// sfs-samples는 Plan 1C에서 추가` 주석을 *대체*하여 `"sfs-samples"`를 include 블록에 추가:
 
@@ -90,7 +90,7 @@ include(
 )
 ```
 
-- [ ] **Step 2: `sfs-samples/build.gradle.kts` 작성**
+- [x] **Step 2: `sfs-samples/build.gradle.kts` 작성**
 
 ```kotlin
 // sfs-samples/build.gradle.kts
@@ -105,7 +105,7 @@ dependencies {
 
 > **메모:** sfs-context의 `api(project(":sfs-beans"))` 덕분에 sfs-samples는 sfs-context만 의존해도 sfs-beans/sfs-core가 transitively 노출됨. 단 *직접* import는 sfs-context 패키지에 한정한다 (역방향 의존 차단).
 
-- [ ] **Step 3: `User.java` 작성**
+- [x] **Step 3: `User.java` 작성**
 
 ```java
 // sfs-samples/src/main/java/com/choisk/sfs/samples/todo/domain/User.java
@@ -126,7 +126,7 @@ public class User {
 }
 ```
 
-- [ ] **Step 4: `Todo.java` 작성**
+- [x] **Step 4: `Todo.java` 작성**
 
 ```java
 // sfs-samples/src/main/java/com/choisk/sfs/samples/todo/domain/Todo.java
@@ -149,7 +149,7 @@ public class Todo {
 }
 ```
 
-- [ ] **Step 5: 컴파일 검증**
+- [x] **Step 5: 컴파일 검증**
 
 ```bash
 ./gradlew :sfs-samples:compileJava
@@ -158,7 +158,7 @@ public class Todo {
 
 예상: BUILD SUCCESSFUL. 모듈이 인식되고 도메인 클래스가 컴파일됨. 기존 130 PASS 유지.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add settings.gradle.kts sfs-samples/build.gradle.kts \
