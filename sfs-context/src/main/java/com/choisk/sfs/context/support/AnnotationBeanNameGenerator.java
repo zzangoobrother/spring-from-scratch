@@ -14,7 +14,6 @@ public class AnnotationBeanNameGenerator implements BeanNameGenerator {
 
     @Override
     public String generate(Class<?> beanClass) {
-        // 명시 value 우선순위: @Component > @Service > @Repository > @Controller > @Configuration
         String explicit = explicitName(beanClass);
         if (explicit != null && !explicit.isEmpty()) return explicit;
         return defaultName(beanClass);

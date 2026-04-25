@@ -17,7 +17,6 @@ public class ClassPathBeanDefinitionScanner {
 
     private final BeanDefinitionRegistry registry;
     private final BeanNameGenerator nameGenerator;
-    // Plan 라인 2056의 static Iterable 전제와 달리, 실제 ClassPathScanner는 인스턴스 메서드 기반 — 필드로 보유
     private final ClassPathScanner classPathScanner = new ClassPathScanner();
 
     public ClassPathBeanDefinitionScanner(BeanDefinitionRegistry registry) {

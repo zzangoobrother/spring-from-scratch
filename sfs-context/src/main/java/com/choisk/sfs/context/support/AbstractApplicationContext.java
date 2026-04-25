@@ -110,7 +110,6 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
         destroyBeans();
     }
 
-    // BeanFactory 위임 (1A 인터페이스 만족용 — 실제 구현은 getBeanFactory() 위임)
     @Override public Object getBean(String name) { return getBeanFactory().getBean(name); }
     @Override public <T> T getBean(String name, Class<T> requiredType) { return getBeanFactory().getBean(name, requiredType); }
     @Override public <T> T getBean(Class<T> requiredType) { return getBeanFactory().getBean(requiredType); }
@@ -119,7 +118,6 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
     @Override public boolean isPrototype(String name) { return getBeanFactory().isPrototype(name); }
     @Override public Class<?> getType(String name) { return getBeanFactory().getType(name); }
 
-    // 내부 라이프사이클 보조 (Task 10/11/12에서 채움)
     protected void prepareRefresh() { startupDate = System.currentTimeMillis(); }
     protected ConfigurableListableBeanFactory obtainFreshBeanFactory() {
         refreshBeanFactory();
@@ -130,9 +128,7 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
     protected void invokeBeanFactoryPostProcessors(ConfigurableListableBeanFactory bf) {
         for (BeanFactoryPostProcessor bfpp : bfpps) bfpp.postProcessBeanFactory(bf);
     }
-    protected void registerBeanPostProcessors(ConfigurableListableBeanFactory bf) {
-        // 1B-α: no-op. 1B-β에서 BPP 자동 등록 추가 예정.
-    }
+    protected void registerBeanPostProcessors(ConfigurableListableBeanFactory bf) { /* no-op (확장점) */ }
     protected void finishBeanFactoryInitialization(ConfigurableListableBeanFactory bf) {
         bf.preInstantiateSingletons();
     }

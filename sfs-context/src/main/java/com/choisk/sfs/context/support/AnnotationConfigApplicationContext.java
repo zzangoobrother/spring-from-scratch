@@ -17,10 +17,6 @@ public class AnnotationConfigApplicationContext extends GenericApplicationContex
     public AnnotationConfigApplicationContext() {
         this.reader = new AnnotatedBeanDefinitionReader(getBeanFactory());
         this.scanner = new ClassPathBeanDefinitionScanner(getBeanFactory());
-        // 1B-β 첫 Task에서 처리기 3종 자동 등록 추가:
-        //   addBeanFactoryPostProcessor(new ConfigurationClassPostProcessor());
-        //   getBeanFactory().addBeanPostProcessor(new AutowiredAnnotationBeanPostProcessor(getBeanFactory()));
-        //   getBeanFactory().addBeanPostProcessor(new CommonAnnotationBeanPostProcessor(getBeanFactory()));
     }
 
     public AnnotationConfigApplicationContext(Class<?>... componentClasses) {
