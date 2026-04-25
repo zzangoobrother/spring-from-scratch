@@ -651,7 +651,7 @@ git commit -m "feat(sfs-samples): TodoService — @Autowired TodoRepository/User
 - Create: `sfs-samples/src/main/java/com/choisk/sfs/samples/todo/controller/UserController.java`
 - Create: `sfs-samples/src/main/java/com/choisk/sfs/samples/todo/controller/TodoController.java`
 
-- [ ] **Step 1: `UserController.java` 작성**
+- [x] **Step 1: `UserController.java` 작성**
 
 ```java
 // sfs-samples/src/main/java/com/choisk/sfs/samples/todo/controller/UserController.java
@@ -683,7 +683,7 @@ public class UserController {
 
 > **시연 요점:** `@PreDestroy logShutdown` — `ctx.close()` 시 LIFO 순서로 호출 (G2). UserController는 등록 순서상 후반이므로 destroy 시점에 호출됨. `userService.total()` 호출이 안전한 이유: UserService 객체 인스턴스는 destroy 콜백이 끝나도 Java 객체로 살아있음 (컨테이너의 destroy 콜백 호출이 끝났을 뿐).
 
-- [ ] **Step 2: `TodoController.java` 작성**
+- [x] **Step 2: `TodoController.java` 작성**
 
 ```java
 // sfs-samples/src/main/java/com/choisk/sfs/samples/todo/controller/TodoController.java
@@ -723,7 +723,7 @@ public class TodoController {
 }
 ```
 
-- [ ] **Step 3: 컴파일 + 회귀 검증**
+- [x] **Step 3: 컴파일 + 회귀 검증**
 
 ```bash
 ./gradlew :sfs-samples:compileJava :sfs-samples:test
@@ -732,7 +732,7 @@ public class TodoController {
 
 예상: BUILD SUCCESSFUL. sfs-samples 5 PASS 유지. 회귀 변동 없음.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add sfs-samples/src/main/java/com/choisk/sfs/samples/todo/controller/UserController.java \
