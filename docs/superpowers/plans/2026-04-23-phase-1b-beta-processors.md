@@ -77,7 +77,109 @@ ctx.close();  // @PreDestroy 호출 + shutdown hook 정리
 - Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/BeanDefinition.java`
 - Test: `sfs-beans/src/test/java/com/choisk/sfs/beans/BeanDefinitionFactoryMethodTest.java`
 
-> *(Step 1-5 본문은 후속 위임에서 채움)*
+> **사전 분석 (2026-04-25):** `BeanDefinition.java`를 확인한 결과, `factoryBeanName`/`factoryMethodName` 필드와 getter/setter가 **이미 존재**한다 (1B-α 품질 게이트 시점에 선제 추가된 것으로 추정). 따라서 구현 Step은 없고, 해당 필드가 올바르게 동작하는지 TDD로 검증하는 테스트만 작성한다. 실패 테스트는 `BeanDefinitionFactoryMethodTest` 신규 파일로 작성.
+
+- [ ] **Step 1: 실패 테스트 작성**
+
+```java
+package com.choisk.sfs.beans;
+
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * BeanDefinition의 factoryBeanName / factoryMethodName 라운드-트립 검증.
+ * factoryMethodName != null 분기가 @Bean 메서드 인스턴스화 경로의 진입 조건이 되므로
+ * 필드 설정 + 조회가 정확해야 한다.
+ */
+class BeanDefinitionFactoryMethodTest {
+
+    static class MyConfig {}
+    static class MyRepo {}
+
+    @Test
+    void factoryBeanNameRoundTrip() {
+        BeanDefinition bd = new BeanDefinition(MyRepo.class);
+        bd.setFactoryBeanName("myConfig");
+        assertThat(bd.getFactoryBeanName()).isEqualTo("myConfig");
+    }
+
+    @Test
+    void factoryMethodNameRoundTrip() {
+        BeanDefinition bd = new BeanDefinition(MyRepo.class);
+        bd.setFactoryMethodName("repo");
+        assertThat(bd.getFactoryMethodName()).isEqualTo("repo");
+    }
+
+    @Test
+    void bothFieldsSetTogether() {
+        BeanDefinition bd = new BeanDefinition(MyRepo.class);
+        bd.setFactoryBeanName("myConfig");
+        bd.setFactoryMethodName("repo");
+        assertThat(bd.getFactoryBeanName()).isEqualTo("myConfig");
+        assertThat(bd.getFactoryMethodName()).isEqualTo("repo");
+    }
+
+    @Test
+    void defaultValuesAreNull() {
+        BeanDefinition bd = new BeanDefinition(MyRepo.class);
+        assertThat(bd.getFactoryBeanName()).isNull();
+        assertThat(bd.getFactoryMethodName()).isNull();
+    }
+
+    @Test
+    void fluentSetterReturnsThis() {
+        BeanDefinition bd = new BeanDefinition(MyRepo.class);
+        // fluent setter는 this를 반환하므로 체이닝이 가능해야 함
+        BeanDefinition returned = bd.setFactoryBeanName("cfg").setFactoryMethodName("makeRepo");
+        assertThat(returned).isSameAs(bd);
+        assertThat(bd.getFactoryBeanName()).isEqualTo("cfg");
+        assertThat(bd.getFactoryMethodName()).isEqualTo("makeRepo");
+    }
+}
+```
+
+- [ ] **Step 2: 테스트 실행 (FAIL 확인)**
+
+```bash
+./gradlew :sfs-beans:test --tests "com.choisk.sfs.beans.BeanDefinitionFactoryMethodTest"
+```
+
+예상: 필드가 이미 존재하므로 실제로는 PASS일 가능성이 높음. PASS라면 Step 3(구현)은 생략하고 Step 4로 직행.
+FAIL 시 예상 메시지: `cannot find symbol: method setFactoryBeanName(String)` — 이 경우 Step 3을 실행.
+
+- [ ] **Step 3: 구현 — `BeanDefinition`에 필드 추가 (Step 2에서 FAIL 시에만 실행)**
+
+Step 2가 FAIL인 경우에만 아래 코드를 `BeanDefinition.java`에 추가한다.
+
+```java
+// BeanDefinition 클래스 내 필드 선언부에 추가
+private String factoryBeanName;
+private String factoryMethodName;
+
+// getter
+public String getFactoryBeanName() { return factoryBeanName; }
+public String getFactoryMethodName() { return factoryMethodName; }
+
+// fluent setter
+public BeanDefinition setFactoryBeanName(String name) { this.factoryBeanName = name; return this; }
+public BeanDefinition setFactoryMethodName(String name) { this.factoryMethodName = name; return this; }
+```
+
+- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+
+```bash
+./gradlew :sfs-beans:test --tests "com.choisk.sfs.beans.BeanDefinitionFactoryMethodTest"
+```
+
+예상: PASS (5건).
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add sfs-beans/src/test/java/com/choisk/sfs/beans/BeanDefinitionFactoryMethodTest.java
+git commit -m "test(sfs-beans): BeanDefinition factoryBeanName/factoryMethodName 라운드-트립 검증"
+```
 
 ---
 
@@ -89,7 +191,173 @@ ctx.close();  // @PreDestroy 호출 + shutdown hook 정리
 - Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/AbstractAutowireCapableBeanFactory.java` (또는 `DefaultListableBeanFactory.createBean` 위치)
 - Test: `sfs-beans/src/test/java/com/choisk/sfs/beans/CreateBeanFactoryMethodTest.java`
 
-> *(Step 1-5 본문은 후속 위임에서 채움)*
+> **사전 분석 (2026-04-25):** `createBean`은 `AbstractAutowireCapableBeanFactory`에 위치 (`sfs-beans/src/main/java/com/choisk/sfs/beans/support/AbstractAutowireCapableBeanFactory.java`). 현재 `createBean` → `resolveBeforeInstantiation` → `doCreateBean` → `instantiateBean` 경로만 있음. `instantiateBean`에서 constructor 경로만 처리하므로, `doCreateBean` 도입부에 `factoryMethodName != null` 분기를 추가해야 한다.
+
+- [ ] **Step 1: 실패 테스트 작성**
+
+```java
+package com.choisk.sfs.beans;
+
+import com.choisk.sfs.beans.support.DefaultListableBeanFactory;
+import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * factoryMethod 모드 인스턴스화 검증.
+ * factoryBeanName + factoryMethodName이 설정된 BeanDefinition은
+ * constructor가 아닌 팩토리 메서드로 인스턴스를 생성해야 한다.
+ */
+class CreateBeanFactoryMethodTest {
+
+    // @Configuration 클래스 역할을 하는 팩토리 빈
+    static class AppConfig {
+        public MyRepo repo() { return new MyRepo("from-factory"); }
+    }
+
+    static class MyRepo {
+        final String source;
+        MyRepo(String source) { this.source = source; }
+        // 기본 생성자 없음 — factoryMethod 경로를 강제하기 위해
+    }
+
+    @Test
+    void factoryMethodCreatesBean() {
+        DefaultListableBeanFactory factory = new DefaultListableBeanFactory();
+
+        // appConfig 빈 등록 (팩토리 빈 자체)
+        factory.registerBeanDefinition("appConfig", new BeanDefinition(AppConfig.class));
+
+        // myRepo 빈: factoryBeanName + factoryMethodName 모드
+        BeanDefinition repoDef = new BeanDefinition(MyRepo.class);
+        repoDef.setFactoryBeanName("appConfig");
+        repoDef.setFactoryMethodName("repo");
+        factory.registerBeanDefinition("myRepo", repoDef);
+
+        MyRepo repo = (MyRepo) factory.getBean("myRepo");
+        assertThat(repo).isNotNull();
+        assertThat(repo.source).isEqualTo("from-factory");
+    }
+
+    @Test
+    void factoryMethodReturnsSingletonByDefault() {
+        DefaultListableBeanFactory factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("appConfig", new BeanDefinition(AppConfig.class));
+
+        BeanDefinition repoDef = new BeanDefinition(MyRepo.class);
+        repoDef.setFactoryBeanName("appConfig");
+        repoDef.setFactoryMethodName("repo");
+        factory.registerBeanDefinition("myRepo", repoDef);
+
+        Object first = factory.getBean("myRepo");
+        Object second = factory.getBean("myRepo");
+        // 싱글톤이므로 동일 인스턴스
+        assertThat(first).isSameAs(second);
+    }
+}
+```
+
+- [ ] **Step 2: 테스트 실행 (FAIL 확인)**
+
+```bash
+./gradlew :sfs-beans:test --tests "com.choisk.sfs.beans.CreateBeanFactoryMethodTest"
+```
+
+예상: FAIL — `MyRepo`에 기본 생성자가 없으므로 현재 `instantiateBean`에서 `BeanCreationException`이 발생하거나, 팩토리 메서드 분기가 없으므로 잘못된 경로 진입.
+
+- [ ] **Step 3: 구현 — `AbstractAutowireCapableBeanFactory.doCreateBean`에 factoryMethod 분기 추가**
+
+`sfs-beans/src/main/java/com/choisk/sfs/beans/support/AbstractAutowireCapableBeanFactory.java`의 `doCreateBean` 메서드 시작 부분에 다음 분기를 추가한다.
+
+```java
+protected Object doCreateBean(String beanName, BeanDefinition definition) {
+    // B-2: 인스턴스화 — factoryMethod 모드 우선, 없으면 constructor 경로
+    Object bean;
+    if (definition.getFactoryMethodName() != null) {
+        bean = instantiateViaFactoryMethod(beanName, definition);
+    } else {
+        bean = instantiateBean(beanName, definition);
+    }
+
+    // B-3: 3차 캐시에 팩토리 등록 (조기 참조용)
+    boolean earlySingletonExposure = definition.isSingleton();
+    if (earlySingletonExposure) {
+        registerSingletonFactory(beanName, () -> getEarlyBeanReference(beanName, bean));
+    }
+
+    // B-4: 프로퍼티 주입
+    populateBean(beanName, definition, bean);
+
+    // B-5: 초기화
+    Object exposed = initializeBean(beanName, definition, bean);
+
+    // B-7: destroy 등록
+    registerDisposableIfNeeded(beanName, definition, exposed);
+
+    return exposed;
+}
+
+/**
+ * factoryBeanName + factoryMethodName 모드 인스턴스화.
+ * <p>팩토리 빈을 먼저 getBean으로 얻은 뒤, 지정된 메서드를 reflection으로 호출한다.
+ * byte-buddy enhance 적용 후에는 inter-bean reference 시 getBean으로 라우팅되어
+ * 컨테이너 싱글톤이 보장된다.
+ */
+private Object instantiateViaFactoryMethod(String beanName, BeanDefinition definition) {
+    String factoryBeanName = definition.getFactoryBeanName();
+    String factoryMethodName = definition.getFactoryMethodName();
+    try {
+        Object factoryBean = getBean(factoryBeanName);
+        // enhance된 클래스의 슈퍼클래스에서 메서드를 찾아야 올바른 반환 타입을 얻음
+        java.lang.reflect.Method method = null;
+        Class<?> searchType = factoryBean.getClass();
+        while (searchType != null && method == null) {
+            for (java.lang.reflect.Method m : searchType.getDeclaredMethods()) {
+                if (m.getName().equals(factoryMethodName) && m.getParameterCount() == 0) {
+                    method = m;
+                    break;
+                }
+            }
+            searchType = searchType.getSuperclass();
+        }
+        if (method == null) {
+            throw new com.choisk.sfs.core.BeanCreationException(beanName,
+                    "Factory method '%s' not found on '%s'".formatted(factoryMethodName, factoryBeanName));
+        }
+        method.setAccessible(true);
+        return method.invoke(factoryBean);
+    } catch (java.lang.reflect.InvocationTargetException e) {
+        throw new com.choisk.sfs.core.BeanCreationException(beanName,
+                "Factory method '%s' threw exception".formatted(factoryMethodName), e.getCause());
+    } catch (ReflectiveOperationException e) {
+        throw new com.choisk.sfs.core.BeanCreationException(beanName,
+                "Factory method invocation failed", e);
+    }
+}
+```
+
+- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+
+```bash
+./gradlew :sfs-beans:test --tests "com.choisk.sfs.beans.CreateBeanFactoryMethodTest"
+```
+
+예상: PASS (2건).
+
+회귀 확인:
+
+```bash
+./gradlew :sfs-beans:test
+```
+
+예상: 기존 테스트 전체 PASS.
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add sfs-beans/src/main/java/com/choisk/sfs/beans/support/AbstractAutowireCapableBeanFactory.java \
+        sfs-beans/src/test/java/com/choisk/sfs/beans/CreateBeanFactoryMethodTest.java
+git commit -m "feat(sfs-beans): AbstractAutowireCapableBeanFactory에 factoryMethod 인스턴스화 분기 추가"
+```
 
 ---
 
@@ -103,7 +371,149 @@ ctx.close();  // @PreDestroy 호출 + shutdown hook 정리
 - Create: `sfs-beans/src/main/java/com/choisk/sfs/beans/DependencyDescriptor.java`
 - Test: `sfs-beans/src/test/java/com/choisk/sfs/beans/DependencyDescriptorTest.java`
 
-> *(Step 1-5 본문은 후속 위임에서 채움)*
+- [ ] **Step 1: 실패 테스트 작성**
+
+```java
+package com.choisk.sfs.beans;
+
+import org.junit.jupiter.api.Test;
+import java.util.List;
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * DependencyDescriptor 생성자 + getter 검증.
+ * required 플래그와 제네릭 타입 추출이 resolveDependency 분기의 핵심 입력이므로
+ * 모든 getter가 생성자에서 받은 값을 그대로 반환해야 한다.
+ */
+class DependencyDescriptorTest {
+
+    interface MyService {}
+    static class MyServiceImpl implements MyService {}
+
+    @Test
+    void requiredTrueByDefault_returnsCorrectType() {
+        DependencyDescriptor desc = new DependencyDescriptor(
+                MyService.class, null, true, "myService");
+        assertThat(desc.getDependencyType()).isEqualTo(MyService.class);
+        assertThat(desc.isRequired()).isTrue();
+        assertThat(desc.getDependencyName()).isEqualTo("myService");
+    }
+
+    @Test
+    void requiredFalse_flagIsPreserved() {
+        DependencyDescriptor desc = new DependencyDescriptor(
+                MyService.class, null, false, "optionalService");
+        assertThat(desc.isRequired()).isFalse();
+    }
+
+    @Test
+    void genericType_isStoredAndReturned() throws Exception {
+        // List<MyService> 필드의 제네릭 타입을 직접 추출해서 전달하는 시나리오
+        java.lang.reflect.Type listType = SampleHolder.class
+                .getDeclaredField("services")
+                .getGenericType();
+
+        DependencyDescriptor desc = new DependencyDescriptor(
+                List.class, listType, true, "services");
+        assertThat(desc.getDependencyType()).isEqualTo(List.class);
+        assertThat(desc.getGenericType()).isEqualTo(listType);
+    }
+
+    @Test
+    void nullGenericType_isAllowed() {
+        // 단순 타입(List/Map 아님)은 genericType null 허용
+        DependencyDescriptor desc = new DependencyDescriptor(
+                MyService.class, null, true, "svc");
+        assertThat(desc.getGenericType()).isNull();
+    }
+
+    @Test
+    void dependencyName_isPreserved() {
+        DependencyDescriptor desc = new DependencyDescriptor(
+                MyService.class, null, true, "primarySvc");
+        assertThat(desc.getDependencyName()).isEqualTo("primarySvc");
+    }
+
+    // List<MyService> 필드를 선언하기 위한 홀더 (제네릭 타입 추출 용도)
+    static class SampleHolder {
+        List<MyService> services;
+    }
+}
+```
+
+- [ ] **Step 2: 테스트 실행 (FAIL 확인)**
+
+```bash
+./gradlew :sfs-beans:test --tests "com.choisk.sfs.beans.DependencyDescriptorTest"
+```
+
+예상: FAIL — `DependencyDescriptor` 클래스가 존재하지 않으므로 컴파일 에러.
+
+- [ ] **Step 3: 구현 — `DependencyDescriptor.java` 신설**
+
+`sfs-beans/src/main/java/com/choisk/sfs/beans/DependencyDescriptor.java` 파일 신규 생성:
+
+```java
+package com.choisk.sfs.beans;
+
+import java.lang.reflect.Type;
+
+/**
+ * 의존성 주입 요청을 기술하는 디스크립터.
+ * <p>Spring 원본: {@code org.springframework.beans.factory.config.DependencyDescriptor}.
+ * AutowiredAnnotationBeanPostProcessor가 resolveDependency 호출 시 사용.
+ *
+ * <p>생성자 인자:
+ * <ul>
+ *   <li>{@code type} — 주입 대상의 선언 타입 (예: List.class, MyService.class)</li>
+ *   <li>{@code genericType} — 제네릭 타입 정보 (List&lt;MyService&gt; 등). null이면 단순 타입</li>
+ *   <li>{@code required} — true이면 매칭 빈 없을 때 예외. false이면 null 반환</li>
+ *   <li>{@code name} — 필드/파라미터 이름. 폴백 매칭 및 Map&lt;String,T&gt; 키에 사용</li>
+ * </ul>
+ */
+public class DependencyDescriptor {
+
+    private final Class<?> type;
+    private final Type genericType;
+    private final boolean required;
+    private final String name;
+
+    public DependencyDescriptor(Class<?> type, Type genericType, boolean required, String name) {
+        this.type = type;
+        this.genericType = genericType;
+        this.required = required;
+        this.name = name;
+    }
+
+    /** 주입 대상의 선언 타입. */
+    public Class<?> getDependencyType() { return type; }
+
+    /** 제네릭 타입 정보. List&lt;T&gt;/Map&lt;String,T&gt; 원소 타입 추출에 사용. null이면 단순 타입. */
+    public Type getGenericType() { return genericType; }
+
+    /** required=false이면 매칭 빈 없을 때 null 반환. true이면 NoSuchBeanDefinitionException 발생. */
+    public boolean isRequired() { return required; }
+
+    /** 필드/파라미터 이름. @Qualifier 미명시 시 이름 기반 폴백 매칭에 사용. */
+    public String getDependencyName() { return name; }
+}
+```
+
+- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+
+```bash
+./gradlew :sfs-beans:test --tests "com.choisk.sfs.beans.DependencyDescriptorTest"
+```
+
+예상: PASS (5건).
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add sfs-beans/src/main/java/com/choisk/sfs/beans/DependencyDescriptor.java \
+        sfs-beans/src/test/java/com/choisk/sfs/beans/DependencyDescriptorTest.java
+git commit -m "feat(sfs-beans): DependencyDescriptor 신설 — required 플래그 + 제네릭 타입 디스크립터"
+```
 
 ---
 
@@ -115,7 +525,290 @@ ctx.close();  // @PreDestroy 호출 + shutdown hook 정리
 - Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultListableBeanFactory.java`
 - Test: `sfs-beans/src/test/java/com/choisk/sfs/beans/ResolveDependencyTest.java`
 
-> *(Step 1-5 본문은 후속 위임에서 채움)*
+- [ ] **Step 1: 실패 테스트 작성**
+
+```java
+package com.choisk.sfs.beans;
+
+import com.choisk.sfs.beans.support.DefaultListableBeanFactory;
+import com.choisk.sfs.core.NoSuchBeanDefinitionException;
+import org.junit.jupiter.api.Test;
+import java.util.List;
+import java.util.Map;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+/**
+ * DefaultListableBeanFactory.resolveDependency 분기 검증.
+ * List/Map/단일/다수/required=false 5개 경로가 모두 올바르게 동작해야 한다.
+ */
+class ResolveDependencyTest {
+
+    interface Handler {}
+
+    static class HandlerA implements Handler {}
+    static class HandlerB implements Handler {}
+
+    static class Standalone {}
+    static class Consumer {}
+
+    // List<Handler> 필드의 제네릭 타입을 추출하기 위한 홀더
+    static class ListHolder {
+        List<Handler> handlers;
+    }
+
+    // Map<String, Handler> 필드의 제네릭 타입을 추출하기 위한 홀더
+    static class MapHolder {
+        Map<String, Handler> handlers;
+    }
+
+    @Test
+    void singleCandidate_returnsTheBean() {
+        DefaultListableBeanFactory factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("standalone", new BeanDefinition(Standalone.class));
+
+        DependencyDescriptor desc = new DependencyDescriptor(
+                Standalone.class, null, true, "standalone");
+        Object result = factory.resolveDependency(desc, "consumer");
+        assertThat(result).isInstanceOf(Standalone.class);
+    }
+
+    @Test
+    void noCandidate_required_throwsException() {
+        DefaultListableBeanFactory factory = new DefaultListableBeanFactory();
+
+        DependencyDescriptor desc = new DependencyDescriptor(
+                Standalone.class, null, true, "standalone");
+        assertThatThrownBy(() -> factory.resolveDependency(desc, "consumer"))
+                .isInstanceOf(NoSuchBeanDefinitionException.class);
+    }
+
+    @Test
+    void noCandidate_requiredFalse_returnsNull() {
+        DefaultListableBeanFactory factory = new DefaultListableBeanFactory();
+
+        DependencyDescriptor desc = new DependencyDescriptor(
+                Standalone.class, null, false, "standalone");
+        Object result = factory.resolveDependency(desc, "consumer");
+        assertThat(result).isNull();
+    }
+
+    @Test
+    void listType_collectsAllMatchingBeans() throws Exception {
+        DefaultListableBeanFactory factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("handlerA", new BeanDefinition(HandlerA.class));
+        factory.registerBeanDefinition("handlerB", new BeanDefinition(HandlerB.class));
+
+        java.lang.reflect.Type genericType = ListHolder.class
+                .getDeclaredField("handlers")
+                .getGenericType();
+        DependencyDescriptor desc = new DependencyDescriptor(
+                List.class, genericType, true, "handlers");
+
+        @SuppressWarnings("unchecked")
+        List<Handler> result = (List<Handler>) factory.resolveDependency(desc, "consumer");
+        assertThat(result).hasSize(2);
+        assertThat(result).allMatch(h -> h instanceof Handler);
+    }
+
+    @Test
+    void mapType_collectsAllMatchingBeansWithNames() throws Exception {
+        DefaultListableBeanFactory factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("handlerA", new BeanDefinition(HandlerA.class));
+        factory.registerBeanDefinition("handlerB", new BeanDefinition(HandlerB.class));
+
+        java.lang.reflect.Type genericType = MapHolder.class
+                .getDeclaredField("handlers")
+                .getGenericType();
+        DependencyDescriptor desc = new DependencyDescriptor(
+                Map.class, genericType, true, "handlers");
+
+        @SuppressWarnings("unchecked")
+        Map<String, Handler> result = (Map<String, Handler>) factory.resolveDependency(desc, "consumer");
+        assertThat(result).containsKeys("handlerA", "handlerB");
+        assertThat(result.get("handlerA")).isInstanceOf(HandlerA.class);
+        assertThat(result.get("handlerB")).isInstanceOf(HandlerB.class);
+    }
+
+    @Test
+    void multipleCandidates_primaryWins() {
+        DefaultListableBeanFactory factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("handlerA", new BeanDefinition(HandlerA.class));
+        factory.registerBeanDefinition("handlerB",
+                new BeanDefinition(HandlerB.class).setPrimary(true));
+
+        DependencyDescriptor desc = new DependencyDescriptor(
+                Handler.class, null, true, "handler");
+        Object result = factory.resolveDependency(desc, "consumer");
+        assertThat(result).isInstanceOf(HandlerB.class);
+    }
+
+    @Test
+    void multipleCandidates_nameMatchFallback() {
+        DefaultListableBeanFactory factory = new DefaultListableBeanFactory();
+        factory.registerBeanDefinition("handlerA", new BeanDefinition(HandlerA.class));
+        factory.registerBeanDefinition("handlerB", new BeanDefinition(HandlerB.class));
+
+        // dependencyName이 "handlerA"이면 이름 매칭으로 handlerA를 선택
+        DependencyDescriptor desc = new DependencyDescriptor(
+                Handler.class, null, true, "handlerA");
+        Object result = factory.resolveDependency(desc, "consumer");
+        assertThat(result).isInstanceOf(HandlerA.class);
+    }
+}
+```
+
+- [ ] **Step 2: 테스트 실행 (FAIL 확인)**
+
+```bash
+./gradlew :sfs-beans:test --tests "com.choisk.sfs.beans.ResolveDependencyTest"
+```
+
+예상: FAIL — `DefaultListableBeanFactory`에 `resolveDependency(DependencyDescriptor, String)` 메서드가 없으므로 컴파일 에러.
+
+- [ ] **Step 3: 구현 — `DefaultListableBeanFactory`에 `resolveDependency` 메서드 추가**
+
+`sfs-beans/src/main/java/com/choisk/sfs/beans/support/DefaultListableBeanFactory.java`에 다음을 추가한다.
+
+import 추가:
+
+```java
+import com.choisk.sfs.beans.DependencyDescriptor;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+```
+
+메서드 추가 (기존 `resolveBeanNameByType` 메서드 바로 아래):
+
+```java
+/**
+ * DependencyDescriptor가 기술하는 의존성을 해석해 인스턴스를 반환한다.
+ * <p>해석 순서:
+ * <ol>
+ *   <li>List&lt;T&gt; — 매칭 빈 전체를 List로 수집</li>
+ *   <li>Map&lt;String, T&gt; — 매칭 빈 전체를 이름→인스턴스 Map으로 수집</li>
+ *   <li>단일 후보 — 그대로 반환</li>
+ *   <li>후보 없음 + required=false — null 반환</li>
+ *   <li>후보 없음 + required=true — NoSuchBeanDefinitionException</li>
+ *   <li>다수 후보 — determineAutowireCandidate(@Primary → 이름 매칭 폴백)</li>
+ * </ol>
+ *
+ * @param desc               주입 대상 디스크립터
+ * @param requestingBeanName 주입을 요청하는 빈 이름 (순환 참조 감지 등에 활용 가능)
+ * @return 해석된 빈 인스턴스. required=false이고 매칭 빈이 없으면 null.
+ */
+public Object resolveDependency(DependencyDescriptor desc, String requestingBeanName) {
+    Class<?> type = desc.getDependencyType();
+
+    // List<T> 분기
+    if (List.class.isAssignableFrom(type)) {
+        Class<?> elementType = extractFirstGenericArg(desc.getGenericType());
+        if (elementType != null) {
+            return new java.util.ArrayList<>(getBeansOfType(elementType).values());
+        }
+    }
+
+    // Map<String, T> 분기
+    if (Map.class.isAssignableFrom(type)) {
+        Class<?> elementType = extractSecondGenericArg(desc.getGenericType());
+        if (elementType != null) {
+            return getBeansOfType(elementType);
+        }
+    }
+
+    // 단일 타입 해석
+    Map<String, Object> matches = getBeansOfType(type);
+    if (matches.isEmpty()) {
+        if (desc.isRequired()) {
+            throw new com.choisk.sfs.core.NoSuchBeanDefinitionException(
+                    "No bean of type " + type.getName() + " found for dependency '" + desc.getDependencyName() + "'");
+        }
+        return null;
+    }
+    if (matches.size() == 1) {
+        return matches.values().iterator().next();
+    }
+
+    // 다수 후보 — @Primary → 이름 매칭 폴백
+    return determineAutowireCandidate(matches, desc);
+}
+
+/**
+ * 다수 후보 중 주입 대상을 결정한다.
+ * <p>우선순위: @Primary → dependencyName 이름 매칭 → NoUniqueBeanDefinitionException.
+ */
+private Object determineAutowireCandidate(Map<String, Object> candidates, DependencyDescriptor desc) {
+    // 1) @Primary 후보 찾기
+    var primaries = new java.util.ArrayList<String>();
+    for (var entry : candidates.entrySet()) {
+        BeanDefinition bd = getBeanDefinition(entry.getKey());
+        if (bd != null && bd.isPrimary()) {
+            primaries.add(entry.getKey());
+        }
+    }
+    if (primaries.size() == 1) {
+        return candidates.get(primaries.get(0));
+    }
+
+    // 2) 이름 매칭 폴백 — dependencyName이 후보 이름과 일치하는 경우
+    String depName = desc.getDependencyName();
+    if (depName != null && candidates.containsKey(depName)) {
+        return candidates.get(depName);
+    }
+
+    // 3) 해결 불가 — 예외
+    throw new com.choisk.sfs.core.NoUniqueBeanDefinitionException(
+            "Multiple beans of type " + desc.getDependencyType().getName()
+                    + " found and no unique candidate: " + candidates.keySet(),
+            new java.util.ArrayList<>(candidates.keySet()));
+}
+
+/** ParameterizedType의 첫 번째 타입 인자를 Class로 추출. List<T>에서 T 추출 용도. */
+private Class<?> extractFirstGenericArg(Type genericType) {
+    if (genericType instanceof ParameterizedType pt) {
+        Type[] args = pt.getActualTypeArguments();
+        if (args.length >= 1 && args[0] instanceof Class<?> cls) {
+            return cls;
+        }
+    }
+    return null;
+}
+
+/** ParameterizedType의 두 번째 타입 인자를 Class로 추출. Map<String,T>에서 T 추출 용도. */
+private Class<?> extractSecondGenericArg(Type genericType) {
+    if (genericType instanceof ParameterizedType pt) {
+        Type[] args = pt.getActualTypeArguments();
+        if (args.length >= 2 && args[1] instanceof Class<?> cls) {
+            return cls;
+        }
+    }
+    return null;
+}
+```
+
+- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+
+```bash
+./gradlew :sfs-beans:test --tests "com.choisk.sfs.beans.ResolveDependencyTest"
+```
+
+예상: PASS (7건).
+
+회귀 확인:
+
+```bash
+./gradlew :sfs-beans:test
+```
+
+예상: 기존 테스트 전체 PASS.
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add sfs-beans/src/main/java/com/choisk/sfs/beans/support/DefaultListableBeanFactory.java \
+        sfs-beans/src/test/java/com/choisk/sfs/beans/ResolveDependencyTest.java
+git commit -m "feat(sfs-beans): DefaultListableBeanFactory에 resolveDependency 신설 — List/Map/required=false/다수 후보 분기"
+```
 
 ---
 
@@ -126,7 +819,29 @@ ctx.close();  // @PreDestroy 호출 + shutdown hook 정리
 **Files:**
 - Test: `sfs-beans/src/test/java/com/choisk/sfs/beans/LazyInitSkipRegressionTest.java` (또는 1B-α의 `LazyInitializationTest` 그대로 회귀 PASS 확인)
 
-> *(Step 1-5 본문은 후속 위임에서 채움)*
+> **이 task의 성격:** 새 테스트를 추가하거나 구현을 변경하지 않는다. 1B-α에서 구현한 `@Lazy` skip 분기가 1B-β의 sfs-beans 변경(Task A1, A2, B1, B2)이 적용된 후에도 그대로 동작하는지 확인하는 회귀 검증이다.
+
+- [ ] **Step 1: 1B-α의 LazyInit 통합 테스트 회귀 실행**
+
+```bash
+./gradlew :sfs-context:test --tests "com.choisk.sfs.context.integration.LazyInitializationTest"
+```
+
+예상: PASS (1건). `@Lazy` 클래스는 `preInstantiateSingletons()`에서 skip되고, 첫 `getBean()` 시 생성됨.
+
+- [ ] **Step 2: sfs-beans 전체 회귀 실행 (1B-β 변경 영향 확인)**
+
+```bash
+./gradlew :sfs-beans:test
+```
+
+예상: 모든 테스트 PASS. Task A1/A2/B1/B2의 변경이 기존 lazy init 로직(`DefaultListableBeanFactory.preInstantiateSingletons`의 `!def.isLazyInit()` 조건)에 영향을 주지 않아야 한다.
+
+- [ ] **Step 3: 회귀 결과 기록 (커밋 없음 — 코드 변경 없음)**
+
+회귀 PASS 확인 후 본 plan 문서에 아래 메모를 추가한다:
+
+> **회귀 PASS 확인 (실행 시점):** sfs-context `LazyInitializationTest` 1건 PASS. 1B-β sfs-beans 변경(factoryMethod 분기, DependencyDescriptor, resolveDependency)이 `preInstantiateSingletons`의 `isLazyInit()` 조건에 영향 없음 확인.
 
 ---
 
@@ -138,7 +853,213 @@ ctx.close();  // @PreDestroy 호출 + shutdown hook 정리
 - Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistry.java:34-44`
 - Test: `sfs-beans/src/test/java/com/choisk/sfs/beans/RegisterSingletonAtomicTest.java`
 
-> *(Step 1-5 본문은 후속 위임에서 채움)*
+> **사전 분석 (2026-04-25):** `DefaultSingletonBeanRegistry.registerSingleton`을 확인한 결과, `singletonObjects.put` 등 3-cache 조작은 `synchronized(singletonLock)` 안에 있으나, 이후 `DisposableBean` 감지 + `registerDisposableBean` 호출은 `singletonLock` **밖**에 있다 (라인 34-44). 두 작업 사이에 다른 스레드가 `destroySingletons`를 호출하면 DisposableBean 등록이 누락될 수 있는 구조적 허점. 이 task에서 두 작업을 같은 `synchronized` 블록으로 묶는다.
+
+- [ ] **Step 1: 실패 테스트 작성**
+
+```java
+package com.choisk.sfs.beans;
+
+import org.junit.jupiter.api.Test;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * registerSingleton의 DisposableBean 감지가 singletonLock 안에서 원자적으로 실행됨을 검증.
+ * singletonObjects.put과 disposableBeans.put이 같은 임계 구역에 있어야
+ * 동시 destroySingletons 호출 시 destroy 콜백이 누락되지 않는다.
+ */
+class RegisterSingletonAtomicTest {
+
+    static class TrackingDisposable implements DisposableBean {
+        final AtomicBoolean destroyed = new AtomicBoolean(false);
+
+        @Override
+        public void destroy() {
+            destroyed.set(true);
+        }
+    }
+
+    @Test
+    void disposableBeanRegisteredWithinLock_destroyCallbackNotLost() throws InterruptedException {
+        DefaultSingletonBeanRegistry registry = new DefaultSingletonBeanRegistry();
+        TrackingDisposable bean = new TrackingDisposable();
+
+        registry.registerSingleton("tracked", bean);
+
+        // destroySingletons 직후에도 destroy 콜백이 실행되어야 함
+        registry.destroySingletons();
+
+        assertThat(bean.destroyed.get())
+                .as("DisposableBean.destroy()가 호출되어야 함 — registerSingleton과 registerDisposableBean이 원자적이어야 보장")
+                .isTrue();
+    }
+
+    @Test
+    void concurrentRegisterAndDestroy_destroyCallbackNotMissed() throws InterruptedException {
+        // 여러 스레드가 registerSingleton과 destroySingletons를 동시 호출해도
+        // DisposableBean 콜백이 누락되지 않음을 확률적으로 검증
+        int iterations = 200;
+        AtomicInteger missedDestroys = new AtomicInteger(0);
+
+        for (int i = 0; i < iterations; i++) {
+            DefaultSingletonBeanRegistry registry = new DefaultSingletonBeanRegistry();
+            TrackingDisposable bean = new TrackingDisposable();
+            CountDownLatch startLatch = new CountDownLatch(1);
+
+            Thread registrar = new Thread(() -> {
+                try {
+                    startLatch.await();
+                    registry.registerSingleton("bean" + Thread.currentThread().threadId(), bean);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+
+            Thread destroyer = new Thread(() -> {
+                try {
+                    startLatch.await();
+                    registry.destroySingletons();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+
+            registrar.start();
+            destroyer.start();
+            startLatch.countDown();
+            registrar.join(500);
+            destroyer.join(500);
+
+            // registerSingleton이 먼저 완료된 경우에 destroy가 호출되었는지 확인
+            // (destroyer가 registerSingleton 전에 실행된 경우는 destroy 미호출이 정상)
+            if (registry.getSingletonNames().length == 0 && !bean.destroyed.get()) {
+                // destroySingletons가 registerSingleton 이후에 실행됐는데 destroy가 안 된 경우만 카운트
+                // 이 검증은 결정적이지 않으므로 참고용
+            }
+        }
+
+        // 결정적 테스트: 순서가 보장된 단일 스레드 시나리오에서 반드시 destroy가 실행
+        DefaultSingletonBeanRegistry registry2 = new DefaultSingletonBeanRegistry();
+        TrackingDisposable bean2 = new TrackingDisposable();
+        registry2.registerSingleton("singleBean", bean2);
+        registry2.destroySingletons();
+        assertThat(bean2.destroyed.get()).isTrue();
+    }
+
+    @Test
+    void nonDisposableBean_doesNotRegisterCallback() {
+        DefaultSingletonBeanRegistry registry = new DefaultSingletonBeanRegistry();
+        // DisposableBean을 구현하지 않는 일반 객체
+        Object plain = new Object();
+        registry.registerSingleton("plain", plain);
+
+        // destroySingletons를 호출해도 예외 없이 통과해야 함
+        registry.destroySingletons();
+
+        // singletonObjects가 비워진 상태 확인
+        assertThat(registry.containsSingleton("plain")).isFalse();
+    }
+}
+```
+
+- [ ] **Step 2: 테스트 실행 (FAIL/PASS 확인)**
+
+```bash
+./gradlew :sfs-beans:test --tests "com.choisk.sfs.beans.RegisterSingletonAtomicTest"
+```
+
+예상: 단일 스레드 테스트(`disposableBeanRegisteredWithinLock_destroyCallbackNotLost`, `nonDisposableBean_doesNotRegisterCallback`)는 현재 코드에서도 PASS할 수 있음. 그러나 `concurrentRegisterAndDestroy_destroyCallbackNotMissed`의 결정적 부분과 구조적 atomic 보장 관점에서 변경이 필요하다.
+
+- [ ] **Step 3: 구현 — `DefaultSingletonBeanRegistry.registerSingleton`의 DisposableBean 감지를 `singletonLock` 안으로 이동**
+
+`sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistry.java`의 `registerSingleton` 메서드를 다음으로 교체한다.
+
+변경 전 (`singletonLock` 블록이 끝난 **뒤**에 DisposableBean 감지):
+```java
+public void registerSingleton(String name, Object bean) {
+    Assert.hasText(name, "name");
+    Assert.notNull(bean, "bean");
+    synchronized (singletonLock) {
+        Object existing = singletonObjects.get(name);
+        if (existing != null) {
+            throw new IllegalStateException(
+                    "Singleton '%s' already exists (%s)".formatted(name, existing.getClass().getName()));
+        }
+        singletonObjects.put(name, bean);
+        earlySingletonObjects.remove(name);
+        singletonFactories.remove(name);
+    }
+    // DisposableBean을 직접 등록한 경우에도 destroy 콜백이 실행되도록 자동 등록
+    if (bean instanceof DisposableBean disposable) {
+        registerDisposableBean(name, () -> {
+            try {
+                disposable.destroy();
+            } catch (Exception e) {
+                throw new RuntimeException("DisposableBean.destroy failed for '" + name + "'", e);
+            }
+        });
+    }
+}
+```
+
+변경 후 (`singletonLock` **안**에서 DisposableBean 감지와 콜백 등록을 원자적으로):
+```java
+public void registerSingleton(String name, Object bean) {
+    Assert.hasText(name, "name");
+    Assert.notNull(bean, "bean");
+    synchronized (singletonLock) {
+        Object existing = singletonObjects.get(name);
+        if (existing != null) {
+            throw new IllegalStateException(
+                    "Singleton '%s' already exists (%s)".formatted(name, existing.getClass().getName()));
+        }
+        singletonObjects.put(name, bean);
+        earlySingletonObjects.remove(name);
+        singletonFactories.remove(name);
+        // DisposableBean 감지 + 콜백 등록을 같은 임계 구역에서 수행 (simplify 이월 B4).
+        // singletonObjects.put과 disposableBeans.put 사이에 destroySingletons가 끼어드는
+        // 구조적 허점을 제거한다.
+        if (bean instanceof DisposableBean disposable) {
+            disposableBeans.put(name, () -> {
+                try {
+                    disposable.destroy();
+                } catch (Exception e) {
+                    throw new RuntimeException("DisposableBean.destroy failed for '" + name + "'", e);
+                }
+            });
+        }
+    }
+}
+```
+
+> **주의:** `registerDisposableBean`은 내부적으로 `synchronized(singletonLock)`을 다시 획득하므로, 같은 스레드에서 중첩 호출하면 교착 상태가 발생한다. 따라서 `disposableBeans.put`을 직접 호출해야 한다. `disposableBeans` 필드가 `private`이므로 접근 가능성을 확인하고 필요 시 `protected`로 변경하거나 동일 클래스 내에서 직접 접근.
+
+- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+
+```bash
+./gradlew :sfs-beans:test --tests "com.choisk.sfs.beans.RegisterSingletonAtomicTest"
+```
+
+예상: PASS (3건).
+
+회귀 확인:
+
+```bash
+./gradlew :sfs-beans:test
+```
+
+예상: 기존 테스트 전체 PASS.
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistry.java \
+        sfs-beans/src/test/java/com/choisk/sfs/beans/RegisterSingletonAtomicTest.java
+git commit -m "refactor(sfs-beans): registerSingleton의 DisposableBean 감지를 singletonLock 안으로 atomic화 (simplify 이월 B4)"
+```
 
 ---
 
