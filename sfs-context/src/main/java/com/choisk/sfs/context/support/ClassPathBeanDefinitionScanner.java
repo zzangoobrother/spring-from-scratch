@@ -3,8 +3,6 @@ package com.choisk.sfs.context.support;
 import com.choisk.sfs.beans.BeanDefinition;
 import com.choisk.sfs.beans.BeanDefinitionRegistry;
 import com.choisk.sfs.context.annotation.Component;
-import com.choisk.sfs.context.annotation.Lazy;
-import com.choisk.sfs.context.annotation.Primary;
 import com.choisk.sfs.core.AnnotationUtils;
 import com.choisk.sfs.core.ClassPathScanner;
 
@@ -37,9 +35,7 @@ public class ClassPathBeanDefinitionScanner {
                 if (clazz.isInterface() || clazz.isAnnotation()) continue;
                 if (!AnnotationUtils.isAnnotated(clazz, Component.class)) continue;
                 BeanDefinition bd = new BeanDefinition(clazz);
-                applyScope(bd, clazz);
-                applyLazy(bd, clazz);
-                applyPrimary(bd, clazz);
+                BeanDefinitionMetadataApplier.apply(bd, clazz);
                 registry.registerBeanDefinition(nameGenerator.generate(clazz), bd);
                 count++;
             }
@@ -56,18 +52,4 @@ public class ClassPathBeanDefinitionScanner {
         }
     }
 
-    private void applyScope(BeanDefinition bd, Class<?> c) {
-        com.choisk.sfs.context.annotation.Scope s =
-                c.getAnnotation(com.choisk.sfs.context.annotation.Scope.class);
-        if (s != null) bd.setScope(com.choisk.sfs.beans.Scope.byName(s.value()));
-    }
-
-    private void applyLazy(BeanDefinition bd, Class<?> c) {
-        Lazy l = c.getAnnotation(Lazy.class);
-        if (l != null) bd.setLazyInit(l.value());
-    }
-
-    private void applyPrimary(BeanDefinition bd, Class<?> c) {
-        if (c.isAnnotationPresent(Primary.class)) bd.setPrimary(true);
-    }
 }

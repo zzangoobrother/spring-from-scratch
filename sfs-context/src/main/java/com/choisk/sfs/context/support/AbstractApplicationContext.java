@@ -68,15 +68,11 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
         synchronized (startupShutdownMonitor) {
             if (!active) {
                 // refresh 안 했거나 이미 close 호출됨 — idempotent
-                if (shutdownHook != null) {
-                    tryRemoveShutdownHook();
-                }
+                tryRemoveShutdownHook();
                 return;
             }
             doClose();
-            if (shutdownHook != null) {
-                tryRemoveShutdownHook();
-            }
+            tryRemoveShutdownHook();
         }
     }
 
@@ -97,6 +93,7 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
     }
 
     private void tryRemoveShutdownHook() {
+        if (shutdownHook == null) return;
         try {
             Runtime.getRuntime().removeShutdownHook(shutdownHook);
         } catch (IllegalStateException ignore) {
@@ -133,7 +130,7 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
         bf.preInstantiateSingletons();
     }
     protected void finishRefresh() { /* no-op (이벤트 발행 등은 후속 페이즈) */ }
-    protected void cancelRefresh(RuntimeException ex) { active = false; }
+    protected void cancelRefresh(RuntimeException ex) { /* no-op: active=true는 try 마지막에만 설정 — catch 진입 시 active는 이미 false (서브클래스 hook) */ }
     protected void destroyBeans() { getBeanFactory().destroySingletons(); }
 
 }
