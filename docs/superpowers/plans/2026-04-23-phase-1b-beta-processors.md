@@ -1463,7 +1463,8 @@ git commit -m "docs: Plan 1B-β 마감 — README 학습용 시나리오 + DoD 9
 | 🔵 Phase 2 직전 | BPP 처리기의 `DefaultListableBeanFactory` 직접 의존 (위 항목과 묶음) | F1, G1 처리기 생성자 | 위 항목 처리 후 처리기 생성자도 인터페이스 타입으로 변경. 모듈 결합도 감소. |
 | 🟣 다음 plan | `DisposableBean` 이중 등록 가능성 (가설 경로) | B3 `registerSingleton` + `doCreateBean#registerDisposableIfNeeded` | `registerDisposableBean`에 이미 등록된 이름 가드 추가 또는 외부 API 코멘트 박제 (`// 외부 직접 등록 전용`). |
 | 🟣 다음 plan | `getBeanNamesForType` 반환 타입 매칭 한계 | E1 BD 생성 (`new BeanDefinition(m.getReturnType())`) | 인터페이스/Object 반환 시 과매칭 가능 (현재 테스트 범위 내 영향 0). 컬렉션 주입 추가 시점에 인스턴스 후 실제 타입 추적 도입. |
-| ⚪ 가벼움 | WHAT 주석 2건 (CLAUDE.md 위반) | F1 라인 39-41, 46-48 | "@Autowired 없는 필드 건너뜀" → 삭제. "required=false + null" → WHY 재작성("선택적 의존성이라 누락이 정상"). 즉시 cleanup 또는 다음 plan 흡수. |
+| 🟣 다음 plan | `getBean(Class)` 경로의 `@Primary` 지원 vs `resolveDependency`의 다수 후보 무조건 예외 — 두 조회 경로 동작 불일치 | `DefaultListableBeanFactory#resolveDependency` 다수 후보 분기 (B2) | `resolveBeansOfType` 결과에 `resolveBeanNameByType`의 `@Primary` 우선 로직 적용. 또는 Javadoc에 "@Primary 미지원" 명시. |
+| ⚪ 가벼움 | WHAT 주석 2건 (CLAUDE.md 위반) | F1 라인 39-41, 46-48 | "@Autowired 없는 필드 건너뜀" → 삭제. "required=false + null" → WHY 재작성("선택적 의존성이라 누락이 정상"). 즉시 cleanup 또는 다음 plan 흡수. — **simplify 패스에서 반영 완료 (2026-04-25)** |
 
 > **참고:** 두 리뷰가 *우선순위에서 직접 충돌*한 항목 2건은 *현재 학습 시나리오 영향 유무*를 결정 기준으로 사용. 다운캐스팅(영향 0)은 Phase 2 직전, 상속 reflection(영향 즉시)은 본 plan 내 처리. quality-reporter 종합 등급: **B+ (84/100)** — 학습 가치 95(A) / 가독성 90(A) / 테스트 87(B) / 안전성 85(B) / 유지보수성 80(B) / 아키텍처 78(C). main 머지 적합.
 
