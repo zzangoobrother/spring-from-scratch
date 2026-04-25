@@ -752,7 +752,7 @@ git commit -m "feat(sfs-samples): UserController (+ @PreDestroy) + TodoControlle
 - Create: `sfs-samples/src/main/java/com/choisk/sfs/samples/todo/TodoDemoApplication.java`
 - Test: `sfs-samples/src/test/java/com/choisk/sfs/samples/todo/TodoDemoApplicationTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 // sfs-samples/src/test/java/com/choisk/sfs/samples/todo/TodoDemoApplicationTest.java
@@ -797,13 +797,13 @@ class TodoDemoApplicationTest {
 
 > **테스트 의도:** `containsSequence`는 *순서대로 포함*하는지 검증. 다른 출력(예: 디버그 로그)이 사이에 끼어 있어도 8 라인이 *순서대로* 등장하면 PASS. 순서 자체가 학습 가치(`@PostConstruct`가 첫 줄, `@PreDestroy`가 마지막 줄)이므로 `containsSequence`가 적합.
 
-- [ ] **Step 2: 테스트 실행 (FAIL — TodoDemoApplication 미존재)**
+- [x] **Step 2: 테스트 실행 (FAIL — TodoDemoApplication 미존재)**
 
 ```bash
 ./gradlew :sfs-samples:test --tests "com.choisk.sfs.samples.todo.TodoDemoApplicationTest"
 ```
 
-- [ ] **Step 3: `TodoDemoApplication.java` 구현**
+- [x] **Step 3: `TodoDemoApplication.java` 구현**
 
 ```java
 // sfs-samples/src/main/java/com/choisk/sfs/samples/todo/TodoDemoApplication.java
@@ -849,7 +849,7 @@ public class TodoDemoApplication {
 > 3. `todoController.complete(1L)`은 첫 번째 Todo("장보기")의 status를 변경 — 같은 객체 참조라 다음 `list(...)` 출력에 반영.
 > 4. try-with-resources 종료 시 `ctx.close()` → LIFO destroy → UserController.@PreDestroy 출력.
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-samples:test
@@ -858,7 +858,7 @@ public class TodoDemoApplication {
 
 예상: sfs-samples 6 PASS (이전 5 + 통합 1). 전체 BUILD SUCCESSFUL. 회귀 변동 없음.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-samples/src/main/java/com/choisk/sfs/samples/todo/TodoDemoApplication.java \
