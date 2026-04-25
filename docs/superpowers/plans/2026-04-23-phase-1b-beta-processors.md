@@ -1107,7 +1107,7 @@ git commit -m "feat(sfs-context): CommonAnnotationBeanPostProcessor — @PreDest
 - Modify: `sfs-context/src/main/java/com/choisk/sfs/context/support/AnnotationConfigApplicationContext.java`
 - Test: `sfs-context/src/test/java/com/choisk/sfs/context/support/AnnotationConfigUtilsTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -1137,13 +1137,13 @@ class AnnotationConfigUtilsTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (FAIL — `AnnotationConfigUtils` 미존재)**
+- [x] **Step 2: 테스트 실행 (FAIL — `AnnotationConfigUtils` 미존재)**
 
 ```bash
 ./gradlew :sfs-context:test --tests "com.choisk.sfs.context.support.AnnotationConfigUtilsTest"
 ```
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -1188,13 +1188,13 @@ public AnnotationConfigApplicationContext() {
 
 > **simplify B3 통합:** `getBeanFactory()` 직접 전달 vs `registerBeanDefinition` 위임 경로를 본 헬퍼가 단일화. reader/scanner는 `this` (BeanDefinitionRegistry 구현)를 받음.
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-context:test
 ```
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-context/src/main/java/com/choisk/sfs/context/support/AnnotationConfigUtils.java \
@@ -1202,6 +1202,14 @@ git add sfs-context/src/main/java/com/choisk/sfs/context/support/AnnotationConfi
         sfs-context/src/test/java/com/choisk/sfs/context/support/AnnotationConfigUtilsTest.java
 git commit -m "feat(sfs-context): AnnotationConfigUtils — 처리기 3종 자동 등록 헬퍼 (simplify 이월 B3 통합)"
 ```
+
+> **실행 기록 (2026-04-25):** 커밋 `e9a1bdd` — PASS 2/2 (AnnotationConfigUtilsTest). 회귀 전체 38 PASS (36→38).
+>
+> **편차 기록:**
+> - `getBeanFactoryPostProcessorCount()` 메서드 미존재 → `ConfigurableApplicationContext`에 `getBeanFactoryPostProcessors(): List<BeanFactoryPostProcessor>` 공개 노출, `AbstractApplicationContext.getBeanFactoryPostProcessors()` protected → `@Override public`로 변경. 테스트에서 `.size()`로 카운트 접근.
+> - `ConfigurableBeanFactory` 인터페이스에 `getBeanPostProcessors(): List<BeanPostProcessor>` 추가 — `hasBpp` 헬퍼가 인터페이스 경로로 BPP 목록 접근 가능하도록 (sfs-beans 수정 포함).
+> - `ctx.getBeanFactory()` 반환 타입이 `ConfigurableListableBeanFactory` (인터페이스) → `AutowiredAnnotationBeanPostProcessor`/`CommonAnnotationBeanPostProcessor` 생성자에 `DefaultListableBeanFactory` 전달 필요. `registerAnnotationConfigProcessors` 내부에서 `instanceof DefaultListableBeanFactory dlbf` 패턴 매칭으로 다운캐스팅 후 전달.
+> - `AnnotationConfigApplicationContext` reader/scanner 초기화가 `getBeanFactory()` 인자로 수행 (plan 본문의 `this` 대신). 자동 등록 호출 라인은 그대로 추가.
 
 ---
 
