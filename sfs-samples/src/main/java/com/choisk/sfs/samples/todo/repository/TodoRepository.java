@@ -5,6 +5,7 @@ import com.choisk.sfs.context.annotation.Repository;
 import com.choisk.sfs.samples.todo.domain.Todo;
 import com.choisk.sfs.samples.todo.support.IdGenerator;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,7 +30,7 @@ public class TodoRepository {
     public List<Todo> findByOwnerId(Long ownerId) {
         return store.values().stream()
                 .filter(t -> t.ownerId.equals(ownerId))
-                .sorted((a, b) -> Long.compare(a.id, b.id))
+                .sorted(Comparator.comparing(t -> t.id))
                 .toList();
     }
 }
