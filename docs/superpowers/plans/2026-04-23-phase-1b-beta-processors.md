@@ -333,7 +333,7 @@ git commit -m "feat(sfs-beans): resolveDependency 단순판 (단일 매칭 + req
 - Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistry.java`
 - Test: `sfs-beans/src/test/java/com/choisk/sfs/beans/RegisterSingletonAtomicTest.java`
 
-- [ ] **Step 1: 회귀 테스트 작성**
+- [x] **Step 1: 회귀 테스트 작성**
 
 ```java
 package com.choisk.sfs.beans;
@@ -360,13 +360,13 @@ class RegisterSingletonAtomicTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (현재 PASS 가능 — atomic 보장 명문화)**
+- [x] **Step 2: 테스트 실행 (현재 PASS 가능 — atomic 보장 명문화)**
 
 ```bash
 ./gradlew :sfs-beans:test --tests "com.choisk.sfs.beans.RegisterSingletonAtomicTest"
 ```
 
-- [ ] **Step 3: 구현 — DisposableBean 감지를 `singletonLock` 안으로 이동**
+- [x] **Step 3: 구현 — DisposableBean 감지를 `singletonLock` 안으로 이동**
 
 ```java
 // DefaultSingletonBeanRegistry.registerSingleton 변경
@@ -389,14 +389,14 @@ public void registerSingleton(String beanName, Object singletonObject) {
 }
 ```
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인) + 회귀**
+- [x] **Step 4: 테스트 실행 (PASS 확인) + 회귀**
 
 ```bash
 ./gradlew :sfs-beans:test
 ```
 예상: 전체 sfs-beans PASS (DisposableBean 회귀 4건 포함).
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultSingletonBeanRegistry.java \
