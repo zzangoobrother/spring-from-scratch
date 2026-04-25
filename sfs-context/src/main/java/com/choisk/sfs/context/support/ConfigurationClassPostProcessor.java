@@ -24,8 +24,9 @@ public class ConfigurationClassPostProcessor implements BeanFactoryPostProcessor
 
     @Override
     public void postProcessBeanFactory(ConfigurableListableBeanFactory bf) {
-        // registerBeanDefinition 호출이 컬렉션 변경을 일으킬 수 있으므로 이름 배열을 복사 후 순회
-        String[] definitionNames = bf.getBeanDefinitionNames().clone();
+        // registerBeanDefinition 호출이 컬렉션 변경을 일으킬 수 있으므로 스냅샷 배열로 순회
+        // getBeanDefinitionNames()는 내부적으로 toArray(new String[0])로 스냅샷을 반환하므로 .clone() 불필요
+        String[] definitionNames = bf.getBeanDefinitionNames();
 
         for (String configName : definitionNames) {
             BeanDefinition bd = bf.getBeanDefinition(configName);
