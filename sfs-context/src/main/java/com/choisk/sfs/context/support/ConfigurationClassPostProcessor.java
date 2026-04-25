@@ -19,7 +19,6 @@ import java.lang.reflect.Method;
  *   <li>name이 비어있으면 메서드명을 빈 이름으로 사용</li>
  * </ul>
  *
- * <p>Plan 1B-β 섹션 E, Task E1.
  */
 public class ConfigurationClassPostProcessor implements BeanFactoryPostProcessor {
 
