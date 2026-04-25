@@ -3,6 +3,8 @@ package com.choisk.sfs.context;
 import com.choisk.sfs.beans.BeanFactoryPostProcessor;
 import com.choisk.sfs.beans.ConfigurableListableBeanFactory;
 
+import java.util.List;
+
 /**
  * 설정 가능한 ApplicationContext. refresh/close 라이프사이클 + BFPP 등록 + JVM shutdown hook.
  *
@@ -29,4 +31,7 @@ public interface ConfigurableApplicationContext extends ApplicationContext, Auto
 
     /** refresh() 5단계에서 호출될 BFPP를 등록. */
     void addBeanFactoryPostProcessor(BeanFactoryPostProcessor postProcessor);
+
+    /** 등록된 BFPP 목록 조회 (AnnotationConfigUtils 멱등성 검사 등에서 사용). */
+    List<BeanFactoryPostProcessor> getBeanFactoryPostProcessors();
 }
