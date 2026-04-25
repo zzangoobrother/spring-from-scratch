@@ -206,7 +206,7 @@ git commit -m "feat(sfs-beans): DependencyDescriptor 신설 (단순판 — type+
 - Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultListableBeanFactory.java`
 - Test: `sfs-beans/src/test/java/com/choisk/sfs/beans/ResolveDependencyTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.beans;
@@ -255,13 +255,13 @@ class ResolveDependencyTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (FAIL 확인)**
+- [x] **Step 2: 테스트 실행 (FAIL 확인)**
 
 ```bash
 ./gradlew :sfs-beans:test --tests "com.choisk.sfs.beans.ResolveDependencyTest"
 ```
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 ```java
 // DefaultListableBeanFactory에 추가
@@ -287,20 +287,27 @@ public Object resolveDependency(DependencyDescriptor desc, String requestingBean
 
 > **축소판 메모:** 다수 후보가 발생하면 `IllegalStateException`으로 명확히 차단. 메시지에 `@Primary`/`@Qualifier` 폴백 정책이 *왜* 필요한지를 명시하여 학습 시점에 의도가 전달되도록 설계.
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-beans:test --tests "com.choisk.sfs.beans.ResolveDependencyTest"
 ./gradlew :sfs-beans:test
 ```
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-beans/src/main/java/com/choisk/sfs/beans/DefaultListableBeanFactory.java \
         sfs-beans/src/test/java/com/choisk/sfs/beans/ResolveDependencyTest.java
 git commit -m "feat(sfs-beans): resolveDependency 단순판 (단일 매칭 + required=false. 다수 후보는 명시적 예외)"
 ```
+
+> **실행 기록 (2026-04-25):** 커밋 `f136236` — PASS 4/4 (ResolveDependencyTest). 회귀 전체 PASS.
+>
+> **편차 기록:**
+> - `NoSuchBeanDefinitionException`은 `com.choisk.sfs.core` 패키지 (plan의 `com.choisk.sfs.beans`와 다름) → import를 `com.choisk.sfs.core.NoSuchBeanDefinitionException`으로 수정.
+> - `DefaultListableBeanFactory`는 `com.choisk.sfs.beans.support` 패키지 → 테스트에 `import com.choisk.sfs.beans.support.DefaultListableBeanFactory` 추가.
+> - `getBeansOfType`은 BeanDefinition 기반만 검색 → `registerSingleton`으로 직접 등록된 싱글톤을 찾지 못함. `resolveDependency` 내부에 `resolveBeansOfType` 헬퍼를 추가하여 `getSingletonNames()` + `getSingleton()` 로 직접 싱글톤도 포함. 4분기 동작은 plan 그대로 유지.
 
 ---
 
