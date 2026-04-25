@@ -179,7 +179,7 @@ git commit -m "feat(sfs-samples): 모듈 신설 + User/Todo 도메인 POJO"
 - Create: `sfs-samples/src/main/java/com/choisk/sfs/samples/todo/support/IdGenerator.java`
 - Test: `sfs-samples/src/test/java/com/choisk/sfs/samples/todo/support/IdGeneratorTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 // sfs-samples/src/test/java/com/choisk/sfs/samples/todo/support/IdGeneratorTest.java
@@ -213,13 +213,13 @@ class IdGeneratorTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (FAIL — 클래스 미존재)**
+- [x] **Step 2: 테스트 실행 (FAIL — 클래스 미존재)**
 
 ```bash
 ./gradlew :sfs-samples:test --tests "com.choisk.sfs.samples.todo.support.IdGeneratorTest"
 ```
 
-- [ ] **Step 3: `IdGenerator.java` 구현**
+- [x] **Step 3: `IdGenerator.java` 구현**
 
 ```java
 // sfs-samples/src/main/java/com/choisk/sfs/samples/todo/support/IdGenerator.java
@@ -247,13 +247,13 @@ public class IdGenerator {
 }
 ```
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-samples:test --tests "com.choisk.sfs.samples.todo.support.IdGeneratorTest"
 ```
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-samples/src/main/java/com/choisk/sfs/samples/todo/support/IdGenerator.java \
