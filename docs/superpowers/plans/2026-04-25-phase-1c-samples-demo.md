@@ -1151,6 +1151,37 @@ git commit -m "docs: Plan 1C 마감 — sfs-samples README + DoD 12항목 [x] + 
 > - **추가 커밋:** A1 + B1 + C1 + D1 + D2 + E1 + F1 + G1 + H1 = 9 커밋
 > - **Phase 1C 종료** — main 머지 준비 완료
 
+> **품질 게이트 기록 (2026-04-25):**
+>
+> CLAUDE.md "완료 후 품질 게이트" 3단계 실행 — *가벼운 게이트* 패턴 (plan 라인 1158 권장 따름).
+>
+> **1단계 — 다관점 코드리뷰 (단일 에이전트, 5 관점)**
+> - `feature-dev:code-reviewer` 1회 dispatch (1B-β의 병렬 2 에이전트 vs 1C의 단일 에이전트 — 데모 코드 단순성 반영)
+> - 종합 등급 **A- (94/100 평균)** — 아키텍처 97 / 가독성 72 / 테스트 89 / 라이프사이클 95 / 보안 96
+> - 발견 6건: Critical 0 / Important 2 (즉시) / Minor 2 (즉시) / Minor 1 (박제) / 반려 5
+>
+> **2단계 — 리팩토링 (즉시 고칠 4건)**
+> - `b5b5d6b` refactor: IdGenerator next/nowInstant WHAT Javadoc 제거 [I-1] (+ 1B-β plan 박제 묶음)
+> - `6b6cfb1` refactor: EnhanceAbsenceDemo WHAT 주석 제거, WHY 단락만 압축 유지 [I-2]
+> - `4689292` refactor: TodoRepository Collectors.toList() → stream().toList() 현대화 [M-2]
+> - `485649b` test: TodoServiceTest completeRejectsUnknownTodo 경계 케이스 추가 [M-1] (137 → 138 PASS)
+>
+> **3단계 — `/simplify` 패스 (병렬 3 에이전트)**
+> - reuse + quality + efficiency 독립 분석
+> - 신규 발견 5건 / 즉시 적용 1건 / 박제 1건 / 반려 3건
+> - `2cceceb` refactor: TodoRepository sorted 람다 → `Comparator.comparing` (Quality + Reuse 동시 발견)
+>
+> **최종 회귀:** sfs-core 28 + sfs-beans 58 + sfs-context 44 + sfs-samples **8** = **총 138 PASS / 0 FAIL**
+> **마감 게이트 추가 커밋:** 5건 (refactor 4 + test 1)
+>
+> **박제 항목 (3 박제 — Phase 2 진입 시 재검토):**
+>
+> | 박제 | 발견 단계 | 학습 가치 | 정합 |
+> |---|---|---|---|
+> | `IdGenerator.nowInstant()` dead API + Clock 두 경로 공존 (UserService가 Clock 직접 주입, IdGenerator의 nowInstant는 IdGeneratorTest에서만 호출) | simplify 3 에이전트 모두 발견 (Efficiency Important/높음) | plan B1의 "Clock 주입 시연" 학습 가치가 *코드 사용 현실*과 어긋남. (a) IdGenerator로 통일 / (b) nowInstant 제거 / (c) Clock 활용 ID 발급 중 선택 필요 | Phase 2 진입 brainstorming에서 @ComponentScan과 함께 묶어 결정 |
+> | `TodoDemoApplication.complete(1L)` 하드코딩 | 1단계 [M-3] | 가독성 — 반환값 바인딩 시 명료해지나 통합 테스트 어서션 변경 필요 | Phase 2 이후 리팩토링 시 고려 |
+> | stdout 캡처 boilerplate (TodoDemoApplicationTest + EnhanceAbsenceDemoTest 2회) | simplify Quality | 3번째 사용처 등장 시 헬퍼 추출 (현재 임계 미달) | 새 데모 추가 시 재검토 |
+
 ---
 
 ## ▶ Plan 1C 완료 후 다음 단계
