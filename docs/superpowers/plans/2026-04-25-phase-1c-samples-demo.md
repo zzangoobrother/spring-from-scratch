@@ -525,7 +525,7 @@ git commit -m "feat(sfs-samples): UserService — @Autowired UserRepository/Cloc
 - Create: `sfs-samples/src/main/java/com/choisk/sfs/samples/todo/service/TodoService.java`
 - Test: `sfs-samples/src/test/java/com/choisk/sfs/samples/todo/service/TodoServiceTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 // sfs-samples/src/test/java/com/choisk/sfs/samples/todo/service/TodoServiceTest.java
@@ -574,13 +574,13 @@ class TodoServiceTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (FAIL — TodoService 미존재)**
+- [x] **Step 2: 테스트 실행 (FAIL — TodoService 미존재)**
 
 ```bash
 ./gradlew :sfs-samples:test --tests "com.choisk.sfs.samples.todo.service.TodoServiceTest"
 ```
 
-- [ ] **Step 3: `TodoService.java` 구현**
+- [x] **Step 3: `TodoService.java` 구현**
 
 ```java
 // sfs-samples/src/main/java/com/choisk/sfs/samples/todo/service/TodoService.java
@@ -623,7 +623,7 @@ public class TodoService {
 
 > **시연 요점:** `@Autowired TodoRepository`, `@Autowired UserRepository` — 같은 빈에 *다중 의존* 주입. 한 빈이 둘 이상의 의존을 받는 케이스가 단위 테스트와 결합되어 자연스럽게 시연됨.
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-samples:test
@@ -631,7 +631,7 @@ public class TodoService {
 
 예상: IdGeneratorTest 2 + UserServiceTest 1 + TodoServiceTest 2 = 5 PASS. 회귀 변동 없음.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-samples/src/main/java/com/choisk/sfs/samples/todo/service/TodoService.java \
