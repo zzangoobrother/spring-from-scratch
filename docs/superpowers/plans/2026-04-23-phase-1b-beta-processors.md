@@ -995,7 +995,7 @@ git commit -m "feat(sfs-context): CommonAnnotationBeanPostProcessor — @PostCon
 - Modify: `sfs-context/src/main/java/com/choisk/sfs/context/support/CommonAnnotationBeanPostProcessor.java`
 - Test: `sfs-context/src/test/java/com/choisk/sfs/context/support/PreDestroyOrderTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -1036,13 +1036,13 @@ class PreDestroyOrderTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (FAIL 확인)**
+- [x] **Step 2: 테스트 실행 (FAIL 확인)**
 
 ```bash
 ./gradlew :sfs-context:test --tests "com.choisk.sfs.context.support.PreDestroyOrderTest"
 ```
 
-- [ ] **Step 3: 구현 — `postProcessAfterInitialization` 보강**
+- [x] **Step 3: 구현 — `postProcessAfterInitialization` 보강**
 
 ```java
 // CommonAnnotationBeanPostProcessor에 추가/변경
@@ -1071,19 +1071,26 @@ public Object postProcessAfterInitialization(Object bean, String beanName) {
 }
 ```
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-context:test
 ```
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-context/src/main/java/com/choisk/sfs/context/support/CommonAnnotationBeanPostProcessor.java \
         sfs-context/src/test/java/com/choisk/sfs/context/support/PreDestroyOrderTest.java
 git commit -m "feat(sfs-context): CommonAnnotationBeanPostProcessor — @PreDestroy 등록 + LIFO 호출"
 ```
+
+> **실행 기록 (2026-04-25):** 커밋 `c81a422` — PASS 1/1 (PreDestroyOrderTest). 회귀 35 → 36 전체 PASS.
+>
+> **편차 기록:**
+> - `registerDisposableBean` 두 번째 인자 타입: `Runnable` — 람다를 그대로 전달 (plan 코드와 동일).
+> - plan의 `java.util.List`/`java.util.ArrayList` 인라인 표기 대신 명시 import(`import java.util.ArrayList; import java.util.List;`) 적용 (CLAUDE.md 와일드카드 금지 규칙 준수).
+> - `DefaultListableBeanFactory` 실제 패키지: `com.choisk.sfs.beans.support` (구조 차이 표 기존 항목 동일 적용).
 
 ---
 
