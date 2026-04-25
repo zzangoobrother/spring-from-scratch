@@ -35,3 +35,17 @@ ctx.close();                  // OK (idempotent)
 ```bash
 ./gradlew :sfs-context:test
 ```
+
+## 주요 통합 테스트 (1B-α 시점)
+
+- `support/AbstractApplicationContextTest` — refresh 8단계 순서 + single-shot
+- `support/GenericApplicationContextTest` — refresh + 외부 BF
+- `support/AnnotatedBeanDefinitionReaderTest` — @Scope/@Lazy/@Primary 추출
+- `support/AnnotationBeanNameGeneratorTest` — 명시 value 우선
+- `support/ClassPathBeanDefinitionScannerTest` — 메타-인식 스캔
+- `integration/ComponentScanIntegrationTest` — End-to-end 두 진입점
+- `integration/RefreshLifecycleIntegrationTest` — 빈 컨텍스트 + 재호출 가드
+- `integration/RefreshFailureCleanupTest` — 5단계 throw 시 destroy 자동 호출
+- `integration/CloseAndShutdownHookTest` — close idempotent + JVM hook
+- `integration/LazyInitializationTest` — preInstantiate skip + 첫 getBean 시 생성
+- `annotation/StereotypeMetaTest` — @Service/@Repository/@Controller/@Configuration 메타 인식

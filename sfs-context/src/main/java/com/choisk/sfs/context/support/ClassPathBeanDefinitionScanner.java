@@ -1,0 +1,55 @@
+package com.choisk.sfs.context.support;
+
+import com.choisk.sfs.beans.BeanDefinition;
+import com.choisk.sfs.beans.BeanDefinitionRegistry;
+import com.choisk.sfs.context.annotation.Component;
+import com.choisk.sfs.core.AnnotationUtils;
+import com.choisk.sfs.core.ClassPathScanner;
+
+/**
+ * 패키지를 스캔하여 {@code @Component} 메타-애노테이션을 가진 클래스를 BeanDefinition으로 등록.
+ *
+ * <p>Spring 원본: {@code ClassPathBeanDefinitionScanner}.
+ */
+public class ClassPathBeanDefinitionScanner {
+
+    private final BeanDefinitionRegistry registry;
+    private final BeanNameGenerator nameGenerator;
+    private final ClassPathScanner classPathScanner = new ClassPathScanner();
+
+    public ClassPathBeanDefinitionScanner(BeanDefinitionRegistry registry) {
+        this(registry, new AnnotationBeanNameGenerator());
+    }
+
+    public ClassPathBeanDefinitionScanner(BeanDefinitionRegistry registry, BeanNameGenerator gen) {
+        this.registry = registry;
+        this.nameGenerator = gen;
+    }
+
+    public int scan(String... basePackages) {
+        int count = 0;
+        for (String pkg : basePackages) {
+            for (ClassPathScanner.ClassInfo info : classPathScanner.scan(pkg)) {
+                Class<?> clazz = loadClass(info.className());
+                if (clazz == null) continue;
+                if (clazz.isInterface() || clazz.isAnnotation()) continue;
+                if (!AnnotationUtils.isAnnotated(clazz, Component.class)) continue;
+                BeanDefinition bd = new BeanDefinition(clazz);
+                BeanDefinitionMetadataApplier.apply(bd, clazz);
+                registry.registerBeanDefinition(nameGenerator.generate(clazz), bd);
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private Class<?> loadClass(String name) {
+        try {
+            return Class.forName(name);
+        } catch (ClassNotFoundException | NoClassDefFoundError e) {
+            // 스캔 대상이 현재 ClassLoader에서 로드 불가 — skip (학습 범위)
+            return null;
+        }
+    }
+
+}
