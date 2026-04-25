@@ -82,9 +82,18 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
 
     @Override
     public void registerShutdownHook() {
-        if (shutdownHook != null) return;  // idempotent
-        shutdownHook = new Thread(this::doClose, "sfs-context-shutdown");
-        Runtime.getRuntime().addShutdownHook(shutdownHook);
+        synchronized (startupShutdownMonitor) {
+            if (shutdownHook != null) return;  // idempotent
+            shutdownHook = new Thread(
+                    () -> {
+                        synchronized (startupShutdownMonitor) {
+                            if (active) doClose();
+                        }
+                    },
+                    "sfs-context-shutdown"
+            );
+            Runtime.getRuntime().addShutdownHook(shutdownHook);
+        }
     }
 
     private void tryRemoveShutdownHook() {
