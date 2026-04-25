@@ -1484,3 +1484,33 @@ git commit -m "docs: Plan 1B-β 마감 — README 학습용 시나리오 + DoD 9
 | **`AnnotationConfigContextIntegrationTest` 등 통합 6선** | end-to-end 시나리오 + tracing context 패턴 | deep 섹션 H |
 
 > **언제 deep version으로 돌아갈까?** ① 본 plan의 시연 application을 다 만들고 *동작은 잘 하는데 직접 호출 형태 inter-bean reference에서 막혔을 때* ② Phase 2 (AOP)로 가지 않고 IoC를 더 깊이 보고 싶을 때 ③ 면접/실무에서 *Spring 내부 구현*을 묻는 상황을 대비할 때.
+
+---
+
+## 품질 게이트 기록 (2026-04-25)
+
+CLAUDE.md "완료 후 품질 게이트" 3단계 실행 결과:
+
+**1단계 — 다관점 코드리뷰 (병렬 2 에이전트)**
+- `feature-dev:code-reviewer` (actionable 이슈) + `code-quality-reporter` (다차원 점수)
+- 발견 6건 / 즉시 1건 / 남겨둘 5건
+- 종합 등급 **B+ (84/100)** — 학습 가치 95(A) / 가독성 90(A) / 테스트 87(B) / 안전성 85(B) / 유지보수성 80(B) / 아키텍처 78(C)
+
+**2단계 — 리팩토링 (즉시 고칠 1건)**
+- 상속 계층 reflection 미탐색 → `ReflectionUtils.doWithFields/doWithMethods` 일원화로 F1/G1/G2 fix
+- 회귀: 124 → 130 PASS (+6: ReflectionUtils 단위 테스트 +3, 상속 회귀 테스트 +3)
+- 커밋 3개: `test → feat → fix` (문제 → 도구 → 해결 흐름 박제)
+
+**3단계 — `/simplify` 패스 (병렬 3 에이전트)**
+- reuse + quality + efficiency 독립 분석
+- 발견 11건 / 반영 11건 / 추가 박제 1건 (`@Primary` 경로 불일치)
+- 채택률 ~100% (세 리뷰 교차 검증 + 박제 항목 명시적 표기 효과)
+- 커밋 4개: `refactor` ReflectionUtils 일원화 4건 / `chore` narrating+WHAT 주석 6건 / `refactor` `.clone()` 이중 복사 제거 / `docs` 박제 보강
+
+**최종 회귀:** sfs-core 28 + sfs-beans 58 + sfs-context 44 = **130 PASS / 0 FAIL** / `./gradlew build` BUILD SUCCESSFUL.
+
+**보류 박제 5건** (별도 표 위치: 이 문서 "## 품질 게이트 발견" 섹션):
+- 🔵 Phase 2 직전 (2건): `(DefaultListableBeanFactory) this` 다운캐스팅 제거 + BPP 처리기의 `DefaultListableBeanFactory` 직접 의존
+- 🟣 다음 plan (3건): `DisposableBean` 이중 등록 가능성 / `getBeanNamesForType` 반환 타입 과매칭 / `@Primary` 경로 불일치 (`getBean(Class)` vs `resolveDependency`)
+
+**Phase 1 종료** — main 머지 준비 완료.
