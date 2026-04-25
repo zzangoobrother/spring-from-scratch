@@ -769,7 +769,7 @@ git commit -m "feat(sfs-context): ConfigurationClassPostProcessor 단순판 (@Be
 - Create: `sfs-context/src/main/java/com/choisk/sfs/context/support/AutowiredAnnotationBeanPostProcessor.java`
 - Test: `sfs-context/src/test/java/com/choisk/sfs/context/support/AutowiredFieldInjectionTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -803,13 +803,13 @@ class AutowiredFieldInjectionTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (FAIL 확인)**
+- [x] **Step 2: 테스트 실행 (FAIL 확인)**
 
 ```bash
 ./gradlew :sfs-context:test --tests "com.choisk.sfs.context.support.AutowiredFieldInjectionTest"
 ```
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 ```java
 package com.choisk.sfs.context.support;
@@ -860,19 +860,24 @@ public class AutowiredAnnotationBeanPostProcessor
 
 > **축소판 메모:** 세터 주입, 생성자 주입, 컬렉션 주입, 다수 후보 폴백은 보류. 필드 주입만으로도 학습 시연 충분.
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-context:test
 ```
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-context/src/main/java/com/choisk/sfs/context/support/AutowiredAnnotationBeanPostProcessor.java \
         sfs-context/src/test/java/com/choisk/sfs/context/support/AutowiredFieldInjectionTest.java
 git commit -m "feat(sfs-context): AutowiredAnnotationBeanPostProcessor — @Autowired 필드 주입 (단순판)"
 ```
+
+> **실행 기록 (2026-04-25):**
+> - `postProcessProperties` 시그니처 편차: plan은 `void postProcessProperties(Object bean, String beanName)` 가정이었으나, 실제 1A 결과물은 `PropertyValues postProcessProperties(PropertyValues pvs, Object bean, String beanName)`. 구현을 실제 시그니처에 맞춰 pvs를 그대로 반환하는 형태로 적용.
+> - `BeanDefinition` 생성자: plan 코드 블록은 무인자 생성자 + setBeanClass 패턴이었으나 실제는 `BeanDefinition(Class<?> beanClass)` 단일 생성자. 테스트 코드 수정.
+> - 커밋 해시: 889ddf3. sfs-context 34 PASS (이전 33 → +1).
 
 ---
 
