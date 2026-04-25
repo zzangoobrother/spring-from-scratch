@@ -416,7 +416,7 @@ git commit -m "fix(sfs-beans): registerSingleton의 DisposableBean 감지 atomic
 - Modify: `sfs-beans/src/main/java/com/choisk/sfs/beans/AbstractAutowireCapableBeanFactory.java`
 - Test: `sfs-beans/src/test/java/com/choisk/sfs/beans/CreateBeanFactoryMethodTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성 — no-arg + 인자 있는 케이스 둘 다**
+- [x] **Step 1: 실패 테스트 작성 — no-arg + 인자 있는 케이스 둘 다**
 
 ```java
 package com.choisk.sfs.beans;
@@ -471,14 +471,14 @@ class CreateBeanFactoryMethodTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (FAIL 확인)**
+- [x] **Step 2: 테스트 실행 (FAIL 확인)**
 
 ```bash
 ./gradlew :sfs-beans:test --tests "com.choisk.sfs.beans.CreateBeanFactoryMethodTest"
 ```
 예상: FAIL — factoryMethod 분기 미구현으로 `String` 클래스를 생성자로 인스턴스화하려 시도.
 
-- [ ] **Step 3: 구현 — `doCreateBean`에 factoryMethod 분기 + 인자 해석 추가**
+- [x] **Step 3: 구현 — `doCreateBean`에 factoryMethod 분기 + 인자 해석 추가**
 
 ```java
 // AbstractAutowireCapableBeanFactory.doCreateBean(String name, BeanDefinition bd)
@@ -531,7 +531,7 @@ private Object[] resolveFactoryMethodArguments(java.lang.reflect.Method m, Strin
 
 > **enhance 부재의 한계:** `@Bean` 메서드 본문에서 *다른 @Bean 메서드를 직접 호출*하는 경우(`return new Service(repo())`)는 매번 새 인스턴스가 생긴다. 본 plan은 *인자 형태 inter-bean reference만* 컨테이너 라우팅으로 처리하며, 직접 호출은 H2 통합 시나리오에서 *깨지는 사례*로 학습 시연.
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-beans:test --tests "com.choisk.sfs.beans.CreateBeanFactoryMethodTest"
@@ -539,13 +539,20 @@ private Object[] resolveFactoryMethodArguments(java.lang.reflect.Method m, Strin
 ```
 예상: PASS, 회귀 영향 없음.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-beans/src/main/java/com/choisk/sfs/beans/AbstractAutowireCapableBeanFactory.java \
         sfs-beans/src/test/java/com/choisk/sfs/beans/CreateBeanFactoryMethodTest.java
 git commit -m "feat(sfs-beans): doCreateBean factoryMethod 분기 + 매개변수 자동 주입 (resolveDependency)"
 ```
+
+> **실행 기록 (2026-04-25):** 커밋 `6afbd19` — PASS 2/2 (CreateBeanFactoryMethodTest). 회귀 56 → 58 전체 PASS.
+>
+> **편차 기록:**
+> - `AbstractAutowireCapableBeanFactory` 실제 경로: `sfs-beans/.../beans/support/` (plan의 `beans/` 직속과 다름) — 구조 차이 표에 이미 등록된 항목과 동일.
+> - factoryMethod 분기를 `doCreateBean` 인라인 대신 `createBeanViaFactoryMethod` 헬퍼로 분리 — 메서드 길이 제어 및 가독성 향상 (동작 동일).
+> - `instantiateViaConstructor` 호출 대신 기존 `instantiateBean` 호출 유지 — plan 표기와 실제 메서드명이 다름.
 
 ---
 
