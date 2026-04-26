@@ -524,7 +524,7 @@ git commit -m "feat(sfs-context): BeanMethodInterceptor — @Bean 메서드 호�
 - Create: `sfs-context/src/main/java/com/choisk/sfs/context/support/ConfigurationClassEnhancer.java`
 - Test: `sfs-context/src/test/java/com/choisk/sfs/context/support/ConfigurationClassEnhancerTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 // sfs-context/src/test/java/com/choisk/sfs/context/support/ConfigurationClassEnhancerTest.java
@@ -586,13 +586,13 @@ class ConfigurationClassEnhancerTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 (FAIL — 클래스 미존재)**
+- [x] **Step 2: 테스트 실행 (FAIL — 클래스 미존재)**
 
 ```bash
 ./gradlew :sfs-context:test --tests "com.choisk.sfs.context.support.ConfigurationClassEnhancerTest"
 ```
 
-- [ ] **Step 3: `ConfigurationClassEnhancer.java` 구현**
+- [x] **Step 3: `ConfigurationClassEnhancer.java` 구현**
 
 ```java
 // sfs-context/src/main/java/com/choisk/sfs/context/support/ConfigurationClassEnhancer.java
@@ -632,7 +632,7 @@ public class ConfigurationClassEnhancer {
 }
 ```
 
-- [ ] **Step 4: 테스트 실행 (PASS 확인)**
+- [x] **Step 4: 테스트 실행 (PASS 확인)**
 
 ```bash
 ./gradlew :sfs-context:test --tests "com.choisk.sfs.context.support.ConfigurationClassEnhancerTest"
@@ -641,7 +641,7 @@ public class ConfigurationClassEnhancer {
 
 예상: BeanMethodInterceptorTest 3 + ConfigurationClassEnhancerTest 2 = 5 PASS 신규. 회귀 변동 없음.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-context/src/main/java/com/choisk/sfs/context/support/ConfigurationClassEnhancer.java \
