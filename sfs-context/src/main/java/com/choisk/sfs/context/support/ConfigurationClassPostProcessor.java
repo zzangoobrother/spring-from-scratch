@@ -36,6 +36,13 @@ public class ConfigurationClassPostProcessor implements BeanFactoryPostProcessor
         enhanceConfigurationClasses(bf);
     }
 
+    /**
+     * @ComponentScan 발견 시 ClassPathBeanDefinitionScanner.scan 호출.
+     * 빈 배열이면 학습 범위 단순화 — 기본 패키지 자동 추론은 후속 phase로 보류.
+     *
+     * <p>basePackages 값은 학습 범위 가정 — 신뢰 가능한 학습용 정적 문자열만 입력됨.
+     * 프로덕션 환경에서는 패키지명 sanitize/검증을 거쳐야 함.
+     */
     private void processComponentScans(ConfigurableListableBeanFactory bf) {
         ClassPathBeanDefinitionScanner scanner = new ClassPathBeanDefinitionScanner(bf);
         // 스냅샷 — 스캔이 BD를 추가할 수 있으므로 동시 변경 방지
@@ -97,11 +104,10 @@ public class ConfigurationClassPostProcessor implements BeanFactoryPostProcessor
             if (beanClass == null) continue;
 
             Configuration cfg = beanClass.getAnnotation(Configuration.class);
-            if (cfg == null) continue;
-            if (!cfg.proxyBeanMethods()) continue;
+            if (cfg == null || !cfg.proxyBeanMethods()) continue;
 
-            // proxyBeanMethods=true — enhance 서브클래스로 beanClass 교체
-            // bf.getBeanDefinition()이 등록된 BD 인스턴스를 그대로 반환하므로 setBeanClass가 직접 반영됨 (복사/재등록 불필요)
+            // bf.getBeanDefinition()이 등록된 BD 인스턴스를 그대로 반환하므로 setBeanClass가 직접 반영됨
+            // (복사/재등록 불필요). enhance된 서브클래스가 다음 createBean()에서 newInstance됨.
             Class<?> enhanced = enhancer.enhance(beanClass);
             bd.setBeanClass(enhanced);
         }
