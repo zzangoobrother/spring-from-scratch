@@ -17,6 +17,9 @@ class BeanMethodInterceptorTest {
 
         @Bean(name = "customAccount")
         public Object account() { return new Object(); }
+
+        @Bean(name = "")
+        public Object profile() { return new Object(); }
     }
 
     @Test
@@ -48,6 +51,24 @@ class BeanMethodInterceptorTest {
         assertThat(result)
                 .as("캐시 miss 시 superCall 결과를 그대로 반환")
                 .isSameAs(freshBean);
+    }
+
+    @Test
+    void interceptFallsBackToMethodNameWhenBeanNameIsEmpty() throws Exception {
+        DefaultListableBeanFactory factory = new DefaultListableBeanFactory();
+        Object cachedBean = new Object();
+        factory.registerSingleton("profile", cachedBean);
+
+        BeanMethodInterceptor interceptor = new BeanMethodInterceptor(factory);
+        Method method = TestConfig.class.getDeclaredMethod("profile");
+        Callable<Object> superCall = () -> {
+            throw new AssertionError("@Bean(name=\"\")는 메서드명 폴백이 적용되어야 함");
+        };
+
+        Object result = interceptor.intercept(superCall, method, new Object[0]);
+        assertThat(result)
+                .as("@Bean(name=\"\") 빈 문자열은 \"이름 미지정\"으로 간주 → 메서드명 \"profile\" 폴백")
+                .isSameAs(cachedBean);
     }
 
     @Test
