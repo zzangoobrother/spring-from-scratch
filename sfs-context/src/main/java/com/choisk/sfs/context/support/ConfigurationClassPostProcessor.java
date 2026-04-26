@@ -24,10 +24,10 @@ public class ConfigurationClassPostProcessor implements BeanFactoryPostProcessor
 
     @Override
     public void postProcessBeanFactory(ConfigurableListableBeanFactory bf) {
-        // ① @Bean 메서드 → factoryMethod BD 등록 (기존 로직)
+        // @Bean 메서드 → factoryMethod BD 등록
         registerBeanMethodsForAllConfigurations(bf);
 
-        // ② enhance 적용 — proxyBeanMethods=true인 @Configuration 클래스
+        // proxyBeanMethods=true인 @Configuration BD의 beanClass를 enhance 서브클래스로 교체
         enhanceConfigurationClasses(bf);
     }
 
@@ -67,6 +67,7 @@ public class ConfigurationClassPostProcessor implements BeanFactoryPostProcessor
             if (!cfg.proxyBeanMethods()) continue;
 
             // proxyBeanMethods=true — enhance 서브클래스로 beanClass 교체
+            // bf.getBeanDefinition()이 등록된 BD 인스턴스를 그대로 반환하므로 setBeanClass가 직접 반영됨 (복사/재등록 불필요)
             Class<?> enhanced = enhancer.enhance(beanClass);
             bd.setBeanClass(enhanced);
         }
