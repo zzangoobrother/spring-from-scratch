@@ -8,6 +8,8 @@ import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.matcher.ElementMatchers;
 
 import java.lang.invoke.MethodHandles;
+import java.lang.reflect.Modifier;
+import java.util.Objects;
 
 /**
  * {@code @Configuration} 클래스의 byte-buddy 서브클래스를 생성하여
@@ -26,6 +28,11 @@ public class ConfigurationClassEnhancer {
     }
 
     public Class<?> enhance(Class<?> configClass) {
+        Objects.requireNonNull(configClass, "configClass cannot be null");
+        if (Modifier.isFinal(configClass.getModifiers())) {
+            throw new IllegalArgumentException(
+                    "@Configuration 클래스는 final이면 안 됨 — byte-buddy 서브클래싱 불가: " + configClass.getName());
+        }
         // 인터셉터는 stateless(beanFactory 필드만) — 호출마다 신규 생성하지만 메모리 부담 없음.
         // enhancer 필드로 보유하지 않는 이유: 후속 phase에서 stateful 인터셉터(예: 호출 카운터)로 확장될 여지를 막지 않기 위함.
         // UsingLookup: Java 9+ 모듈 시스템에서 별도 ClassLoader 없이 configClass 패키지에 직접 define.
