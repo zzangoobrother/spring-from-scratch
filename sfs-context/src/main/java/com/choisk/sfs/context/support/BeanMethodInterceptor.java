@@ -32,18 +32,9 @@ public class BeanMethodInterceptor {
     }
 
     /**
-     * byte-buddy MethodDelegation 진입점.
+     * byte-buddy MethodDelegation 진입점. 분기 전략은 클래스 Javadoc 참조.
      *
-     * <p>빈 이름을 결정한 뒤:
-     * <ul>
-     *   <li>캐시 hit → {@code beanFactory.getBean(beanName)} 반환</li>
-     *   <li>캐시 miss → {@code superCall.call()} 위임 (원본 메서드 본문 실행)</li>
-     * </ul>
-     *
-     * @param superCall byte-buddy가 주입하는 원본 메서드 호출 Callable
-     * @param method    호출된 메서드 (애노테이션 추출용)
-     * @param args      메서드 인자 배열 (현재 사용 안 함, 확장성 보존)
-     * @return 캐시된 빈 또는 신규 생성된 빈
+     * @param args 메서드 인자 (현재 미사용 — 인자형 {@code @Bean} 메서드 확장성 보존 목적)
      */
     @RuntimeType
     public Object intercept(
@@ -59,11 +50,9 @@ public class BeanMethodInterceptor {
     }
 
     /**
-     * {@code @Bean(name=...)} 값이 있으면 첫 번째 값을 빈 이름으로 사용하고,
-     * 없으면 메서드명을 빈 이름으로 사용한다.
-     *
-     * @param method 대상 메서드
-     * @return 결정된 빈 이름
+     * 빈 이름 결정 — Spring 관례를 따른다:
+     * {@code @Bean(name="")}, {@code @Bean(name={})}, name 미지정은 모두 "이름 미지정"으로 간주하여 메서드명 폴백.
+     * (배열 첫 요소만 주 이름으로 사용; 나머지 별칭 등록은 학습 범위 외)
      */
     private String resolveBeanName(Method method) {
         Bean ann = method.getAnnotation(Bean.class);
