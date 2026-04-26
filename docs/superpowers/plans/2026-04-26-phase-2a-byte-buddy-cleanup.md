@@ -810,6 +810,7 @@ git commit -m "feat(sfs-context): ConfigurationClassPostProcessor.enhanceConfigu
 > - `./gradlew build` 전체에서 `sfs-samples:EnhanceAbsenceDemoTest`가 FAIL (enhance 활성화로
 >   직접 호출도 싱글톤 반환 → `→ false` 박제가 깨짐). 이는 D2 Task의 예정 작업이므로 C1 범위 내에서
 >   수정하지 않음. `:sfs-context:test` 전체 50 PASS로 C1 DoD 충족.
+> - **C1 풀 사이클 reviewer 후속 (2026-04-26):** spec/quality reviewer 이슈 4건 반영 — 3 커밋 분리(refactor + feat + test). 회귀 sfs-context 50 → 53 PASS.
 
 ---
 
