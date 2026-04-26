@@ -43,12 +43,10 @@ class ConfigurationClassEnhancerTest {
         Class<?> enhanced = enhancer.enhance(SampleConfig.class);
         SampleConfig instance = (SampleConfig) enhanced.getDeclaredConstructor().newInstance();
 
-        // greeting()은 인터셉터 경유 → 캐시된 "cached!" 반환
         assertThat(instance.greeting())
                 .as("@Bean 메서드 직접 호출이 인터셉터 경유로 컨테이너 빈을 반환해야 함")
                 .isEqualTo(cachedGreeting);
 
-        // counter()는 캐시에 없으므로 superCall(원본 메서드 본문) 실행 → 42
         assertThat(instance.counter())
                 .as("캐시 miss 시 원본 메서드 본문이 실행되어야 함")
                 .isEqualTo(42);

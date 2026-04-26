@@ -12,7 +12,7 @@ import net.bytebuddy.matcher.ElementMatchers;
  *
  * <p>Spring 본가의 CGLIB 기반 enhance와 동일한 메커니즘을 byte-buddy로 구현.
  * 인터페이스가 아닌 *클래스 자체*의 서브클래스이므로 {@code final} 클래스/메서드는
- * enhance 불가 — 학습 범위 축소판은 이 제약을 수용 (검증 task는 후속 phase로 보류).
+ * enhance 불가 — 학습 범위 축소판은 이 제약을 수용 ({@code null}/`final` 입력 시 명시적 예외 발생, 동일 클래스 중복 enhance 캐시는 후속 phase로 보류).
  */
 public class ConfigurationClassEnhancer {
 
@@ -23,6 +23,8 @@ public class ConfigurationClassEnhancer {
     }
 
     public Class<?> enhance(Class<?> configClass) {
+        // 인터셉터는 stateless(beanFactory 필드만) — 호출마다 신규 생성하지만 메모리 부담 없음.
+        // enhancer 필드로 보유하지 않는 이유: 후속 phase에서 stateful 인터셉터(예: 호출 카운터)로 확장될 여지를 막지 않기 위함.
         return new ByteBuddy()
                 .subclass(configClass)
                 .method(ElementMatchers.isAnnotatedWith(Bean.class))
