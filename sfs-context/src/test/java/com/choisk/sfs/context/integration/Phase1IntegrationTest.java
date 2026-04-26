@@ -92,17 +92,14 @@ class Phase1IntegrationTest {
      */
     @Test
     void argFormBeanReferenceUsesContainerRouting() {
-        AnnotationConfigApplicationContext ctx =
-                new AnnotationConfigApplicationContext(AppConfigArgInjection.class);
+        try (var ctx = new AnnotationConfigApplicationContext(AppConfigArgInjection.class)) {
+            Service service = ctx.getBean(Service.class);
+            Repo repo = ctx.getBean(Repo.class);
 
-        Service service = ctx.getBean(Service.class);
-        Repo repo = ctx.getBean(Repo.class);
-
-        assertThat(service.repo)
-                .as("매개변수로 받은 Repo는 컨테이너의 동일 싱글톤이어야 함")
-                .isSameAs(repo);
-
-        ctx.close();
+            assertThat(service.repo)
+                    .as("매개변수로 받은 Repo는 컨테이너의 동일 싱글톤이어야 함")
+                    .isSameAs(repo);
+        }
     }
 
     /**
@@ -115,17 +112,14 @@ class Phase1IntegrationTest {
      */
     @Test
     void directCallFormRoutesToContainerWithEnhance() {
-        AnnotationConfigApplicationContext ctx =
-                new AnnotationConfigApplicationContext(AppConfigDirectCall.class);
+        try (var ctx = new AnnotationConfigApplicationContext(AppConfigDirectCall.class)) {
+            Service service = ctx.getBean(Service.class);
+            Repo repo = ctx.getBean(Repo.class);
 
-        Service service = ctx.getBean(Service.class);
-        Repo repo = ctx.getBean(Repo.class);
-
-        assertThat(service.repo)
-                .as("enhance 적용 시 service() 본문의 repo() 직접 호출이 컨테이너 라우팅됨")
-                .isSameAs(repo);
-
-        ctx.close();
+            assertThat(service.repo)
+                    .as("enhance 적용 시 service() 본문의 repo() 직접 호출이 컨테이너 라우팅됨")
+                    .isSameAs(repo);
+        }
     }
 
     /**
@@ -152,17 +146,14 @@ class Phase1IntegrationTest {
      */
     @Test
     void directCallFormBypassesEnhanceWhenProxyBeanMethodsDisabled() {
-        AnnotationConfigApplicationContext ctx =
-                new AnnotationConfigApplicationContext(NoProxyDirectCallConfig.class);
+        try (var ctx = new AnnotationConfigApplicationContext(NoProxyDirectCallConfig.class)) {
+            Service service = ctx.getBean(Service.class);
+            Repo repo = ctx.getBean(Repo.class);
 
-        Service service = ctx.getBean(Service.class);
-        Repo repo = ctx.getBean(Repo.class);
-
-        assertThat(service.repo)
-                .as("proxyBeanMethods=false면 enhance가 적용되지 않아 직접 호출이 새 인스턴스를 생성")
-                .isNotSameAs(repo);
-
-        ctx.close();
+            assertThat(service.repo)
+                    .as("proxyBeanMethods=false면 enhance가 적용되지 않아 직접 호출이 새 인스턴스를 생성")
+                    .isNotSameAs(repo);
+        }
     }
 
     /**
@@ -173,27 +164,26 @@ class Phase1IntegrationTest {
      */
     @Test
     void phase1FullScenario() {
-        AnnotationConfigApplicationContext ctx =
-                new AnnotationConfigApplicationContext(AppConfigArgInjection.class, Worker.class);
+        // @PreDestroy 호출 확인을 위해 Worker 참조를 try 블록 밖에서 유지
+        Worker w;
+        try (var ctx = new AnnotationConfigApplicationContext(AppConfigArgInjection.class, Worker.class)) {
+            w = ctx.getBean(Worker.class);
 
-        Worker w = ctx.getBean(Worker.class);
+            // @Autowired 필드 주입 확인
+            assertThat(w.service).isNotNull();
 
-        // @Autowired 필드 주입 확인
-        assertThat(w.service).isNotNull();
+            // 매개변수 라우팅 — service.repo와 컨테이너의 Repo 싱글톤이 같은 인스턴스
+            assertThat(w.service.repo).isSameAs(ctx.getBean(Repo.class));
 
-        // 매개변수 라우팅 — service.repo와 컨테이너의 Repo 싱글톤이 같은 인스턴스
-        assertThat(w.service.repo).isSameAs(ctx.getBean(Repo.class));
+            // 동작 호출 가능 확인
+            assertThat(w.service.repo.greet()).isEqualTo("data");
 
-        // 동작 호출 가능 확인
-        assertThat(w.service.repo.greet()).isEqualTo("data");
+            // @PostConstruct 호출 확인
+            assertThat(w.initCalled).as("@PostConstruct must fire").isTrue();
 
-        // @PostConstruct 호출 확인
-        assertThat(w.initCalled).as("@PostConstruct must fire").isTrue();
-
-        // close 전에는 @PreDestroy 미호출
-        assertThat(w.destroyCalled).as("@PreDestroy not called yet").isFalse();
-
-        ctx.close();
+            // close 전에는 @PreDestroy 미호출
+            assertThat(w.destroyCalled).as("@PreDestroy not called yet").isFalse();
+        } // try-with-resources — ctx.close() 자동 호출
 
         // close 후 @PreDestroy 호출 확인
         assertThat(w.destroyCalled).as("@PreDestroy fires on close()").isTrue();
