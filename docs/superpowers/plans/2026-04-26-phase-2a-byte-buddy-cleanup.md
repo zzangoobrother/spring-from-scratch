@@ -90,7 +90,7 @@ new AnnotationConfigApplicationContext(AppConfig.class)
 - Modify: `sfs-context/src/main/java/com/choisk/sfs/context/support/CommonAnnotationBeanPostProcessor.java`
 - Modify: `sfs-context/src/main/java/com/choisk/sfs/context/support/AnnotationConfigUtils.java`
 
-- [ ] **Step 1: `ConfigurableBeanFactory`에 `registerDisposableBean` + `containsSingleton` 시그니처 추가**
+- [x] **Step 1: `ConfigurableBeanFactory`에 `registerDisposableBean` + `containsSingleton` 시그니처 추가**
 
 ```java
 // sfs-beans/src/main/java/com/choisk/sfs/beans/ConfigurableBeanFactory.java
@@ -127,7 +127,7 @@ public interface ConfigurableBeanFactory extends HierarchicalBeanFactory {
 
 > **시연 요점:** 두 메서드는 *이미 `DefaultSingletonBeanRegistry`에 public method로 존재*. 인터페이스에 시그니처를 추가만 해도 `AbstractBeanFactory extends DefaultSingletonBeanRegistry implements ConfigurableBeanFactory` 관계로 자동 만족됨. 별도 구현 추가 불필요.
 
-- [ ] **Step 2: `ConfigurableListableBeanFactory`에 `resolveDependency` 시그니처 추가**
+- [x] **Step 2: `ConfigurableListableBeanFactory`에 `resolveDependency` 시그니처 추가**
 
 ```java
 // sfs-beans/src/main/java/com/choisk/sfs/beans/ConfigurableListableBeanFactory.java
@@ -150,7 +150,7 @@ public interface ConfigurableListableBeanFactory
 }
 ```
 
-- [ ] **Step 3: `DefaultListableBeanFactory.resolveDependency`에 `@Override` 추가**
+- [x] **Step 3: `DefaultListableBeanFactory.resolveDependency`에 `@Override` 추가**
 
 `DefaultListableBeanFactory.java` 158번째 줄 근처의 `resolveDependency` 메서드 선언 위에 `@Override` 추가:
 
@@ -164,7 +164,7 @@ public interface ConfigurableListableBeanFactory
 
 > **메모:** `DefaultSingletonBeanRegistry.registerDisposableBean` / `containsSingleton`은 *부모 클래스* 메서드라서 `@Override` 추가 위치가 다른 이슈가 있을 수 있음. 인터페이스 메서드 만족은 *상속 체인 어디서든* 가능하므로 별도 작업 불필요. 컴파일러가 만족 여부를 검증함.
 
-- [ ] **Step 4: `AutowiredAnnotationBeanPostProcessor` 생성자 파라미터 타입 변경**
+- [x] **Step 4: `AutowiredAnnotationBeanPostProcessor` 생성자 파라미터 타입 변경**
 
 ```java
 // sfs-context/src/main/java/com/choisk/sfs/context/support/AutowiredAnnotationBeanPostProcessor.java
@@ -208,7 +208,7 @@ public class AutowiredAnnotationBeanPostProcessor implements InstantiationAwareB
 
 > **변경 요지:** import의 `DefaultListableBeanFactory` → `ConfigurableListableBeanFactory`, 필드 + 생성자 파라미터 타입 동일 변경. 본문 변경 없음.
 
-- [ ] **Step 5: `CommonAnnotationBeanPostProcessor` 생성자 파라미터 타입 변경**
+- [x] **Step 5: `CommonAnnotationBeanPostProcessor` 생성자 파라미터 타입 변경**
 
 ```java
 // sfs-context/src/main/java/com/choisk/sfs/context/support/CommonAnnotationBeanPostProcessor.java
@@ -272,7 +272,7 @@ public class CommonAnnotationBeanPostProcessor implements BeanPostProcessor {
 
 > **변경 요지:** `DefaultListableBeanFactory` → `ConfigurableBeanFactory` (resolveDependency 안 쓰므로 ListableBeanFactory보다 약한 타입으로 충분). 본문 변경 없음.
 
-- [ ] **Step 6: `AnnotationConfigUtils` 다운캐스팅 제거**
+- [x] **Step 6: `AnnotationConfigUtils` 다운캐스팅 제거**
 
 ```java
 // sfs-context/src/main/java/com/choisk/sfs/context/support/AnnotationConfigUtils.java
@@ -318,7 +318,7 @@ public final class AnnotationConfigUtils {
 
 > **변경 요지:** 다운캐스팅 블록(`if (!(ctx.getBeanFactory() instanceof DefaultListableBeanFactory dlbf)) { throw ... }`) 통째로 제거. import의 `DefaultListableBeanFactory` 제거 → `ConfigurableListableBeanFactory`만 import.
 
-- [ ] **Step 7: 컴파일 + 회귀 검증**
+- [x] **Step 7: 컴파일 + 회귀 검증**
 
 ```bash
 ./gradlew :sfs-beans:compileJava :sfs-context:compileJava :sfs-samples:compileJava
@@ -328,7 +328,7 @@ public final class AnnotationConfigUtils {
 
 예상: BUILD SUCCESSFUL. 회귀 138 PASS / 0 FAIL 유지 (sfs-core 28 + sfs-beans 58 + sfs-context 44 + sfs-samples 8).
 
-- [ ] **Step 8: 커밋**
+- [x] **Step 8: 커밋**
 
 ```bash
 git add sfs-beans/src/main/java/com/choisk/sfs/beans/ConfigurableBeanFactory.java \

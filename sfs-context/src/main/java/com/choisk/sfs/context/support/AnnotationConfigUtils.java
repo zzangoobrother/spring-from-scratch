@@ -2,7 +2,7 @@ package com.choisk.sfs.context.support;
 
 import com.choisk.sfs.beans.BeanFactoryPostProcessor;
 import com.choisk.sfs.beans.BeanPostProcessor;
-import com.choisk.sfs.beans.support.DefaultListableBeanFactory;
+import com.choisk.sfs.beans.ConfigurableListableBeanFactory;
 import com.choisk.sfs.context.ConfigurableApplicationContext;
 
 /**
@@ -26,20 +26,10 @@ public final class AnnotationConfigUtils {
     /**
      * 처리기 3종을 컨텍스트에 등록한다. 각 처리기는 이미 등록된 경우 건너뛴다(멱등).
      *
-     * <p>{@code getBeanFactory()}는 {@code DefaultListableBeanFactory}를 반환해야 한다.
-     * {@link AutowiredAnnotationBeanPostProcessor}와 {@link CommonAnnotationBeanPostProcessor}
-     * 생성자가 {@code DefaultListableBeanFactory}를 요구하기 때문이다.
-     *
      * @param ctx 처리기를 등록할 컨텍스트
-     * @throws IllegalStateException getBeanFactory()가 DefaultListableBeanFactory가 아닌 경우
      */
     public static void registerAnnotationConfigProcessors(ConfigurableApplicationContext ctx) {
-        // BPP 등록 시 DefaultListableBeanFactory 인스턴스 필요 — 다운캐스팅
-        if (!(ctx.getBeanFactory() instanceof DefaultListableBeanFactory dlbf)) {
-            throw new IllegalStateException(
-                    "AnnotationConfigUtils requires DefaultListableBeanFactory, but got: "
-                    + ctx.getBeanFactory().getClass().getName());
-        }
+        ConfigurableListableBeanFactory bf = ctx.getBeanFactory();
 
         // 1. ConfigurationClassPostProcessor (BFPP) — @Bean 메서드 → BD 변환
         if (!hasBfpp(ctx, ConfigurationClassPostProcessor.class)) {
@@ -48,14 +38,12 @@ public final class AnnotationConfigUtils {
 
         // 2. AutowiredAnnotationBeanPostProcessor (BPP) — @Autowired 필드 주입
         if (!hasBpp(ctx, AutowiredAnnotationBeanPostProcessor.class)) {
-            ctx.getBeanFactory().addBeanPostProcessor(
-                    new AutowiredAnnotationBeanPostProcessor(dlbf));
+            bf.addBeanPostProcessor(new AutowiredAnnotationBeanPostProcessor(bf));
         }
 
         // 3. CommonAnnotationBeanPostProcessor (BPP) — @PostConstruct/@PreDestroy
         if (!hasBpp(ctx, CommonAnnotationBeanPostProcessor.class)) {
-            ctx.getBeanFactory().addBeanPostProcessor(
-                    new CommonAnnotationBeanPostProcessor(dlbf));
+            bf.addBeanPostProcessor(new CommonAnnotationBeanPostProcessor(bf));
         }
     }
 
