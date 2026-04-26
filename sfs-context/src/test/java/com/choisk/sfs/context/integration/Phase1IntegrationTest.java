@@ -12,11 +12,11 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Phase 1 종료 시연 통합 테스트.
+ * Phase 1 + 2A 통합 테스트.
  *
  * <p>처리기 3종(ConfigurationClassPostProcessor, AutowiredAnnotationBeanPostProcessor,
  * CommonAnnotationBeanPostProcessor)이 동시에 동작하는 풀 시나리오를 검증하며,
- * inter-bean reference의 두 형태(매개변수 라우팅 ✅ / 직접 호출 ❌)를 명시적으로 박제한다.
+ * inter-bean reference의 두 형태(매개변수 라우팅 ✅ / 직접 호출 — enhance 적용으로 ✅)를 박제한다.
  */
 class Phase1IntegrationTest {
 
@@ -52,7 +52,7 @@ class Phase1IntegrationTest {
 
     /**
      * 직접 호출 형태 inter-bean reference 시나리오용 @Configuration.
-     * service() 본문에서 repo()를 직접 호출 — enhance 없으므로 매번 새 Repo 인스턴스.
+     * service() 본문에서 repo()를 직접 호출 — enhance 적용 시 BeanMethodInterceptor가 컨테이너로 라우팅.
      */
     @Configuration
     static class AppConfigDirectCall {
@@ -60,8 +60,7 @@ class Phase1IntegrationTest {
         public Repo repo() { return new Repo(); }
 
         /**
-         * 본문에서 repo()를 직접 호출하면 컨테이너 경유 없이 새 인스턴스가 생성된다.
-         * byte-buddy enhance가 없기 때문에 서비스가 갖는 repo와 컨테이너의 repo는 다른 인스턴스.
+         * 본문에서 repo()를 직접 호출 — enhance 적용 후 BeanMethodInterceptor가 컨테이너 빈을 반환.
          */
         @Bean
         public Service service() { return new Service(repo()); }
@@ -107,14 +106,15 @@ class Phase1IntegrationTest {
     }
 
     /**
-     * 테스트 2: 직접 호출 형태 inter-bean reference — enhance 부재로 매번 새 인스턴스 ❌
+     * 테스트 2: 직접 호출 형태 inter-bean reference — enhance 적용으로 컨테이너 라우팅 ✅
      *
-     * <p>byte-buddy enhance가 없으면 @Bean 메서드 본문의 repo() 직접 호출은 컨테이너를
-     * 우회하여 새로운 Repo 인스턴스를 만든다. 이것이 바로 Spring이 byte-buddy를 쓰는 이유.
-     * 이 테스트는 enhance 부재 효과를 박제한다 — enhance 도입 시 isSameAs로 변한다.
+     * <p>Phase 2A의 {@code ConfigurationClassEnhancer}가 {@code @Configuration} 클래스의
+     * {@code @Bean} 메서드 호출을 {@code BeanMethodInterceptor}로 가로채 컨테이너 빈을 반환한다.
+     * 따라서 {@code service()} 본문에서 {@code repo()}를 직접 호출해도 컨테이너의
+     * 동일 Repo 싱글톤이 반환됨 — Phase 1C에서 박제한 {@code → false}가 {@code → true}로 변형.
      */
     @Test
-    void directCallFormCreatesDistinctInstanceWithoutEnhance() {
+    void directCallFormRoutesToContainerWithEnhance() {
         AnnotationConfigApplicationContext ctx =
                 new AnnotationConfigApplicationContext(AppConfigDirectCall.class);
 
@@ -122,8 +122,8 @@ class Phase1IntegrationTest {
         Repo repo = ctx.getBean(Repo.class);
 
         assertThat(service.repo)
-                .as("enhance가 없으면 service() 본문의 repo() 직접 호출은 컨테이너를 우회하여 새 Repo를 만든다")
-                .isNotSameAs(repo);
+                .as("enhance 적용 시 service() 본문의 repo() 직접 호출이 컨테이너 라우팅됨")
+                .isSameAs(repo);
 
         ctx.close();
     }

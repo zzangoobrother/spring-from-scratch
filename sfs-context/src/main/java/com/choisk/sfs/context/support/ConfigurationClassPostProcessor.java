@@ -9,42 +9,40 @@ import com.choisk.sfs.context.annotation.Configuration;
 import java.lang.reflect.Method;
 
 /**
- * @Configuration 클래스의 @Bean 메서드를 스캔해 factoryMethod BeanDefinition으로 등록하는 처리기.
- * byte-buddy enhance 없이 단순판으로 동작한다 (enhance 없이도 매개변수 형태 inter-bean reference는
- * C1의 resolveDependency 라우팅으로 처리됨).
+ * @Configuration 클래스의 @Bean 메서드를 스캔해 factoryMethod BeanDefinition으로 등록하고,
+ * proxyBeanMethods=true인 @Configuration 클래스는 byte-buddy로 enhance한다.
  *
- * <p>등록 규칙:
+ * <p>Phase 2A에서 enhance 동작 추가 — Phase 1B-β의 단순판은 enhance 없이 매개변수 라우팅만 지원했음.
+ *
+ * <p>등록 규칙 (변경 없음):
  * <ul>
  *   <li>@Bean(name=...) 값이 있으면 첫 번째 값을 빈 이름으로 사용</li>
  *   <li>name이 비어있으면 메서드명을 빈 이름으로 사용</li>
  * </ul>
- *
  */
 public class ConfigurationClassPostProcessor implements BeanFactoryPostProcessor {
 
     @Override
     public void postProcessBeanFactory(ConfigurableListableBeanFactory bf) {
-        // registerBeanDefinition 호출이 컬렉션 변경을 일으킬 수 있으므로 스냅샷 배열로 순회
-        // getBeanDefinitionNames()는 내부적으로 toArray(new String[0])로 스냅샷을 반환하므로 .clone() 불필요
-        String[] definitionNames = bf.getBeanDefinitionNames();
+        // ① @Bean 메서드 → factoryMethod BD 등록 (기존 로직)
+        registerBeanMethodsForAllConfigurations(bf);
 
+        // ② enhance 적용 — proxyBeanMethods=true인 @Configuration 클래스
+        enhanceConfigurationClasses(bf);
+    }
+
+    private void registerBeanMethodsForAllConfigurations(ConfigurableListableBeanFactory bf) {
+        // registerBeanDefinition 호출이 컬렉션 변경을 일으킬 수 있으므로 스냅샷 배열로 순회
+        String[] definitionNames = bf.getBeanDefinitionNames();
         for (String configName : definitionNames) {
             BeanDefinition bd = bf.getBeanDefinition(configName);
-            if (bd.getBeanClass() == null) {
-                continue;
-            }
-            if (!bd.getBeanClass().isAnnotationPresent(Configuration.class)) {
-                continue;
-            }
+            if (bd.getBeanClass() == null) continue;
+            if (!bd.getBeanClass().isAnnotationPresent(Configuration.class)) continue;
 
-            // @Configuration 클래스의 모든 @Bean 메서드 추출 후 BD 등록
             for (Method m : bd.getBeanClass().getDeclaredMethods()) {
-                if (!m.isAnnotationPresent(Bean.class)) {
-                    continue;
-                }
+                if (!m.isAnnotationPresent(Bean.class)) continue;
 
                 Bean beanAnno = m.getAnnotation(Bean.class);
-                // name()이 비어있으면 메서드명, 아니면 첫 번째 name 값을 빈 이름으로 사용
                 String[] names = beanAnno.name();
                 String beanName = (names.length > 0 && !names[0].isEmpty()) ? names[0] : m.getName();
 
@@ -54,6 +52,23 @@ public class ConfigurationClassPostProcessor implements BeanFactoryPostProcessor
 
                 bf.registerBeanDefinition(beanName, beanBd);
             }
+        }
+    }
+
+    private void enhanceConfigurationClasses(ConfigurableListableBeanFactory bf) {
+        ConfigurationClassEnhancer enhancer = new ConfigurationClassEnhancer(bf);
+        for (String name : bf.getBeanDefinitionNames()) {
+            BeanDefinition bd = bf.getBeanDefinition(name);
+            Class<?> beanClass = bd.getBeanClass();
+            if (beanClass == null) continue;
+
+            Configuration cfg = beanClass.getAnnotation(Configuration.class);
+            if (cfg == null) continue;
+            if (!cfg.proxyBeanMethods()) continue;
+
+            // proxyBeanMethods=true — enhance 서브클래스로 beanClass 교체
+            Class<?> enhanced = enhancer.enhance(beanClass);
+            bd.setBeanClass(enhanced);
         }
     }
 }

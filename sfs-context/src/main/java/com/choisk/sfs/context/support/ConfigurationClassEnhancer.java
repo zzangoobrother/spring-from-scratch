@@ -3,8 +3,11 @@ package com.choisk.sfs.context.support;
 import com.choisk.sfs.beans.ConfigurableBeanFactory;
 import com.choisk.sfs.context.annotation.Bean;
 import net.bytebuddy.ByteBuddy;
+import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.matcher.ElementMatchers;
+
+import java.lang.invoke.MethodHandles;
 
 /**
  * {@code @Configuration} 클래스의 byte-buddy 서브클래스를 생성하여
@@ -25,12 +28,19 @@ public class ConfigurationClassEnhancer {
     public Class<?> enhance(Class<?> configClass) {
         // 인터셉터는 stateless(beanFactory 필드만) — 호출마다 신규 생성하지만 메모리 부담 없음.
         // enhancer 필드로 보유하지 않는 이유: 후속 phase에서 stateful 인터셉터(예: 호출 카운터)로 확장될 여지를 막지 않기 위함.
-        return new ByteBuddy()
-                .subclass(configClass)
-                .method(ElementMatchers.isAnnotatedWith(Bean.class))
-                .intercept(MethodDelegation.to(new BeanMethodInterceptor(beanFactory)))
-                .make()
-                .load(configClass.getClassLoader())
-                .getLoaded();
+        // UsingLookup: Java 9+ 모듈 시스템에서 별도 ClassLoader 없이 configClass 패키지에 직접 define.
+        // WRAPPER/CHILD_FIRST 는 ByteArrayClassLoader를 사용해 unnamed module 내부 클래스 접근이 막힘.
+        try {
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(configClass, MethodHandles.lookup());
+            return new ByteBuddy()
+                    .subclass(configClass)
+                    .method(ElementMatchers.isAnnotatedWith(Bean.class))
+                    .intercept(MethodDelegation.to(new BeanMethodInterceptor(beanFactory)))
+                    .make()
+                    .load(configClass.getClassLoader(), ClassLoadingStrategy.UsingLookup.of(lookup))
+                    .getLoaded();
+        } catch (IllegalAccessException e) {
+            throw new IllegalStateException("enhance 서브클래스 로딩 실패: " + configClass.getName(), e);
+        }
     }
 }
