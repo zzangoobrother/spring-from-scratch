@@ -1,26 +1,26 @@
 package com.choisk.sfs.context.support;
 
+import com.choisk.sfs.beans.ConfigurableListableBeanFactory;
 import com.choisk.sfs.beans.DependencyDescriptor;
 import com.choisk.sfs.beans.InstantiationAwareBeanPostProcessor;
 import com.choisk.sfs.beans.PropertyValues;
-import com.choisk.sfs.beans.support.DefaultListableBeanFactory;
 import com.choisk.sfs.context.annotation.Autowired;
 import com.choisk.sfs.core.ReflectionUtils;
 
 /**
  * {@code @Autowired} 애노테이션이 붙은 필드에 의존성을 주입하는 BeanPostProcessor 단순판.
  * <p>{@link InstantiationAwareBeanPostProcessor#postProcessProperties}에서 빈의 상속 계층 전체를
- * 탐색하며 {@code @Autowired}가 붙은 필드를 {@link DefaultListableBeanFactory#resolveDependency}로 채운다.
+ * 탐색하며 {@code @Autowired}가 붙은 필드를 {@link ConfigurableListableBeanFactory#resolveDependency}로 채운다.
  * <p>{@link ReflectionUtils#doWithFields}로 상속 계층 traversal을 일원화하여
  * 부모 클래스에 선언된 {@code @Autowired} 필드도 올바르게 주입한다.
  * <p>필드 주입만 지원 (세터 주입·생성자 주입은 학습 범위 보류).
  */
 public class AutowiredAnnotationBeanPostProcessor implements InstantiationAwareBeanPostProcessor {
 
-    /** 의존성 해석에 사용할 빈 팩토리 */
-    private final DefaultListableBeanFactory beanFactory;
+    /** 의존성 해석에 사용할 빈 팩토리 — 인터페이스 의존 (AOP 서브클래스 등장 시 ClassCastException 사전 차단) */
+    private final ConfigurableListableBeanFactory beanFactory;
 
-    public AutowiredAnnotationBeanPostProcessor(DefaultListableBeanFactory beanFactory) {
+    public AutowiredAnnotationBeanPostProcessor(ConfigurableListableBeanFactory beanFactory) {
         this.beanFactory = beanFactory;
     }
 

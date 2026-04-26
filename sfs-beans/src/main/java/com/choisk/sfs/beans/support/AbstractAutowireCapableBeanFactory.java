@@ -6,6 +6,7 @@ import com.choisk.sfs.beans.BeanFactoryAware;
 import com.choisk.sfs.beans.BeanNameAware;
 import com.choisk.sfs.beans.BeanPostProcessor;
 import com.choisk.sfs.beans.BeanReference;
+import com.choisk.sfs.beans.ConfigurableListableBeanFactory;
 import com.choisk.sfs.beans.DependencyDescriptor;
 import com.choisk.sfs.beans.DisposableBean;
 import com.choisk.sfs.beans.InitializingBean;
@@ -82,7 +83,7 @@ public abstract class AbstractAutowireCapableBeanFactory
     /**
      * factoryMethod 경로로 빈을 생성한다.
      * <p>BD의 factoryBeanName으로 팩토리 빈을 가져온 후, factoryMethodName과 일치하는 메서드를
-     * 찾아 인자를 {@link DefaultListableBeanFactory#resolveDependency}로 해석하여 호출한다.
+     * 찾아 인자를 {@link ConfigurableListableBeanFactory#resolveDependency}로 해석하여 호출한다.
      * 동일 이름 오버로드는 하나만 있다고 가정 (학습용 단순화).
      */
     private Object createBeanViaFactoryMethod(String beanName, BeanDefinition definition) {
@@ -98,7 +99,7 @@ public abstract class AbstractAutowireCapableBeanFactory
     }
 
     /**
-     * 메서드 매개변수마다 {@link DefaultListableBeanFactory#resolveDependency}를 호출하여
+     * 메서드 매개변수마다 {@link ConfigurableListableBeanFactory#resolveDependency}를 호출하여
      * 인자 배열을 구성한다.
      * <p>dependency name은 {@code paramType.getSimpleName()} 사용 — {@code -parameters} 컴파일 옵션 의존 회피.
      */
@@ -108,8 +109,8 @@ public abstract class AbstractAutowireCapableBeanFactory
         for (int i = 0; i < paramTypes.length; i++) {
             DependencyDescriptor desc = new DependencyDescriptor(
                     paramTypes[i], true, paramTypes[i].getSimpleName());
-            // AbstractAutowireCapableBeanFactory의 구체 구현체는 DefaultListableBeanFactory이므로 캐스팅
-            args[i] = ((DefaultListableBeanFactory) this).resolveDependency(desc, requestingBeanName);
+            // 런타임 인스턴스는 ConfigurableListableBeanFactory 구현체(DefaultListableBeanFactory)이므로 캐스팅 — A1에서 인터페이스에 승격됨
+            args[i] = ((ConfigurableListableBeanFactory) this).resolveDependency(desc, requestingBeanName);
         }
         return args;
     }

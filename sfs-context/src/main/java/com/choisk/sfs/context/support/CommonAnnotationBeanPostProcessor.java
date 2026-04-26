@@ -1,7 +1,7 @@
 package com.choisk.sfs.context.support;
 
 import com.choisk.sfs.beans.BeanPostProcessor;
-import com.choisk.sfs.beans.support.DefaultListableBeanFactory;
+import com.choisk.sfs.beans.ConfigurableBeanFactory;
 import com.choisk.sfs.context.annotation.PostConstruct;
 import com.choisk.sfs.context.annotation.PreDestroy;
 import com.choisk.sfs.core.ReflectionUtils;
@@ -24,10 +24,10 @@ import java.util.List;
  */
 public class CommonAnnotationBeanPostProcessor implements BeanPostProcessor {
 
-    /** @PreDestroy 등록 시 beanFactory.registerDisposableBean 호출에 활용 */
-    private final DefaultListableBeanFactory beanFactory;
+    /** @PreDestroy 등록 시 beanFactory.registerDisposableBean 호출에 활용 — 인터페이스 의존 (AOP 서브클래스 등장 시 ClassCastException 사전 차단) */
+    private final ConfigurableBeanFactory beanFactory;
 
-    public CommonAnnotationBeanPostProcessor(DefaultListableBeanFactory beanFactory) {
+    public CommonAnnotationBeanPostProcessor(ConfigurableBeanFactory beanFactory) {
         this.beanFactory = beanFactory;
     }
 

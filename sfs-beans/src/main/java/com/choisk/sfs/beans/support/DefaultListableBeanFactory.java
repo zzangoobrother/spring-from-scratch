@@ -155,6 +155,7 @@ public class DefaultListableBeanFactory
      * @param requestingBeanName 요청 빈 이름 (순환 참조 감지용, 현재 미사용)
      * @return 해석된 빈 인스턴스 또는 null (required=false + 미매칭)
      */
+    @Override
     public Object resolveDependency(DependencyDescriptor desc, String requestingBeanName) {
         // BeanDefinition 기반 + 직접 등록 싱글톤을 모두 포함한 타입 매칭 맵 구성
         Map<String, Object> matches = resolveBeansOfType(desc.getDependencyType());

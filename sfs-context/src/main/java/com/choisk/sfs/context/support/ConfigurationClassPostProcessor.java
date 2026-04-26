@@ -4,47 +4,87 @@ import com.choisk.sfs.beans.BeanDefinition;
 import com.choisk.sfs.beans.BeanFactoryPostProcessor;
 import com.choisk.sfs.beans.ConfigurableListableBeanFactory;
 import com.choisk.sfs.context.annotation.Bean;
+import com.choisk.sfs.context.annotation.ComponentScan;
 import com.choisk.sfs.context.annotation.Configuration;
 
 import java.lang.reflect.Method;
+import java.util.LinkedHashSet;
 
 /**
- * @Configuration 클래스의 @Bean 메서드를 스캔해 factoryMethod BeanDefinition으로 등록하는 처리기.
- * byte-buddy enhance 없이 단순판으로 동작한다 (enhance 없이도 매개변수 형태 inter-bean reference는
- * C1의 resolveDependency 라우팅으로 처리됨).
+ * @Configuration 클래스의 @Bean 메서드를 스캔해 factoryMethod BeanDefinition으로 등록하고,
+ * proxyBeanMethods=true인 @Configuration 클래스는 byte-buddy로 enhance한다.
  *
- * <p>등록 규칙:
+ * <p>Phase 2A에서 enhance 동작 추가 — Phase 1B-β의 단순판은 enhance 없이 매개변수 라우팅만 지원했음.
+ *
+ * <p>등록 규칙 (변경 없음):
  * <ul>
  *   <li>@Bean(name=...) 값이 있으면 첫 번째 값을 빈 이름으로 사용</li>
  *   <li>name이 비어있으면 메서드명을 빈 이름으로 사용</li>
  * </ul>
- *
  */
 public class ConfigurationClassPostProcessor implements BeanFactoryPostProcessor {
 
     @Override
     public void postProcessBeanFactory(ConfigurableListableBeanFactory bf) {
-        // registerBeanDefinition 호출이 컬렉션 변경을 일으킬 수 있으므로 스냅샷 배열로 순회
-        // getBeanDefinitionNames()는 내부적으로 toArray(new String[0])로 스냅샷을 반환하므로 .clone() 불필요
+        // @ComponentScan으로 신규 BD를 추가 — 후속 단계가 그 BD도 처리하도록 최우선
+        processComponentScans(bf);
+
+        // @Bean 메서드 → factoryMethod BD 등록
+        registerBeanMethodsForAllConfigurations(bf);
+
+        // proxyBeanMethods=true인 @Configuration BD의 beanClass를 enhance 서브클래스로 교체
+        enhanceConfigurationClasses(bf);
+    }
+
+    /**
+     * @ComponentScan 발견 시 ClassPathBeanDefinitionScanner.scan 호출.
+     * 빈 배열이면 학습 범위 단순화 — 기본 패키지 자동 추론은 후속 phase로 보류.
+     *
+     * <p>basePackages 값은 학습 범위 가정 — 신뢰 가능한 학습용 정적 문자열만 입력됨.
+     * 프로덕션 환경에서는 패키지명 sanitize/검증을 거쳐야 함.
+     */
+    private void processComponentScans(ConfigurableListableBeanFactory bf) {
+        ClassPathBeanDefinitionScanner scanner = new ClassPathBeanDefinitionScanner(bf);
+        // 스냅샷 — 스캔이 BD를 추가할 수 있으므로 동시 변경 방지
         String[] definitionNames = bf.getBeanDefinitionNames();
 
         for (String configName : definitionNames) {
             BeanDefinition bd = bf.getBeanDefinition(configName);
-            if (bd.getBeanClass() == null) {
-                continue;
-            }
-            if (!bd.getBeanClass().isAnnotationPresent(Configuration.class)) {
-                continue;
-            }
+            if (bd.getBeanClass() == null) continue;
 
-            // @Configuration 클래스의 모든 @Bean 메서드 추출 후 BD 등록
+            ComponentScan scan = bd.getBeanClass().getAnnotation(ComponentScan.class);
+            if (scan == null) continue;
+
+            String[] basePackages = mergePackages(scan.basePackages(), scan.value());
+            if (basePackages.length == 0) {
+                // 학습 범위: 명시 지정만 지원 — 빈 배열은 no-op
+                continue;
+            }
+            scanner.scan(basePackages);
+        }
+    }
+
+    private String[] mergePackages(String[] basePackages, String[] value) {
+        // value()와 basePackages()는 동의어 — 합집합으로 중복 제거
+        LinkedHashSet<String> result = new LinkedHashSet<>();
+        for (String p : basePackages) if (p != null && !p.isEmpty()) result.add(p);
+        for (String p : value) if (p != null && !p.isEmpty()) result.add(p);
+        return result.toArray(new String[0]);
+    }
+
+    private void registerBeanMethodsForAllConfigurations(ConfigurableListableBeanFactory bf) {
+        // registerBeanDefinition 호출이 컬렉션 변경을 일으킬 수 있으므로 스냅샷 배열로 순회
+        String[] definitionNames = bf.getBeanDefinitionNames();
+        for (String configName : definitionNames) {
+            BeanDefinition bd = bf.getBeanDefinition(configName);
+            if (bd.getBeanClass() == null) continue;
+            if (!bd.getBeanClass().isAnnotationPresent(Configuration.class)) continue;
+
             for (Method m : bd.getBeanClass().getDeclaredMethods()) {
-                if (!m.isAnnotationPresent(Bean.class)) {
-                    continue;
-                }
+                if (!m.isAnnotationPresent(Bean.class)) continue;
 
+                // 동일 이름 규칙이 BeanMethodInterceptor.resolveBeanName에도 독립 구현 — 변경 시 양쪽 함께 갱신
                 Bean beanAnno = m.getAnnotation(Bean.class);
-                // name()이 비어있으면 메서드명, 아니면 첫 번째 name 값을 빈 이름으로 사용
                 String[] names = beanAnno.name();
                 String beanName = (names.length > 0 && !names[0].isEmpty()) ? names[0] : m.getName();
 
@@ -54,6 +94,23 @@ public class ConfigurationClassPostProcessor implements BeanFactoryPostProcessor
 
                 bf.registerBeanDefinition(beanName, beanBd);
             }
+        }
+    }
+
+    private void enhanceConfigurationClasses(ConfigurableListableBeanFactory bf) {
+        ConfigurationClassEnhancer enhancer = new ConfigurationClassEnhancer(bf);
+        for (String name : bf.getBeanDefinitionNames()) {
+            BeanDefinition bd = bf.getBeanDefinition(name);
+            Class<?> beanClass = bd.getBeanClass();
+            if (beanClass == null) continue;
+
+            Configuration cfg = beanClass.getAnnotation(Configuration.class);
+            if (cfg == null || !cfg.proxyBeanMethods()) continue;
+
+            // bf.getBeanDefinition()이 등록된 BD 인스턴스를 그대로 반환하므로 setBeanClass가 직접 반영됨
+            // (복사/재등록 불필요). enhance된 서브클래스가 다음 createBean()에서 newInstance됨.
+            Class<?> enhanced = enhancer.enhance(beanClass);
+            bd.setBeanClass(enhanced);
         }
     }
 }

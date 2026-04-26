@@ -95,6 +95,14 @@ public class DefaultSingletonBeanRegistry {
         }
     }
 
+    /**
+     * 1차/2차/3차 캐시 어디라도 빈이 등장하면 true 반환.
+     * {@link com.choisk.sfs.context.support.BeanMethodInterceptor}가 인터셉트 분기 판단에 사용.
+     *
+     * <p>학습 범위 한계: 2차 캐시 hit 시 <em>조기 노출 참조</em>가 반환되므로
+     * 순환 참조 시나리오에서 BeanMethodInterceptor가 미완성 빈을 반환할 가능성 존재.
+     * 본 phase는 단방향 의존만 가정하므로 발생 안 함 — 후속 phase에서 박제 보강 가능.
+     */
     public boolean containsSingleton(String name) {
         return singletonObjects.containsKey(name)
                 || earlySingletonObjects.containsKey(name)
