@@ -129,7 +129,44 @@ class Phase1IntegrationTest {
     }
 
     /**
-     * 테스트 3: Phase 1 풀 시나리오.
+     * proxyBeanMethods=false 시 enhance 미적용 — 직접 호출이 새 인스턴스 생성함을 박제.
+     *
+     * <p>enhance가 꺼졌을 때 {@code service()} 본문의 {@code repo()} 직접 호출은
+     * 매번 새 {@code Repo} 인스턴스를 생성하므로 컨테이너의 singleton Repo 빈과 다른 인스턴스이다.
+     */
+    @Configuration(proxyBeanMethods = false)
+    static class NoProxyDirectCallConfig {
+        @Bean
+        public Repo repo() { return new Repo(); }
+
+        @Bean
+        public Service service() { return new Service(repo()); }
+    }
+
+    /**
+     * 테스트 3: proxyBeanMethods=false 분기 대칭 박제.
+     *
+     * <p>enhance가 적용되지 않으면 {@code service()} 본문의 {@code repo()} 직접 호출이
+     * 컨테이너를 거치지 않아 새 인스턴스를 생성한다.
+     * {@code directCallFormRoutesToContainerWithEnhance}의 {@code true} 경우와 대칭.
+     */
+    @Test
+    void directCallFormBypassesEnhanceWhenProxyBeanMethodsDisabled() {
+        AnnotationConfigApplicationContext ctx =
+                new AnnotationConfigApplicationContext(NoProxyDirectCallConfig.class);
+
+        Service service = ctx.getBean(Service.class);
+        Repo repo = ctx.getBean(Repo.class);
+
+        assertThat(service.repo)
+                .as("proxyBeanMethods=false면 enhance가 적용되지 않아 직접 호출이 새 인스턴스를 생성")
+                .isNotSameAs(repo);
+
+        ctx.close();
+    }
+
+    /**
+     * 테스트 5: Phase 1 풀 시나리오.
      *
      * <p>@Configuration + @Bean 매개변수 주입 + @Component @Autowired 필드 주입 +
      * @PostConstruct (open 시) + @PreDestroy (close 시) 모두 동작하는 end-to-end 시연.
