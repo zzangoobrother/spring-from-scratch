@@ -65,7 +65,7 @@ public class ConfigurationClassPostProcessor implements BeanFactoryPostProcessor
     }
 
     private String[] mergePackages(String[] basePackages, String[] value) {
-        // 두 배열을 합쳐 빈 문자열 제거 — value()와 basePackages()가 동의어이므로 합집합 처리
+        // value()와 basePackages()는 동의어 — 합집합으로 중복 제거
         LinkedHashSet<String> result = new LinkedHashSet<>();
         for (String p : basePackages) if (p != null && !p.isEmpty()) result.add(p);
         for (String p : value) if (p != null && !p.isEmpty()) result.add(p);
@@ -83,6 +83,7 @@ public class ConfigurationClassPostProcessor implements BeanFactoryPostProcessor
             for (Method m : bd.getBeanClass().getDeclaredMethods()) {
                 if (!m.isAnnotationPresent(Bean.class)) continue;
 
+                // 동일 이름 규칙이 BeanMethodInterceptor.resolveBeanName에도 독립 구현 — 변경 시 양쪽 함께 갱신
                 Bean beanAnno = m.getAnnotation(Bean.class);
                 String[] names = beanAnno.name();
                 String beanName = (names.length > 0 && !names[0].isEmpty()) ? names[0] : m.getName();

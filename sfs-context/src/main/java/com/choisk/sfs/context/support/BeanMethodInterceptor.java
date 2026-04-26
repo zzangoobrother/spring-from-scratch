@@ -53,6 +53,9 @@ public class BeanMethodInterceptor {
      * 빈 이름 결정 — Spring 관례를 따른다:
      * {@code @Bean(name="")}, {@code @Bean(name={})}, name 미지정은 모두 "이름 미지정"으로 간주하여 메서드명 폴백.
      * (배열 첫 요소만 주 이름으로 사용; 나머지 별칭 등록은 학습 범위 외)
+     *
+     * <p>동일 규칙이 {@link ConfigurationClassPostProcessor}의 BD 등록 단계에도 독립 적용됨.
+     * 두 단계(등록 vs 런타임 라우팅) 분리는 Spring 본가 패턴 — 규칙 변경 시 양쪽 함께 갱신할 것.
      */
     private String resolveBeanName(Method method) {
         Bean ann = method.getAnnotation(Bean.class);
