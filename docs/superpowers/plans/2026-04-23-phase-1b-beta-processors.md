@@ -1477,6 +1477,7 @@ git commit -m "docs: Plan 1B-β 마감 — README 학습용 시나리오 + DoD 9
 | 항목 | 학습 가치 | deep version 위치 |
 |---|---|---|
 | **byte-buddy enhance + 직접 호출 형태 동일 싱글톤** | proxy 기반 메타프로그래밍 / `@Configuration` 계약의 본질 (H2의 두 번째 테스트가 `isSameAs`로 변하는 시점) | deep Task E1, E2, E3 |
+| **`@ComponentScan` + `ConfigurationClassPostProcessor`** | `@Configuration` BFPP 처리 묶음 / 명시 등록 → 자동 발견 마일스톤 (Phase 1C F1의 7 클래스 나열이 한 줄로 축약되는 시점) | (Phase 2 plan에서 신설 — 2026-04-25 추가, byte-buddy enhance와 한 묶음으로 도입) |
 | **세터/생성자 주입** + 단일 ctor 자동 검출 (Spring 4.3+) | 의존성 주입의 3 경로 / 불변성 / 테스트 용이성 | deep Task F2, F3 |
 | **`List<T>`/`Map<String, T>` 컬렉션 주입** | 제네릭 추출 / 타입 시스템 / 다중 구현 패턴 | deep Task F5 |
 | **`@Primary` → `@Qualifier` → 필드명 폴백** | 다수 후보 해결 정책 / 전략 패턴 | deep Task F6 |
