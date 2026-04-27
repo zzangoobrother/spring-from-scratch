@@ -81,6 +81,11 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
 
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) {
+        if (sharedInterceptor == null) {
+            throw new IllegalStateException(
+                    "AspectEnhancingBeanPostProcessor가 BeanFactory 주입 전에 사용됨 — setBeanFactory()가 먼저 호출되어야 함"
+            );
+        }
         if (bean instanceof BeanPostProcessor) return bean;  // 자기 참조 격리
 
         // @Aspect 빈은 preRegisterAspects(setBeanFactory 시점)에서 이미 advice 등록 완료 — 여기서는 enhance 대상에서만 제외

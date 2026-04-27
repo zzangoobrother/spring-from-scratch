@@ -113,6 +113,16 @@ class AspectEnhancingBeanPostProcessorTest {
                 .hasMessageContaining("FinalFieldBean");
     }
 
+    @Test
+    void postProcessBeforeSetBeanFactoryThrows() {
+        // setBeanFactory 미호출 상태에서 postProcessAfterInitialization 호출 시 명확한 에러
+        AspectEnhancingBeanPostProcessor uninitializedBpp = new AspectEnhancingBeanPostProcessor();
+        Object someBean = new Object();
+        assertThatThrownBy(() -> uninitializedBpp.postProcessAfterInitialization(someBean, "name"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("setBeanFactory");
+    }
+
     /**
      * preRegisterAspects(setBeanFactory)가 advice를 등록한 상태에서
      * postProcessAfterInitialization이 같은 @Aspect 빈을 다시 통과해도
