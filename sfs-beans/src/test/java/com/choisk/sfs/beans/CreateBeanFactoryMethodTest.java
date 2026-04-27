@@ -58,8 +58,6 @@ class CreateBeanFactoryMethodTest {
         assertThat(bf.getBean("describe")).isEqualTo("repo-tag=repo");
     }
 
-    // ── T3: factory method 경로의 BeanFactoryAware 콜백 검증 ─────────────────
-
     static class AwareBean implements BeanFactoryAware {
         BeanFactory captured;
 
@@ -74,10 +72,8 @@ class CreateBeanFactoryMethodTest {
     }
 
     /**
-     * T3: factory method 경로(doCreateBean)에서 initializeBean이 호출되어
-     * BeanFactoryAware.setBeanFactory 콜백이 실제로 트리거되는지 검증.
-     *
-     * <p>B2 인프라 편차 수정(doCreateBean factory method 경로에 initializeBean 추가)의 안전망.
+     * factory method 경로(doCreateBean)도 생성자 경로와 동일하게 initializeBean이 호출되어
+     * BeanFactoryAware.setBeanFactory 콜백을 트리거해야 한다 (두 경로의 라이프사이클 동등성).
      */
     @Test
     void factoryMethodPathInvokesBeanFactoryAware() {

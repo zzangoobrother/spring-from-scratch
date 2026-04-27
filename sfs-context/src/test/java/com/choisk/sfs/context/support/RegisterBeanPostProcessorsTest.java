@@ -8,11 +8,11 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * T2: {@link AbstractApplicationContext#registerBeanPostProcessors} 직접 단위 검증.
+ * {@link AbstractApplicationContext#registerBeanPostProcessors} 직접 단위 검증.
  *
- * <p>{@code AbstractApplicationContextTest}의 {@code TracingContext}는
- * {@code registerBeanPostProcessors}를 no-op으로 오버라이드하므로 실 구현 검증 부재.
- * 본 테스트는 {@code AnnotationConfigApplicationContext}를 통해 실 구현 경로를 검증한다.
+ * <p>{@code AbstractApplicationContextTest}의 {@code TracingContext}는 본 메서드를
+ * no-op으로 오버라이드하므로 실 구현 경로를 거치지 않는다. 본 테스트는
+ * {@code AnnotationConfigApplicationContext}를 통해 실 구현(`@Bean BPP` 등록 + 중복 방지)을 검증한다.
  */
 class RegisterBeanPostProcessorsTest {
 

@@ -114,12 +114,9 @@ class AspectEnhancingBeanPostProcessorTest {
     }
 
     /**
-     * T1: preRegisterAspects(setBeanFactory) + postProcessAfterInitialization 양쪽을 통과해도
-     * advice가 1개만 등록되어야 한다 (이중 등록 방지 회귀 안전망).
-     *
-     * <p>HIGH-1 수정 이전 코드에서는 이 테스트가 RED: postProcessAfterInitialization의
-     * @Aspect 분기에서 registry.register()를 재호출해 advices 리스트에 2개 누적.
-     * 수정 후 GREEN: postProcessAfterInitialization에서 재등록 제거 → 1개만 유지.
+     * preRegisterAspects(setBeanFactory)가 advice를 등록한 상태에서
+     * postProcessAfterInitialization이 같은 @Aspect 빈을 다시 통과해도
+     * advice는 *1개만* 등록되어야 한다 (이중 등록 방지 invariant).
      */
     @Test
     void aspectAdviceIsRegisteredOnceEvenWhenBothPreRegisterAndPostProcessRun() throws NoSuchMethodException {
