@@ -19,6 +19,9 @@ public class AspectRegistry {
 
     /**
      * {@code @Aspect} 빈의 메서드를 순회하며 {@code @Around}/{@code @Before}/{@code @After} 발견 시 advice 등록.
+     *
+     * <p>{@link Class#getDeclaredMethods}: aspect 클래스 <em>상속 미지원</em>이 의도. 부모 클래스의 advice는 무시됨
+     * (Phase 2C+ 이후 상속 advice 지원 여부 재검토).
      */
     public void register(String aspectBeanName, Class<?> aspectClass) {
         for (Method m : aspectClass.getDeclaredMethods()) {

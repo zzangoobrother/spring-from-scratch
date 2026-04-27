@@ -25,15 +25,29 @@ import java.lang.reflect.Modifier;
  *
  * <p>한계: {@code final} 클래스/필드는 fail-fast로 명확한 에러. {@code final} 메서드는 silent skip
  * (Phase 2C에서 검출 추가 예정).
+ *
+ * <p><strong>한계 (자원 수명):</strong> {@link ClassLoadingStrategy.UsingLookup}으로 생성한 동적 클래스는
+ * 대상 클래스의 ClassLoader에 주입되어 ClassLoader 수명에 묶인다. ApplicationContext close 시
+ * 별도 cleanup이 없어 <em>컨텍스트 재생성이 잦은 환경</em>(테스트 스위트, hot-reload)에서는 Metaspace 누적 가능.
+ * 학습 컨텍스트(단일 ApplicationContext) 범위에서는 영향 없음. 격리 ClassLoader 기반 회수는 Phase 2C+ 검토.
+ *
+ * <p><strong>제약 (등록 순서):</strong> {@code @Aspect} 빈이 <em>대상 빈보다 먼저</em> 본 BPP를 통과해야
+ * advice가 적용된다. 컨테이너의 빈 생성 순서가 보장되지 않는 환경에서는 <em>late-registered aspect</em>가
+ * <em>먼저 enhance된 빈</em>에 적용되지 않는다.
+ * Phase 2C+에서 two-pass(BPP 사전 수집) 방식으로 해소 예정.
  */
 public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, BeanFactoryAware {
 
     private BeanFactory beanFactory;
     private final AspectRegistry registry = new AspectRegistry();
+    // HIGH-1: enhance마다 새 인스턴스 생성하지 않도록 setBeanFactory 시점에 1회 초기화
+    private AdviceInterceptor sharedInterceptor;
 
     @Override
     public void setBeanFactory(BeanFactory beanFactory) {
         this.beanFactory = beanFactory;
+        // registry는 생성자에서 final 초기화 — setBeanFactory 진입 시점에 안전 사용 가능
+        this.sharedInterceptor = new AdviceInterceptor(beanFactory, registry);
     }
 
     @Override
@@ -64,8 +78,9 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
         try {
             return new ByteBuddy()
                     .subclass(originalClass)
-                    .method(ElementMatchers.any())  // 매칭 검사는 인터셉터 안에서 (registry.findApplicable)
-                    .intercept(MethodDelegation.to(new AdviceInterceptor(beanFactory, registry)))
+                    // byte-buddy 정적 matcher는 registry(런타임 상태)를 참조 불가 — 모든 메서드 위임 후 인터셉터에서 분기
+                    .method(ElementMatchers.any())
+                    .intercept(MethodDelegation.to(sharedInterceptor))  // HIGH-1: 공유 인스턴스 재사용
                     .make()
                     .load(originalClass.getClassLoader(),
                             ClassLoadingStrategy.UsingLookup.of(
@@ -86,7 +101,11 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
         }
     }
 
-    private void copyFields(Object source, Object target, Class<?> declaredClass) {
+    /**
+     * HIGH-2: 복사 시작 전 상속 체인 전체를 선검사 — final 필드 발견 시 *부분 복사 없이* 즉시 throw.
+     * pre-check가 통과한 이후 copyFields 본문에서는 final 검사 불필요.
+     */
+    private void validateNoFinalFields(Class<?> declaredClass) {
         Class<?> c = declaredClass;
         while (c != null && c != Object.class) {
             for (Field f : c.getDeclaredFields()) {
@@ -97,6 +116,17 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
                                     + " on enhanced " + declaredClass.getName()
                                     + ". Remove final or use constructor injection (Phase 2C+)");
                 }
+            }
+            c = c.getSuperclass();
+        }
+    }
+
+    private void copyFields(Object source, Object target, Class<?> declaredClass) {
+        validateNoFinalFields(declaredClass);  // 사전 검사: 부분 복사 상태로 throw하지 않도록 선행
+        Class<?> c = declaredClass;
+        while (c != null && c != Object.class) {
+            for (Field f : c.getDeclaredFields()) {
+                if (Modifier.isStatic(f.getModifiers())) continue;
                 f.setAccessible(true);
                 try {
                     f.set(target, f.get(source));
