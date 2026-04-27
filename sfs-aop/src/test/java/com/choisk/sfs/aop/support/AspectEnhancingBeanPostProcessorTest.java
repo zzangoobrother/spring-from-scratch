@@ -119,7 +119,7 @@ class AspectEnhancingBeanPostProcessorTest {
 
         assertThatThrownBy(() -> bpp.postProcessAfterInitialization(new FinalFieldBean(), "finalFieldBean"))
                 .isInstanceOf(IllegalStateException.class)
-                // LOW-5: 메시지 형태가 깨지면 테스트도 깨지도록 구체적 단언 (안전망 강도 향상)
+                // 메시지 형태가 바뀌면 테스트도 깨지도록 구체적 단언
                 .hasMessageContaining("Cannot copy final field fixed")
                 .hasMessageContaining("FinalFieldBean");
     }

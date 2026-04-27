@@ -40,7 +40,7 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
 
     private BeanFactory beanFactory;
     private final AspectRegistry registry = new AspectRegistry();
-    // HIGH-1: enhance마다 새 인스턴스 생성하지 않도록 setBeanFactory 시점에 1회 초기화
+    // 매 enhance마다 새 인스턴스 생성을 회피 — setBeanFactory 시점에 1회 초기화 후 모든 enhanced 빈에 공유
     private AdviceInterceptor sharedInterceptor;
 
     @Override
@@ -80,7 +80,7 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
                     .subclass(originalClass)
                     // byte-buddy 정적 matcher는 registry(런타임 상태)를 참조 불가 — 모든 메서드 위임 후 인터셉터에서 분기
                     .method(ElementMatchers.any())
-                    .intercept(MethodDelegation.to(sharedInterceptor))  // HIGH-1: 공유 인스턴스 재사용
+                    .intercept(MethodDelegation.to(sharedInterceptor))
                     .make()
                     .load(originalClass.getClassLoader(),
                             ClassLoadingStrategy.UsingLookup.of(
@@ -102,7 +102,7 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
     }
 
     /**
-     * HIGH-2: 복사 시작 전 상속 체인 전체를 선검사 — final 필드 발견 시 *부분 복사 없이* 즉시 throw.
+     * 복사 시작 전 상속 체인 전체를 선검사 — final 필드 발견 시 *부분 복사 없이* 즉시 throw.
      * pre-check가 통과한 이후 copyFields 본문에서는 final 검사 불필요.
      */
     private void validateNoFinalFields(Class<?> declaredClass) {

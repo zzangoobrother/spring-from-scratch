@@ -86,10 +86,9 @@ class AspectRegistryTest {
 
     @Test
     void registerTwoAspectsAccumulatesAllAdvices() {
-        // LOW-4: 다중 @Aspect 등록 시 advice 누적 검증 — ArrayList 기반 registry가 진짜 누적하는지 안전망
         AspectRegistry registry = new AspectRegistry();
         registry.register("aspectA", TestAspect.class);
-        registry.register("aspectB", TestAspect.class);  // 같은 클래스 두 번 등록
+        registry.register("aspectB", TestAspect.class);  // 같은 클래스 두 번 등록 — 누적 안전망
 
         List<AdviceInfo> all = registry.findApplicable(targetMethod(TargetWithLoggable.class, "annotatedMethod"));
         assertThat(all).hasSize(6);  // 3(aspectA) + 3(aspectB)
