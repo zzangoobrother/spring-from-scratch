@@ -7,11 +7,16 @@ import com.choisk.sfs.aop.annotation.Before;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 컨테이너 전체의 advice 레지스트리. BPP의 *내부 상태* — 빈으로 등록 안 함.
  * <p>BPP가 {@code @Aspect} 빈 발견 시 {@link #register} 호출, 일반 빈 매칭 시 {@link #findApplicable} lookup.
+ *
+ * <p><strong>캐시:</strong> {@link #findApplicable(Method)}는 Method → List&lt;AdviceInfo&gt; 매핑을 캐시한다.
+ * advices가 startup 이후 불변이라는 가정에 의존하며, {@link #register} 호출 시 invalidate된다.
  *
  * <p><strong>스레드 안전성</strong>: 컨테이너 refresh 단일 스레드 가정 — 등록(write)은 refresh 중에만,
  * 매칭 조회(read)는 그 이후에만 발생. 멀티스레드 환경 진입 시 외부 동기화 필요.
@@ -19,6 +24,7 @@ import java.util.List;
 public class AspectRegistry {
 
     private final List<AdviceInfo> advices = new ArrayList<>();
+    private final Map<Method, List<AdviceInfo>> cache = new HashMap<>();
 
     /**
      * {@code @Aspect} 빈의 메서드를 순회하며 {@code @Around}/{@code @Before}/{@code @After} 발견 시 advice 등록.
@@ -51,6 +57,7 @@ public class AspectRegistry {
                 advices.add(new AdviceInfo(AdviceType.AFTER, after.value(), m, aspectBeanName));
             }
         }
+        cache.clear();  // advices 변경 시 캐시 invalidate
     }
 
     /**
@@ -94,17 +101,20 @@ public class AspectRegistry {
 
     /**
      * 메서드의 매칭 advice 반환. 메서드 단위 애노테이션 우선, 없으면 declaring 클래스 단위 매칭.
+     * 결과는 Method 단위로 캐시되며 {@link #register} 호출 시 invalidate된다.
      */
     public List<AdviceInfo> findApplicable(Method targetMethod) {
-        List<AdviceInfo> result = new ArrayList<>();
-        for (AdviceInfo info : advices) {
-            Class<? extends Annotation> ann = info.targetAnnotation();
-            if (targetMethod.isAnnotationPresent(ann)
-                    || targetMethod.getDeclaringClass().isAnnotationPresent(ann)) {
-                result.add(info);
+        return cache.computeIfAbsent(targetMethod, key -> {
+            List<AdviceInfo> result = new ArrayList<>();
+            for (AdviceInfo info : advices) {
+                Class<? extends Annotation> ann = info.targetAnnotation();
+                if (key.isAnnotationPresent(ann)
+                        || key.getDeclaringClass().isAnnotationPresent(ann)) {
+                    result.add(info);
+                }
             }
-        }
-        return result;
+            return result;
+        });
     }
 
     /**
