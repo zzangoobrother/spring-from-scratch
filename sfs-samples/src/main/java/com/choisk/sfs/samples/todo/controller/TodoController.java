@@ -1,5 +1,6 @@
 package com.choisk.sfs.samples.todo.controller;
 
+import com.choisk.sfs.aop.annotation.Loggable;
 import com.choisk.sfs.context.annotation.Autowired;
 import com.choisk.sfs.context.annotation.Controller;
 import com.choisk.sfs.samples.todo.domain.Todo;
@@ -27,6 +28,7 @@ public class TodoController {
         System.out.println("[TodoController] Todos for owner " + ownerId + ": " + summary);
     }
 
+    @Loggable
     public void complete(Long todoId) {
         todoService.complete(todoId);
         System.out.println("[TodoController] Todo " + todoId + " completed");

@@ -55,8 +55,13 @@ public abstract class AbstractAutowireCapableBeanFactory
 
     protected Object doCreateBean(String beanName, BeanDefinition definition) {
         // factoryMethod 분기 — BD에 factoryMethodName이 있으면 생성자 대신 팩토리 메서드로 인스턴스화
+        // initializeBean(Aware + BPP after)도 적용해야 BeanFactoryAware 콜백 + BPP after 처리됨
         if (definition.getFactoryMethodName() != null) {
-            return createBeanViaFactoryMethod(beanName, definition);
+            Object factoryResult = createBeanViaFactoryMethod(beanName, definition);
+            Object initialized = initializeBean(beanName, definition, factoryResult);
+            // initializeBean 실패 시 registerDisposableIfNeeded 미호출 — 초기화 미완 빈은 destroy 대상 아님 (Spring 본가와 동일 정책)
+            registerDisposableIfNeeded(beanName, definition, initialized);
+            return initialized;
         }
 
         // B-2: 인스턴스화

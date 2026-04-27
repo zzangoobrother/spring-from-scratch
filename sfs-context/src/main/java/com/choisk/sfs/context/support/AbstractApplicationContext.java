@@ -1,6 +1,7 @@
 package com.choisk.sfs.context.support;
 
 import com.choisk.sfs.beans.BeanFactoryPostProcessor;
+import com.choisk.sfs.beans.BeanPostProcessor;
 import com.choisk.sfs.beans.ConfigurableListableBeanFactory;
 import com.choisk.sfs.context.ApplicationContext;
 import com.choisk.sfs.context.ConfigurableApplicationContext;
@@ -126,7 +127,21 @@ public abstract class AbstractApplicationContext implements ConfigurableApplicat
     protected void invokeBeanFactoryPostProcessors(ConfigurableListableBeanFactory bf) {
         for (BeanFactoryPostProcessor bfpp : bfpps) bfpp.postProcessBeanFactory(bf);
     }
-    protected void registerBeanPostProcessors(ConfigurableListableBeanFactory bf) { /* no-op (확장점) */ }
+    /**
+     * BeanDefinition 중 {@link BeanPostProcessor} 구현체를 *우선 생성*하여 BeanFactory의 BPP 체인에 등록.
+     * <p>이 단계에서 BPP를 먼저 생성하는 이유: {@link #finishBeanFactoryInitialization} 시점(일반 빈 생성) 전에
+     * BPP 체인이 완성되어야 모든 일반 빈에 후처리가 적용된다 (Spring 본가 패턴 동일).
+     */
+    protected void registerBeanPostProcessors(ConfigurableListableBeanFactory bf) {
+        String[] bppNames = bf.getBeanNamesForType(BeanPostProcessor.class);
+        for (String name : bppNames) {
+            Object bpp = bf.getBean(name);
+            // contains 체크: addBeanPostProcessor는 remove+add이므로 이미 등록된 BPP를 재추가하면 리스트 끝으로 이동해 순서 변경 발생
+            if (!bf.getBeanPostProcessors().contains(bpp)) {
+                bf.addBeanPostProcessor((BeanPostProcessor) bpp);
+            }
+        }
+    }
     protected void finishBeanFactoryInitialization(ConfigurableListableBeanFactory bf) {
         bf.preInstantiateSingletons();
     }

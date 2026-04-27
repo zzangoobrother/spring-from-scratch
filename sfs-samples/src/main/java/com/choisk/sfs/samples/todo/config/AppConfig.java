@@ -1,5 +1,6 @@
 package com.choisk.sfs.samples.todo.config;
 
+import com.choisk.sfs.aop.support.AspectEnhancingBeanPostProcessor;
 import com.choisk.sfs.context.annotation.Bean;
 import com.choisk.sfs.context.annotation.ComponentScan;
 import com.choisk.sfs.context.annotation.Configuration;
@@ -19,5 +20,10 @@ public class AppConfig {
     @Bean
     public IdGenerator idGenerator(Clock clock) {
         return new IdGenerator(clock);
+    }
+
+    @Bean
+    public AspectEnhancingBeanPostProcessor aspectBpp() {
+        return new AspectEnhancingBeanPostProcessor();
     }
 }
