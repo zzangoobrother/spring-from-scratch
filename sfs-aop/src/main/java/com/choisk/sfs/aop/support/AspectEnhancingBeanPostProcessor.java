@@ -19,7 +19,7 @@ import java.lang.reflect.Modifier;
  *
  * <ol>
  *   <li>{@code BeanPostProcessor} 빈은 그대로 반환 — 자기 참조 격리</li>
- *   <li>{@code @Aspect} 빈은 {@link AspectRegistry}에 advice 등록 후 원본 반환</li>
+ *   <li>{@code @Aspect} 빈은 enhance 제외 — 자기 자신이 advice 호출 대상이 되면 advice가 advice를 가로채는 무한 루프 위험</li>
  *   <li>일반 빈은 매칭 검사 → 매칭 시 byte-buddy 서브클래스 + 인터셉터 적용 + 필드 reflection 복사</li>
  *   <li>매칭 없으면 원본 그대로 — enhance 비용 0</li>
  * </ol>
@@ -32,10 +32,9 @@ import java.lang.reflect.Modifier;
  * 별도 cleanup이 없어 <em>컨텍스트 재생성이 잦은 환경</em>(테스트 스위트, hot-reload)에서는 Metaspace 누적 가능.
  * 학습 컨텍스트(단일 ApplicationContext) 범위에서는 영향 없음. 격리 ClassLoader 기반 회수는 Phase 2C+ 검토.
  *
- * <p><strong>제약 (등록 순서):</strong> {@code @Aspect} 빈이 <em>대상 빈보다 먼저</em> 본 BPP를 통과해야
- * advice가 적용된다. 컨테이너의 빈 생성 순서가 보장되지 않는 환경에서는 <em>late-registered aspect</em>가
- * <em>먼저 enhance된 빈</em>에 적용되지 않는다.
- * Phase 2C+에서 two-pass(BPP 사전 수집) 방식으로 해소 예정.
+ * <p><strong>등록 순서 의존:</strong> {@code @Aspect} 빈이 <em>대상 빈보다 먼저</em> 생성되지 않아도 advice가 적용되도록,
+ * {@link #setBeanFactory} 시점에 {@link #preRegisterAspects two-pass 사전 수집}을 수행한다.
+ * BeanDefinition만 읽어 registry에 등록 — 빈 인스턴스 생성 없음 → 순환 의존 회피.
  */
 public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, BeanFactoryAware {
 
@@ -84,8 +83,8 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
     public Object postProcessAfterInitialization(Object bean, String beanName) {
         if (bean instanceof BeanPostProcessor) return bean;  // 자기 참조 격리
 
+        // @Aspect 빈은 preRegisterAspects(setBeanFactory 시점)에서 이미 advice 등록 완료 — 여기서는 enhance 대상에서만 제외
         if (bean.getClass().isAnnotationPresent(Aspect.class)) {
-            registry.register(beanName, bean.getClass());
             return bean;
         }
 
@@ -149,6 +148,14 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
             }
             c = c.getSuperclass();
         }
+    }
+
+    /**
+     * 테스트 전용 — 프로덕션 코드에서 호출 금지. (Test-only — production code must not call this.)
+     * <p>이중 등록 방지 단언 등 내부 상태 검증에 사용.
+     */
+    AspectRegistry getRegistryForTesting() {
+        return registry;
     }
 
     private void copyFields(Object source, Object target, Class<?> declaredClass) {

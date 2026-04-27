@@ -49,6 +49,8 @@ class AspectEnhancingBeanPostProcessorTest {
     @BeforeEach
     void setUp() {
         beanFactory = new DefaultListableBeanFactory();
+        // preRegisterAspects가 setBeanFactory 시점에 BD를 순회하므로, BD를 먼저 등록 후 setBeanFactory 호출
+        beanFactory.registerBeanDefinition("testAspect", new BeanDefinition(TestAspect.class));
         bpp = new AspectEnhancingBeanPostProcessor();
         bpp.setBeanFactory(beanFactory);
     }
@@ -64,10 +66,8 @@ class AspectEnhancingBeanPostProcessorTest {
 
     @Test
     void matchingBeanIsEnhancedWithFieldsCopied() {
-        TestAspect aspect = new TestAspect();
-        beanFactory.registerBeanDefinition("testAspect", new BeanDefinition(TestAspect.class));
-        beanFactory.registerSingleton("testAspect", aspect);
-        bpp.postProcessAfterInitialization(aspect, "testAspect");  // advice 등록
+        // setUp에서 BD 등록 + setBeanFactory로 preRegisterAspects 완료
+        beanFactory.registerSingleton("testAspect", new TestAspect());
 
         TargetWithLoggable original = new TargetWithLoggable();
         original.name = "copied";
@@ -88,11 +88,6 @@ class AspectEnhancingBeanPostProcessorTest {
 
     @Test
     void beanPostProcessorBeanIsNotEnhanced() {
-        TestAspect aspect = new TestAspect();
-        beanFactory.registerBeanDefinition("testAspect", new BeanDefinition(TestAspect.class));
-        beanFactory.registerSingleton("testAspect", aspect);
-        bpp.postProcessAfterInitialization(aspect, "testAspect");
-
         AnotherBpp anotherBpp = new AnotherBpp();
         Object result = bpp.postProcessAfterInitialization(anotherBpp, "anotherBpp");
         assertThat(result).isSameAs(anotherBpp);  // BPP는 enhance 안 됨
@@ -100,11 +95,7 @@ class AspectEnhancingBeanPostProcessorTest {
 
     @Test
     void finalClassThrowsClearError() {
-        TestAspect aspect = new TestAspect();
-        beanFactory.registerBeanDefinition("testAspect", new BeanDefinition(TestAspect.class));
-        beanFactory.registerSingleton("testAspect", aspect);
-        bpp.postProcessAfterInitialization(aspect, "testAspect");
-
+        // setUp에서 BD 등록 + setBeanFactory로 preRegisterAspects 완료
         assertThatThrownBy(() -> bpp.postProcessAfterInitialization(new FinalClass(), "finalBean"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("final");
@@ -112,11 +103,7 @@ class AspectEnhancingBeanPostProcessorTest {
 
     @Test
     void finalFieldThrowsClearError() {
-        TestAspect aspect = new TestAspect();
-        beanFactory.registerBeanDefinition("testAspect", new BeanDefinition(TestAspect.class));
-        beanFactory.registerSingleton("testAspect", aspect);
-        bpp.postProcessAfterInitialization(aspect, "testAspect");
-
+        // setUp에서 BD 등록 + setBeanFactory로 preRegisterAspects 완료
         assertThatThrownBy(() -> bpp.postProcessAfterInitialization(new FinalFieldBean(), "finalFieldBean"))
                 .isInstanceOf(IllegalStateException.class)
                 // 메시지 형태가 바뀌면 테스트도 깨지도록 구체적 단언
