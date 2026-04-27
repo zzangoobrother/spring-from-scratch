@@ -83,7 +83,9 @@ public class DefaultListableBeanFactory
     public String[] getBeanNamesForType(Class<?> type) {
         var matches = new ArrayList<String>();
         for (var entry : beanDefinitionMap.entrySet()) {
-            if (type.isAssignableFrom(entry.getValue().getBeanClass())) {
+            Class<?> beanClass = entry.getValue().getBeanClass();
+            // null 가드: factoryMethod 전용 BD는 getBeanClass()가 null일 수 있음 (ConfigurationClassPostProcessor 패턴 정렬)
+            if (beanClass != null && type.isAssignableFrom(beanClass)) {
                 matches.add(entry.getKey());
             }
         }

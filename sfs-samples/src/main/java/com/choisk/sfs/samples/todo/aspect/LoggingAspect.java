@@ -17,9 +17,9 @@ import com.choisk.sfs.samples.todo.support.IdGenerator;
 @Component
 public class LoggingAspect {
 
-    /** 각 advice 호출에 고유 ID를 부여하기 위한 발급기 — @Autowired 필드 주입 */
+    // @Autowired 필드 주입 — 학습 시연 단순화 (생성자 주입 + @Aspect 양립은 Phase 2C+ 검증)
     @Autowired
-    IdGenerator idGen;
+    private IdGenerator idGen;
 
     /**
      * {@code @Loggable} 부착 메서드의 실행 시간을 측정하고 콘솔에 출력한다.

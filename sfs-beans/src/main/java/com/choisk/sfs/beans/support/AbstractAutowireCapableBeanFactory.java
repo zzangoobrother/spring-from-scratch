@@ -59,6 +59,7 @@ public abstract class AbstractAutowireCapableBeanFactory
         if (definition.getFactoryMethodName() != null) {
             Object factoryResult = createBeanViaFactoryMethod(beanName, definition);
             Object initialized = initializeBean(beanName, definition, factoryResult);
+            // initializeBean 실패 시 registerDisposableIfNeeded 미호출 — 초기화 미완 빈은 destroy 대상 아님 (Spring 본가와 동일 정책)
             registerDisposableIfNeeded(beanName, definition, initialized);
             return initialized;
         }
