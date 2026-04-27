@@ -1,5 +1,6 @@
 package com.choisk.sfs.samples.todo.aspect;
 
+import com.choisk.sfs.aop.annotation.After;
 import com.choisk.sfs.aop.annotation.Around;
 import com.choisk.sfs.aop.annotation.Aspect;
 import com.choisk.sfs.aop.annotation.Before;
@@ -35,6 +36,17 @@ public class LoggingAspect {
     public void logCall(JoinPoint jp) {
         System.out.println("[Before] " + jp.getMethod().getName()
                 + " 호출 — args=" + Arrays.toString(jp.getArgs()));
+    }
+
+    /**
+     * 메서드 종료 후 호출되는 진단 로그 — @Loggable 부착 메서드의 정상/예외 종료 시점에 출력.
+     * 출력 형식: {@code [After] <methodName> 종료}
+     *
+     * @param jp 조인 포인트 — 메서드명만 사용 (innerCall=null)
+     */
+    @After(Loggable.class)
+    public void logExit(JoinPoint jp) {
+        System.out.println("[After] " + jp.getMethod().getName() + " 종료");
     }
 
     /**

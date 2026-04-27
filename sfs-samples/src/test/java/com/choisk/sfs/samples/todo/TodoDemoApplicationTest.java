@@ -42,10 +42,15 @@ class TodoDemoApplicationTest {
         assertThat(lines)
                 .filteredOn(l -> l.startsWith("[Before] complete 호출") && l.contains("args="))
                 .hasSize(1);
-        // 호출 순서 박제: [Before] → [TodoController] Todo 1 completed → [Around id=N]
+        // @After advice 출력 1개 — finally 블록에서 호출, 정상/예외 종료 모두 보장
+        assertThat(lines)
+                .filteredOn(l -> l.equals("[After] complete 종료"))
+                .hasSize(1);
+        // 호출 순서 박제: [Before] → 진짜 메서드 → [After](finally) → [Around] 종료
         assertThat(lines).containsSubsequence(
                 "[Before] complete 호출 — args=[1]",
-                "[TodoController] Todo 1 completed"
+                "[TodoController] Todo 1 completed",
+                "[After] complete 종료"
         );
     }
 }

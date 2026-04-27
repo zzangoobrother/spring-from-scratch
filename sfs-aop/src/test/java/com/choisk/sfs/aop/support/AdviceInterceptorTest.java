@@ -1,5 +1,6 @@
 package com.choisk.sfs.aop.support;
 
+import com.choisk.sfs.aop.annotation.After;
 import com.choisk.sfs.aop.annotation.Around;
 import com.choisk.sfs.aop.annotation.Loggable;
 import com.choisk.sfs.beans.BeanFactory;
@@ -61,6 +62,33 @@ class AdviceInterceptorTest {
     public static class ThrowingBeforeAspect {
         @com.choisk.sfs.aop.annotation.Before(Loggable.class)
         public void thrower(JoinPoint jp) { throw new IllegalStateException("blocked"); }
+    }
+
+    public static class BeforeAfterAroundAspect {
+        public static final java.util.List<String> calls = new java.util.ArrayList<>();
+
+        @Around(Loggable.class)
+        public Object aroundCheck(ProceedingJoinPoint pjp) throws Throwable {
+            calls.add("around-enter");
+            try {
+                return pjp.proceed();
+            } finally {
+                calls.add("around-exit");
+            }
+        }
+
+        @com.choisk.sfs.aop.annotation.Before(Loggable.class)
+        public void beforeCheck(JoinPoint jp) { calls.add("before"); }
+
+        @After(Loggable.class)
+        public void afterCheck(JoinPoint jp) { calls.add("after"); }
+    }
+
+    public static class AfterOnThrowAspect {
+        public static boolean afterCalled = false;
+
+        @After(Loggable.class)
+        public void afterCheck(JoinPoint jp) { afterCalled = true; }
     }
 
     static class Target {
@@ -184,6 +212,46 @@ class AdviceInterceptorTest {
 
         assertThat(result).isEqualTo("hello world");
         assertThat(BeforeOnlyAspect.beforeCount).isEqualTo(1);  // @Before가 정확히 1회 invoke됨
+    }
+
+    @Test
+    void aroundComposesBeforeAndAfter() throws Throwable {
+        BeanFactory bf = beanFactoryWith("triadic", new BeforeAfterAroundAspect());
+        AspectRegistry registry = new AspectRegistry();
+        registry.register("triadic", BeforeAfterAroundAspect.class);
+
+        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        Target target = new Target();
+        Method greet = Target.class.getMethod("greet", String.class);
+        Object[] args = {"x"};
+        Callable<Object> superCall = () -> {
+            BeforeAfterAroundAspect.calls.add("super");
+            return target.greet((String) args[0]);
+        };
+
+        BeforeAfterAroundAspect.calls.clear();
+        interceptor.intercept(superCall, greet, args, target);
+
+        assertThat(BeforeAfterAroundAspect.calls)
+                .containsExactly("around-enter", "before", "super", "after", "around-exit");
+    }
+
+    @Test
+    void afterAdviceRunsEvenWhenMethodThrows() throws Throwable {
+        BeanFactory bf = beanFactoryWith("afterOnThrow", new AfterOnThrowAspect());
+        AspectRegistry registry = new AspectRegistry();
+        registry.register("afterOnThrow", AfterOnThrowAspect.class);
+
+        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        Target target = new Target();
+        Method greet = Target.class.getMethod("greet", String.class);
+        Callable<Object> superCall = () -> { throw new RuntimeException("biz fail"); };
+
+        AfterOnThrowAspect.afterCalled = false;
+        assertThatThrownBy(() -> interceptor.intercept(superCall, greet, new Object[]{"x"}, target))
+                .isInstanceOf(RuntimeException.class).hasMessage("biz fail");
+
+        assertThat(AfterOnThrowAspect.afterCalled).isTrue();  // finally에서 호출됨
     }
 
     private static BeanFactory beanFactoryWith(String name, Object bean) {
