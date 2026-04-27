@@ -9,6 +9,8 @@ import com.choisk.sfs.beans.support.DefaultListableBeanFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Method;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -109,5 +111,30 @@ class AspectEnhancingBeanPostProcessorTest {
                 // 메시지 형태가 바뀌면 테스트도 깨지도록 구체적 단언
                 .hasMessageContaining("Cannot copy final field fixed")
                 .hasMessageContaining("FinalFieldBean");
+    }
+
+    /**
+     * T1: preRegisterAspects(setBeanFactory) + postProcessAfterInitialization 양쪽을 통과해도
+     * advice가 1개만 등록되어야 한다 (이중 등록 방지 회귀 안전망).
+     *
+     * <p>HIGH-1 수정 이전 코드에서는 이 테스트가 RED: postProcessAfterInitialization의
+     * @Aspect 분기에서 registry.register()를 재호출해 advices 리스트에 2개 누적.
+     * 수정 후 GREEN: postProcessAfterInitialization에서 재등록 제거 → 1개만 유지.
+     */
+    @Test
+    void aspectAdviceIsRegisteredOnceEvenWhenBothPreRegisterAndPostProcessRun() throws NoSuchMethodException {
+        // setUp에서 이미 BD 등록 + setBeanFactory → preRegisterAspects 완료 (1회 등록)
+        TestAspect aspect = new TestAspect();
+        beanFactory.registerSingleton("testAspect", aspect);
+
+        // postProcessAfterInitialization 통과 — 이중 등록 시도
+        bpp.postProcessAfterInitialization(aspect, "testAspect");
+
+        // @Loggable 메서드에 대한 applicable advice가 정확히 1개만 존재해야 함
+        Method greet = TargetWithLoggable.class.getMethod("greet");
+        AspectRegistry registry = bpp.getRegistryForTesting();
+        assertThat(registry.findApplicable(greet))
+                .as("preRegisterAspects + postProcess 이중 통과 시 advice는 1개만 등록되어야 함")
+                .hasSize(1);
     }
 }
