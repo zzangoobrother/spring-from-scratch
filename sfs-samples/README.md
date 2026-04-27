@@ -64,6 +64,25 @@ Phase 1C 시점에 두 번째 줄은 `→ false`였음 — Phase 2A에서 `Confi
 
 `ConfigurationEnhanceDemoTest`가 위 변형을 자동 검증 — 박제(테스트)는 *진실이 바뀌면 함께 갱신*된다는 메타 학습 가치를 한 커밋에 화석화.
 
+## Phase 2B 갱신 사항
+
+- **`LoggingAspect` 신설** (`aspect/LoggingAspect.java`) — `@Aspect @Component` 양립, `@Autowired IdGenerator` 의존, `@Around`/`@Before`/`@After` 3종 메서드. Phase 2A IdGenerator 통일의 자연 회수.
+- **`TodoController.complete()`에 `@Loggable` 부착** — 컨테이너가 자동으로 byte-buddy 서브클래스 + AdviceInterceptor 적용.
+- **`AppConfig`에 `@Bean AspectEnhancingBeanPostProcessor` 추가** — AOP 활성화 한 줄. Phase 1B-β BPP 학습의 자연 회수.
+- **시연 출력 11 라인으로 누적** — Phase 2A 8 라인 + advice 3 라인.
+
+## 시연 마일스톤 (누적)
+
+| 시점 | TodoDemoApplicationTest 출력 라인 | 신규 |
+|---|---|---|
+| Phase 1C 끝 | 8 | (기존) |
+| Phase 2A 끝 | 8 | (variant 1: enhance 적용) |
+| **Phase 2B B2 끝** | 9 | +`[Around id=N] complete 실행 시간 X ms` |
+| **Phase 2B C1 끝** | 10 | +`[Before] complete 호출 — args=[1]` |
+| **Phase 2B C2 끝** | 11 | +`[After] complete 종료` |
+
+각 task 끝마다 시연 출력이 *늘어남* — 박제가 task 단위 RED → GREEN 전환을 자동 검출. Phase 2A의 단일 마일스톤(false→true)보다 *3회* 발생, 학습 진척이 시각적.
+
 ## 실행
 
 IDE에서 main() 직접 실행 또는:
@@ -78,6 +97,7 @@ IDE에서 main() 직접 실행 또는:
 com.choisk.sfs.samples.todo/
 ├── TodoDemoApplication.java          # main #1
 ├── ConfigurationEnhanceDemo.java     # main #2
+├── aspect/LoggingAspect.java
 ├── config/AppConfig.java
 ├── domain/User.java, Todo.java
 ├── repository/UserRepository.java, TodoRepository.java
