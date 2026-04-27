@@ -8,9 +8,9 @@ import net.bytebuddy.implementation.bind.annotation.SuperCall;
 import net.bytebuddy.implementation.bind.annotation.This;
 
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;  // byte-buddy @SuperCall 강제 타입 — 제거 불가
+import java.util.stream.Collectors;
 
 /**
  * byte-buddy {@code MethodDelegation} 인터셉터 — 매칭 메서드 호출을 가로채 advice 종류별로 합성.
@@ -80,16 +80,13 @@ public class AdviceInterceptor {
      * advice 우선순위(@Order) 도입 시 이 제한을 chain으로 교체한다.
      */
     private AdviceInfo findAtMostOne(List<AdviceInfo> list, AdviceType type) {
-        List<AdviceInfo> found = new ArrayList<>();
-        for (AdviceInfo info : list) {
-            if (info.type() == type) found.add(info);
-        }
+        List<AdviceInfo> found = list.stream()
+                .filter(i -> i.type() == type)
+                .toList();
         if (found.size() > 1) {
-            StringBuilder names = new StringBuilder();
-            for (AdviceInfo info : found) {
-                if (!names.isEmpty()) names.append(", ");
-                names.append(info.aspectBeanName());
-            }
+            String names = found.stream()
+                    .map(AdviceInfo::aspectBeanName)
+                    .collect(Collectors.joining(", "));
             throw new IllegalStateException(
                     "동일 메서드에 @Around advice가 " + found.size() + "개 정의됨 — advice 우선순위(@Order) 미지원"
                             + ". advice bean name: [" + names + "]"
