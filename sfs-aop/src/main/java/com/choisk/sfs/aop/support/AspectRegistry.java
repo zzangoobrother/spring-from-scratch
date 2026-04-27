@@ -112,13 +112,21 @@ public class AspectRegistry {
      *
      * <p>{@link Class#getMethods()}로 public 상속 메서드까지 포함해 검사한다.
      * private/package-private 메서드는 advice 비대상이므로 검사 대상에서 제외해도 무방하다.
+     *
+     * <p>루프 구조: 클래스 레벨을 먼저 O(A) 스캔 후, 메서드 레벨에서는 {@code getMethods()} 1회만 호출하여
+     * outer-method / inner-advice 순서로 early exit한다.
      */
     public boolean findAnyApplicable(Class<?> targetClass) {
+        if (advices.isEmpty()) return false;
+        // 클래스 레벨 매칭 — getMethods() 호출 없이 O(A)
         for (AdviceInfo info : advices) {
-            Class<? extends Annotation> ann = info.targetAnnotation();
-            if (targetClass.isAnnotationPresent(ann)) return true;
-            for (Method m : targetClass.getMethods()) {
-                if (m.isAnnotationPresent(ann)) return true;
+            if (targetClass.isAnnotationPresent(info.targetAnnotation())) return true;
+        }
+        // 메서드 레벨 — getMethods() 1회만 호출
+        Method[] methods = targetClass.getMethods();
+        for (Method m : methods) {
+            for (AdviceInfo info : advices) {
+                if (m.isAnnotationPresent(info.targetAnnotation())) return true;
             }
         }
         return false;
