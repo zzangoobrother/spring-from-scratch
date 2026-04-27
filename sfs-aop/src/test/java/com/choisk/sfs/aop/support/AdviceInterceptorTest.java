@@ -91,6 +91,25 @@ class AdviceInterceptorTest {
         public void afterCheck(JoinPoint jp) { afterCalled = true; }
     }
 
+    /**
+     * @Before가 throw하면 try/finally 블록 진입 전에 예외가 전파되므로,
+     * finally에 위치한 @After는 절대 호출되지 않아야 한다.
+     * invokeAll(BEFORE) 호출 위치가 try 바깥인 한 이 보장이 유지된다 — 회귀 안전망.
+     */
+    public static class ThrowingBeforeWithAfterAspect {
+        public static boolean afterCalled = false;
+
+        @com.choisk.sfs.aop.annotation.Before(Loggable.class)
+        public void beforeBoom(JoinPoint jp) {
+            throw new RuntimeException("before fail");
+        }
+
+        @After(Loggable.class)
+        public void afterCheck(JoinPoint jp) {
+            afterCalled = true;
+        }
+    }
+
     static class Target {
         @Loggable
         public String greet(String name) { return "hello " + name; }
@@ -252,6 +271,27 @@ class AdviceInterceptorTest {
                 .isInstanceOf(RuntimeException.class).hasMessage("biz fail");
 
         assertThat(AfterOnThrowAspect.afterCalled).isTrue();  // finally에서 호출됨
+    }
+
+    @Test
+    void beforeThrowingSkipsAfter() throws Throwable {
+        BeanFactory bf = beanFactoryWith("throwingBeforeWithAfter", new ThrowingBeforeWithAfterAspect());
+        AspectRegistry registry = new AspectRegistry();
+        registry.register("throwingBeforeWithAfter", ThrowingBeforeWithAfterAspect.class);
+
+        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        Target target = new Target();
+        Method greet = Target.class.getMethod("greet", String.class);
+        Callable<Object> superCall = () -> target.greet("x");
+
+        ThrowingBeforeWithAfterAspect.afterCalled = false;
+        assertThatThrownBy(() -> interceptor.intercept(superCall, greet, new Object[]{"x"}, target))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("before fail");
+
+        assertThat(ThrowingBeforeWithAfterAspect.afterCalled)
+                .as("@Before가 throw하면 try 진입 전이라 finally 미실행 — @After 호출 안 됨")
+                .isFalse();
     }
 
     private static BeanFactory beanFactoryWith(String name, Object bean) {
