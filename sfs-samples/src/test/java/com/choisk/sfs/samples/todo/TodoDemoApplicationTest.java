@@ -52,5 +52,24 @@ class TodoDemoApplicationTest {
                 "[TodoController] Todo 1 completed",
                 "[After] complete 종료"
         );
+
+        // [After] 다음에 [Around 종료] 순서 박제 (spec § 4.2 합성 순서)
+        // [Around id=N] complete 실행 시간 X ms — 동적 id/시간 때문에 인덱스 비교로 순서 검증
+        java.util.List<String> lineList = java.util.Arrays.asList(lines);
+        int afterIdx = lineList.indexOf("[After] complete 종료");
+        int aroundEndIdx = -1;
+        for (int i = 0; i < lineList.size(); i++) {
+            String line = lineList.get(i);
+            if (line.startsWith("[Around id=") && line.contains("complete 실행 시간")) {
+                aroundEndIdx = i;
+                break;
+            }
+        }
+        assertThat(aroundEndIdx)
+                .as("[Around id=...] complete 실행 시간 라인 존재")
+                .isGreaterThanOrEqualTo(0);
+        assertThat(aroundEndIdx)
+                .as("[After] 다음에 [Around 종료]가 와야 함 (spec § 4.2 합성 순서)")
+                .isGreaterThan(afterIdx);
     }
 }
