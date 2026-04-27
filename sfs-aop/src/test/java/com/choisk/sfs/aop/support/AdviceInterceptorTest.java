@@ -1,6 +1,7 @@
 package com.choisk.sfs.aop.support;
 
 import com.choisk.sfs.aop.annotation.Around;
+import com.choisk.sfs.aop.annotation.Aspect;
 import com.choisk.sfs.aop.annotation.Loggable;
 import com.choisk.sfs.beans.BeanFactory;
 import com.choisk.sfs.beans.support.DefaultListableBeanFactory;
@@ -10,11 +11,37 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AdviceInterceptorTest {
+
+    public static class BeforeAndAroundAspect {
+        public static final java.util.List<String> calls = new java.util.ArrayList<>();
+
+        @Around(Loggable.class)
+        public Object aroundCheck(ProceedingJoinPoint pjp) throws Throwable {
+            calls.add("around-enter");
+            Object r = pjp.proceed();
+            calls.add("around-exit");
+            return r;
+        }
+
+        @com.choisk.sfs.aop.annotation.Before(Loggable.class)
+        public void beforeCheck(JoinPoint jp) {
+            calls.add("before");
+        }
+    }
+
+    public static class BeforeOnlyAspect {
+        public static int beforeCount = 0;
+
+        @com.choisk.sfs.aop.annotation.Before(Loggable.class)
+        public void beforeOnly(JoinPoint jp) { beforeCount++; }
+    }
 
     public static class CountingAroundAspect {
         public static final AtomicInteger callCount = new AtomicInteger(0);
@@ -94,6 +121,51 @@ class AdviceInterceptorTest {
 
         assertThat(result).isEqualTo("plain x");
         assertThat(CountingAroundAspect.callCount.get()).isEqualTo(0);
+    }
+
+    @Test
+    void beforeAdviceRunsBeforeMethodCall() throws Throwable {
+        BeanFactory bf = beanFactoryWith("beforeAndAround", new BeforeAndAroundAspect());
+        AspectRegistry registry = new AspectRegistry();
+        registry.register("beforeAndAround", BeforeAndAroundAspect.class);
+
+        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        Target target = new Target();
+        Method greet = Target.class.getMethod("greet", String.class);
+        Object[] args = {"x"};
+        Callable<Object> superCall = () -> {
+            BeforeAndAroundAspect.calls.add("super");
+            return target.greet((String) args[0]);
+        };
+
+        BeforeAndAroundAspect.calls.clear();
+        interceptor.intercept(superCall, greet, args, target);
+
+        assertThat(BeforeAndAroundAspect.calls)
+                .containsExactly("around-enter", "before", "super", "around-exit");
+    }
+
+    @Test
+    void beforeAdviceThrowingPreventsMethodCall() throws Throwable {
+        @Aspect
+        class ThrowingBeforeAspect {
+            @com.choisk.sfs.aop.annotation.Before(Loggable.class)
+            public void thrower(JoinPoint jp) { throw new IllegalStateException("blocked"); }
+        }
+        BeanFactory bf = beanFactoryWith("throwAspect", new ThrowingBeforeAspect());
+        AspectRegistry registry = new AspectRegistry();
+        registry.register("throwAspect", ThrowingBeforeAspect.class);
+
+        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        Target target = new Target();
+        Method greet = Target.class.getMethod("greet", String.class);
+        AtomicBoolean superCalled = new AtomicBoolean(false);
+        Callable<Object> superCall = () -> { superCalled.set(true); return null; };
+
+        assertThatThrownBy(() -> interceptor.intercept(superCall, greet, new Object[]{"x"}, target))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("blocked");
+        assertThat(superCalled.get()).isFalse();  // 진짜 메서드 차단됨
     }
 
     private static BeanFactory beanFactoryWith(String name, Object bean) {

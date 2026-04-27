@@ -38,5 +38,14 @@ class TodoDemoApplicationTest {
         assertThat(lines)
                 .filteredOn(l -> l.startsWith("[Around id=") && l.contains("complete 실행 시간"))
                 .hasSize(1);
+        // @Before advice 출력 1개 — complete 호출 직전, args=[1] (Long 1L → Arrays.toString → "[1]")
+        assertThat(lines)
+                .filteredOn(l -> l.startsWith("[Before] complete 호출") && l.contains("args="))
+                .hasSize(1);
+        // 호출 순서 박제: [Before] → [TodoController] Todo 1 completed → [Around id=N]
+        assertThat(lines).containsSubsequence(
+                "[Before] complete 호출 — args=[1]",
+                "[TodoController] Todo 1 completed"
+        );
     }
 }
