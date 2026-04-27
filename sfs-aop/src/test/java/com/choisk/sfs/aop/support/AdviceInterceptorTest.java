@@ -1,7 +1,6 @@
 package com.choisk.sfs.aop.support;
 
 import com.choisk.sfs.aop.annotation.Around;
-import com.choisk.sfs.aop.annotation.Aspect;
 import com.choisk.sfs.aop.annotation.Loggable;
 import com.choisk.sfs.beans.BeanFactory;
 import com.choisk.sfs.beans.support.DefaultListableBeanFactory;
@@ -9,7 +8,6 @@ import com.choisk.sfs.beans.BeanDefinition;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
-import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -58,6 +56,11 @@ class AdviceInterceptorTest {
         public Object skipProceed(ProceedingJoinPoint pjp) throws Throwable {
             return "skipped";  // proceed() 호출 안 함
         }
+    }
+
+    public static class ThrowingBeforeAspect {
+        @com.choisk.sfs.aop.annotation.Before(Loggable.class)
+        public void thrower(JoinPoint jp) { throw new IllegalStateException("blocked"); }
     }
 
     static class Target {
@@ -147,11 +150,6 @@ class AdviceInterceptorTest {
 
     @Test
     void beforeAdviceThrowingPreventsMethodCall() throws Throwable {
-        @Aspect
-        class ThrowingBeforeAspect {
-            @com.choisk.sfs.aop.annotation.Before(Loggable.class)
-            public void thrower(JoinPoint jp) { throw new IllegalStateException("blocked"); }
-        }
         BeanFactory bf = beanFactoryWith("throwAspect", new ThrowingBeforeAspect());
         AspectRegistry registry = new AspectRegistry();
         registry.register("throwAspect", ThrowingBeforeAspect.class);

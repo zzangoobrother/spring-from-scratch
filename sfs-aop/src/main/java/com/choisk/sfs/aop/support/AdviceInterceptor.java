@@ -9,7 +9,7 @@ import net.bytebuddy.implementation.bind.annotation.This;
 
 import java.lang.reflect.Method;
 import java.util.List;
-import java.util.concurrent.Callable;
+import java.util.concurrent.Callable;  // byte-buddy @SuperCall 강제 타입 — 제거 불가
 
 /**
  * byte-buddy {@code MethodDelegation} 인터셉터 — 매칭 메서드 호출을 가로채 advice 종류별로 합성.
@@ -40,22 +40,18 @@ public class AdviceInterceptor {
         // @Before/After advice는 proceed() 호출하지 않으므로 innerCall=null JoinPoint 사용 (fail-fast 보장)
         JoinPoint jp = new MethodInvocationJoinPoint(self, method, args, null);
         // innerCall: BEFORE advice 전체 실행 후 진짜 메서드 호출 — @Around는 이 묶음을 proceed()로 위임받음
-        Callable<Object> innerCall = () -> {
-            try {
-                invokeAll(applicable, AdviceType.BEFORE, jp);
-            } catch (Exception e) {
-                throw e;
-            } catch (Throwable t) {
-                throw new RuntimeException(t);  // Error 계열만 도달 — RuntimeException으로 전파
-            }
+        ThrowingCallable innerCall = () -> {
+            invokeAll(applicable, AdviceType.BEFORE, jp);
             return superCall.call();
         };
 
         AdviceInfo around = findOne(applicable, AdviceType.AROUND);
         if (around != null) {
+            // @Around 있으면 ProceedingJoinPoint에 innerCall 위임 — proceed() 호출이 innerCall 실행
             ProceedingJoinPoint pjp = new MethodInvocationJoinPoint(self, method, args, innerCall);
             return invokeAdvice(around, pjp);
         }
+        // @Around 없으면 innerCall 직통 (@Before invoke + superCall)
         return innerCall.call();
     }
 

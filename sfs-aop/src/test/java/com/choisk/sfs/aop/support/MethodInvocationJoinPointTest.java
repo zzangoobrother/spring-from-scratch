@@ -2,8 +2,8 @@ package com.choisk.sfs.aop.support;
 
 import org.junit.jupiter.api.Test;
 
+import com.choisk.sfs.aop.support.ThrowingCallable;
 import java.lang.reflect.Method;
-import java.util.concurrent.Callable;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -19,7 +19,7 @@ class MethodInvocationJoinPointTest {
         Target target = new Target();
         Method method = Target.class.getMethod("greet", String.class);
         Object[] args = {"world"};
-        Callable<Object> innerCall = () -> "intercepted: " + args[0];
+        ThrowingCallable innerCall = () -> "intercepted: " + args[0];
 
         ProceedingJoinPoint pjp = new MethodInvocationJoinPoint(target, method, args, innerCall);
 

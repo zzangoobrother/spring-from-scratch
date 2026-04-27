@@ -26,10 +26,10 @@ public class LoggingAspect {
     private IdGenerator idGen;
 
     /**
-     * {@code @Loggable} 부착 메서드 호출 직전에 메서드명과 인자를 출력한다.
+     * 진단 로그용 진입 추적 — {@code @Loggable} 부착 메서드 호출 직전에 메서드명과 인자를 콘솔에 박제한다.
      * 출력 형식: {@code [Before] <methodName> 호출 — args=<args>}
      *
-     * @param jp 조인 포인트 — 메서드명·인자 읽기 전용, proceed() 호출 불가
+     * @param jp 조인 포인트 — 메서드명·인자 읽기 전용, proceed() 호출 불가 (innerCall=null)
      */
     @Before(Loggable.class)
     public void logCall(JoinPoint jp) {
