@@ -6,6 +6,7 @@ import com.choisk.sfs.aop.annotation.Loggable;
 import com.choisk.sfs.beans.BeanFactory;
 import com.choisk.sfs.beans.support.DefaultListableBeanFactory;
 import com.choisk.sfs.beans.BeanDefinition;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -17,6 +18,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AdviceInterceptorTest {
+
+    @BeforeEach
+    void resetStaticState() {
+        // static 가변 필드 일괄 초기화 — 테스트 격리 보장
+        BeforeAndAroundAspect.calls.clear();
+        BeforeAfterAroundAspect.calls.clear();
+        AfterOnThrowAspect.afterCalled = false;
+        ThrowingBeforeWithAfterAspect.afterCalled = false;
+        BeforeOnlyAspect.beforeCount = 0;
+        CountingAroundAspect.callCount.set(0);
+    }
 
     public static class BeforeAndAroundAspect {
         public static final java.util.List<String> calls = new java.util.ArrayList<>();
@@ -130,7 +142,6 @@ class AdviceInterceptorTest {
         Object[] args = {"world"};
         Callable<Object> superCall = () -> target.greet((String) args[0]);
 
-        CountingAroundAspect.callCount.set(0);
         Object result = interceptor.intercept(superCall, greet, args, target);
 
         assertThat(result).isEqualTo("hello world");
@@ -166,7 +177,6 @@ class AdviceInterceptorTest {
         Object[] args = {"x"};
         Callable<Object> superCall = () -> target.plain((String) args[0]);
 
-        CountingAroundAspect.callCount.set(0);
         Object result = interceptor.intercept(superCall, greet, args, target);
 
         assertThat(result).isEqualTo("plain x");
@@ -188,7 +198,6 @@ class AdviceInterceptorTest {
             return target.greet((String) args[0]);
         };
 
-        BeforeAndAroundAspect.calls.clear();
         interceptor.intercept(superCall, greet, args, target);
 
         assertThat(BeforeAndAroundAspect.calls)
@@ -226,7 +235,6 @@ class AdviceInterceptorTest {
         Object[] args = {"world"};
         Callable<Object> superCall = () -> target.greet((String) args[0]);
 
-        BeforeOnlyAspect.beforeCount = 0;
         Object result = interceptor.intercept(superCall, greet, args, target);
 
         assertThat(result).isEqualTo("hello world");
@@ -248,7 +256,6 @@ class AdviceInterceptorTest {
             return target.greet((String) args[0]);
         };
 
-        BeforeAfterAroundAspect.calls.clear();
         interceptor.intercept(superCall, greet, args, target);
 
         assertThat(BeforeAfterAroundAspect.calls)
@@ -266,7 +273,6 @@ class AdviceInterceptorTest {
         Method greet = Target.class.getMethod("greet", String.class);
         Callable<Object> superCall = () -> { throw new RuntimeException("biz fail"); };
 
-        AfterOnThrowAspect.afterCalled = false;
         assertThatThrownBy(() -> interceptor.intercept(superCall, greet, new Object[]{"x"}, target))
                 .isInstanceOf(RuntimeException.class).hasMessage("biz fail");
 
@@ -284,7 +290,6 @@ class AdviceInterceptorTest {
         Method greet = Target.class.getMethod("greet", String.class);
         Callable<Object> superCall = () -> target.greet("x");
 
-        ThrowingBeforeWithAfterAspect.afterCalled = false;
         assertThatThrownBy(() -> interceptor.intercept(superCall, greet, new Object[]{"x"}, target))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("before fail");
