@@ -5,13 +5,13 @@ import com.choisk.sfs.beans.BeanFactory;
 import com.choisk.sfs.beans.BeanFactoryAware;
 import com.choisk.sfs.beans.BeanPostProcessor;
 import com.choisk.sfs.beans.ConfigurableListableBeanFactory;
+import com.choisk.sfs.core.ReflectionUtils;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.matcher.ElementMatchers;
 
 import java.lang.invoke.MethodHandles;
-import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
 /**
@@ -145,19 +145,15 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
      * pre-check가 통과한 이후 copyFields 본문에서는 final 검사 불필요.
      */
     private void validateNoFinalFields(Class<?> declaredClass) {
-        Class<?> c = declaredClass;
-        while (c != null && c != Object.class) {
-            for (Field f : c.getDeclaredFields()) {
-                if (Modifier.isStatic(f.getModifiers())) continue;
-                if (Modifier.isFinal(f.getModifiers())) {
-                    throw new IllegalStateException(
-                            "Cannot copy final field " + f.getName()
-                                    + " on enhanced " + declaredClass.getName()
-                                    + ". Remove final or use constructor injection (Phase 2C+)");
-                }
+        ReflectionUtils.doWithFields(declaredClass, f -> {
+            if (Modifier.isStatic(f.getModifiers())) return;
+            if (Modifier.isFinal(f.getModifiers())) {
+                throw new IllegalStateException(
+                        "Cannot copy final field " + f.getName()
+                                + " on enhanced " + declaredClass.getName()
+                                + ". Remove final or use constructor injection (Phase 2C+)");
             }
-            c = c.getSuperclass();
-        }
+        });
     }
 
     /**
@@ -170,18 +166,9 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
 
     private void copyFields(Object source, Object target, Class<?> declaredClass) {
         validateNoFinalFields(declaredClass);  // 사전 검사: 부분 복사 상태로 throw하지 않도록 선행
-        Class<?> c = declaredClass;
-        while (c != null && c != Object.class) {
-            for (Field f : c.getDeclaredFields()) {
-                if (Modifier.isStatic(f.getModifiers())) continue;
-                f.setAccessible(true);
-                try {
-                    f.set(target, f.get(source));
-                } catch (IllegalAccessException e) {
-                    throw new IllegalStateException("Cannot copy field " + f.getName(), e);
-                }
-            }
-            c = c.getSuperclass();
-        }
+        ReflectionUtils.doWithFields(declaredClass, f -> {
+            if (Modifier.isStatic(f.getModifiers())) return;
+            ReflectionUtils.setField(f, target, ReflectionUtils.getField(f, source));
+        });
     }
 }
