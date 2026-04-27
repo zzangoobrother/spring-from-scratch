@@ -3,6 +3,6 @@ plugins {
 }
 
 dependencies {
-    api(project(":sfs-context"))
+    implementation(project(":sfs-context"))
     implementation(libs.bytebuddy)
 }
