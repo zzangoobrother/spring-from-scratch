@@ -4,6 +4,7 @@ import com.choisk.sfs.aop.annotation.Aspect;
 import com.choisk.sfs.beans.BeanFactory;
 import com.choisk.sfs.beans.BeanFactoryAware;
 import com.choisk.sfs.beans.BeanPostProcessor;
+import com.choisk.sfs.beans.ConfigurableListableBeanFactory;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.MethodDelegation;
@@ -43,11 +44,40 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
     // 매 enhance마다 새 인스턴스 생성을 회피 — setBeanFactory 시점에 1회 초기화 후 모든 enhanced 빈에 공유
     private AdviceInterceptor sharedInterceptor;
 
+    /**
+     * BeanFactory 주입 시점에 모든 BeanDefinition을 사전 순회하여 {@code @Aspect} 클래스를
+     * registry에 미리 등록한다.
+     *
+     * <p>이 two-pass 사전 수집이 없으면, {@code preInstantiateSingletons()}에서 {@code @Aspect} 빈보다
+     * 대상 빈이 먼저 생성될 경우 advice가 누락된다 (등록 순서 의존 문제).
+     * {@code setBeanFactory}는 BFPP(ConfigurationClassPostProcessor) 실행 이후에 호출되므로
+     * 모든 BeanDefinition이 이미 등록된 상태 — 안전하게 사전 순회 가능.
+     *
+     * <p>이 시점에서 Aspect 빈을 {@code getBean()}으로 즉시 생성하면 순환 의존 위험이 있으므로,
+     * BeanDefinition에서 {@code beanClass}만 읽어 클래스 정보로만 registry에 등록한다.
+     */
     @Override
     public void setBeanFactory(BeanFactory beanFactory) {
         this.beanFactory = beanFactory;
         // registry는 생성자에서 final 초기화 — setBeanFactory 진입 시점에 안전 사용 가능
         this.sharedInterceptor = new AdviceInterceptor(beanFactory, registry);
+        // @Aspect BD 사전 수집 — two-pass: 등록 순서 무관하게 모든 Aspect 미리 등록
+        preRegisterAspects(beanFactory);
+    }
+
+    /**
+     * BeanDefinition을 순회하여 {@code @Aspect} 클래스를 registry에 미리 등록한다.
+     * 빈 이름은 {@code aspectBeanName}으로, 실제 advice 호출 시 {@code beanFactory.getBean(name)}으로
+     * 인스턴스를 조회하므로 이 시점에서 실제 빈 생성이 필요 없다.
+     */
+    private void preRegisterAspects(BeanFactory bf) {
+        if (!(bf instanceof ConfigurableListableBeanFactory clbf)) return;
+        for (String name : clbf.getBeanDefinitionNames()) {
+            Class<?> beanClass = clbf.getBeanDefinition(name).getBeanClass();
+            if (beanClass != null && beanClass.isAnnotationPresent(Aspect.class)) {
+                registry.register(name, beanClass);
+            }
+        }
     }
 
     @Override
