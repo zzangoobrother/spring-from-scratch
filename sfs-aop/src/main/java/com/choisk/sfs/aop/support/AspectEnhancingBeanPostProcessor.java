@@ -5,13 +5,13 @@ import com.choisk.sfs.beans.BeanFactory;
 import com.choisk.sfs.beans.BeanFactoryAware;
 import com.choisk.sfs.beans.BeanPostProcessor;
 import com.choisk.sfs.beans.ConfigurableListableBeanFactory;
+import com.choisk.sfs.core.ReflectionUtils;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.matcher.ElementMatchers;
 
 import java.lang.invoke.MethodHandles;
-import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 
 /**
@@ -35,6 +35,11 @@ import java.lang.reflect.Modifier;
  * <p><strong>등록 순서 의존:</strong> {@code @Aspect} 빈이 <em>대상 빈보다 먼저</em> 생성되지 않아도 advice가 적용되도록,
  * {@link #setBeanFactory} 시점에 {@link #preRegisterAspects two-pass 사전 수집}을 수행한다.
  * BeanDefinition만 읽어 registry에 등록 — 빈 인스턴스 생성 없음 → 순환 의존 회피.
+ *
+ * <p><strong>스레드 안전성</strong>: 컨테이너 refresh 단일 스레드 가정.
+ * {@code setBeanFactory}(advice 등록 write)는 refresh 직렬 흐름에서만 호출되고,
+ * {@code postProcessAfterInitialization}(enhance read) 역시 {@code doCreateBean} 직렬 흐름 안에서만 발생한다.
+ * 멀티스레드 환경에서 여러 ApplicationContext가 동일 BPP 인스턴스를 공유하는 경우 외부 동기화 필요.
  */
 public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, BeanFactoryAware {
 
@@ -58,9 +63,7 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
     @Override
     public void setBeanFactory(BeanFactory beanFactory) {
         this.beanFactory = beanFactory;
-        // registry는 생성자에서 final 초기화 — setBeanFactory 진입 시점에 안전 사용 가능
         this.sharedInterceptor = new AdviceInterceptor(beanFactory, registry);
-        // @Aspect BD 사전 수집 — two-pass: 등록 순서 무관하게 모든 Aspect 미리 등록
         preRegisterAspects(beanFactory);
     }
 
@@ -81,6 +84,11 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
 
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) {
+        if (sharedInterceptor == null) {
+            throw new IllegalStateException(
+                    "AspectEnhancingBeanPostProcessor가 BeanFactory 주입 전에 사용됨 — setBeanFactory()가 먼저 호출되어야 함"
+            );
+        }
         if (bean instanceof BeanPostProcessor) return bean;  // 자기 참조 격리
 
         // @Aspect 빈은 preRegisterAspects(setBeanFactory 시점)에서 이미 advice 등록 완료 — 여기서는 enhance 대상에서만 제외
@@ -135,19 +143,15 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
      * pre-check가 통과한 이후 copyFields 본문에서는 final 검사 불필요.
      */
     private void validateNoFinalFields(Class<?> declaredClass) {
-        Class<?> c = declaredClass;
-        while (c != null && c != Object.class) {
-            for (Field f : c.getDeclaredFields()) {
-                if (Modifier.isStatic(f.getModifiers())) continue;
-                if (Modifier.isFinal(f.getModifiers())) {
-                    throw new IllegalStateException(
-                            "Cannot copy final field " + f.getName()
-                                    + " on enhanced " + declaredClass.getName()
-                                    + ". Remove final or use constructor injection (Phase 2C+)");
-                }
+        ReflectionUtils.doWithFields(declaredClass, f -> {
+            if (Modifier.isStatic(f.getModifiers())) return;
+            if (Modifier.isFinal(f.getModifiers())) {
+                throw new IllegalStateException(
+                        "Cannot copy final field " + f.getName()
+                                + " on enhanced " + declaredClass.getName()
+                                + ". Remove final or use constructor injection (Phase 2C+)");
             }
-            c = c.getSuperclass();
-        }
+        });
     }
 
     /**
@@ -160,18 +164,9 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
 
     private void copyFields(Object source, Object target, Class<?> declaredClass) {
         validateNoFinalFields(declaredClass);  // 사전 검사: 부분 복사 상태로 throw하지 않도록 선행
-        Class<?> c = declaredClass;
-        while (c != null && c != Object.class) {
-            for (Field f : c.getDeclaredFields()) {
-                if (Modifier.isStatic(f.getModifiers())) continue;
-                f.setAccessible(true);
-                try {
-                    f.set(target, f.get(source));
-                } catch (IllegalAccessException e) {
-                    throw new IllegalStateException("Cannot copy field " + f.getName(), e);
-                }
-            }
-            c = c.getSuperclass();
-        }
+        ReflectionUtils.doWithFields(declaredClass, f -> {
+            if (Modifier.isStatic(f.getModifiers())) return;
+            ReflectionUtils.setField(f, target, ReflectionUtils.getField(f, source));
+        });
     }
 }

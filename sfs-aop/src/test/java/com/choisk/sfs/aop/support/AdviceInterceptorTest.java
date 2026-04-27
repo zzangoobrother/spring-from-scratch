@@ -1,20 +1,58 @@
 package com.choisk.sfs.aop.support;
 
+import com.choisk.sfs.aop.annotation.After;
 import com.choisk.sfs.aop.annotation.Around;
 import com.choisk.sfs.aop.annotation.Loggable;
 import com.choisk.sfs.beans.BeanFactory;
 import com.choisk.sfs.beans.support.DefaultListableBeanFactory;
 import com.choisk.sfs.beans.BeanDefinition;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
-import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AdviceInterceptorTest {
+
+    @BeforeEach
+    void resetStaticState() {
+        // static 가변 필드 일괄 초기화 — 테스트 격리 보장
+        BeforeAndAroundAspect.calls.clear();
+        BeforeAfterAroundAspect.calls.clear();
+        AfterOnThrowAspect.afterCalled = false;
+        ThrowingBeforeWithAfterAspect.afterCalled = false;
+        BeforeOnlyAspect.beforeCount = 0;
+        CountingAroundAspect.callCount.set(0);
+    }
+
+    public static class BeforeAndAroundAspect {
+        public static final java.util.List<String> calls = new java.util.ArrayList<>();
+
+        @Around(Loggable.class)
+        public Object aroundCheck(ProceedingJoinPoint pjp) throws Throwable {
+            calls.add("around-enter");
+            Object r = pjp.proceed();
+            calls.add("around-exit");
+            return r;
+        }
+
+        @com.choisk.sfs.aop.annotation.Before(Loggable.class)
+        public void beforeCheck(JoinPoint jp) {
+            calls.add("before");
+        }
+    }
+
+    public static class BeforeOnlyAspect {
+        public static int beforeCount = 0;
+
+        @com.choisk.sfs.aop.annotation.Before(Loggable.class)
+        public void beforeOnly(JoinPoint jp) { beforeCount++; }
+    }
 
     public static class CountingAroundAspect {
         public static final AtomicInteger callCount = new AtomicInteger(0);
@@ -33,6 +71,57 @@ class AdviceInterceptorTest {
         }
     }
 
+    public static class ThrowingBeforeAspect {
+        @com.choisk.sfs.aop.annotation.Before(Loggable.class)
+        public void thrower(JoinPoint jp) { throw new IllegalStateException("blocked"); }
+    }
+
+    public static class BeforeAfterAroundAspect {
+        public static final java.util.List<String> calls = new java.util.ArrayList<>();
+
+        @Around(Loggable.class)
+        public Object aroundCheck(ProceedingJoinPoint pjp) throws Throwable {
+            calls.add("around-enter");
+            try {
+                return pjp.proceed();
+            } finally {
+                calls.add("around-exit");
+            }
+        }
+
+        @com.choisk.sfs.aop.annotation.Before(Loggable.class)
+        public void beforeCheck(JoinPoint jp) { calls.add("before"); }
+
+        @After(Loggable.class)
+        public void afterCheck(JoinPoint jp) { calls.add("after"); }
+    }
+
+    public static class AfterOnThrowAspect {
+        public static boolean afterCalled = false;
+
+        @After(Loggable.class)
+        public void afterCheck(JoinPoint jp) { afterCalled = true; }
+    }
+
+    /**
+     * @Before가 throw하면 try/finally 블록 진입 전에 예외가 전파되므로,
+     * finally에 위치한 @After는 절대 호출되지 않아야 한다.
+     * invokeAll(BEFORE) 호출 위치가 try 바깥인 한 이 보장이 유지된다 — 회귀 안전망.
+     */
+    public static class ThrowingBeforeWithAfterAspect {
+        public static boolean afterCalled = false;
+
+        @com.choisk.sfs.aop.annotation.Before(Loggable.class)
+        public void beforeBoom(JoinPoint jp) {
+            throw new RuntimeException("before fail");
+        }
+
+        @After(Loggable.class)
+        public void afterCheck(JoinPoint jp) {
+            afterCalled = true;
+        }
+    }
+
     static class Target {
         @Loggable
         public String greet(String name) { return "hello " + name; }
@@ -43,17 +132,12 @@ class AdviceInterceptorTest {
 
     @Test
     void aroundAdviceWrapsMethodCall() throws Throwable {
-        BeanFactory bf = beanFactoryWith("countingAspect", new CountingAroundAspect());
-        AspectRegistry registry = new AspectRegistry();
-        registry.register("countingAspect", CountingAroundAspect.class);
-
-        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        AdviceInterceptor interceptor = interceptorFor("countingAspect", new CountingAroundAspect());
         Target target = new Target();
         Method greet = Target.class.getMethod("greet", String.class);
         Object[] args = {"world"};
         Callable<Object> superCall = () -> target.greet((String) args[0]);
 
-        CountingAroundAspect.callCount.set(0);
         Object result = interceptor.intercept(superCall, greet, args, target);
 
         assertThat(result).isEqualTo("hello world");
@@ -62,11 +146,7 @@ class AdviceInterceptorTest {
 
     @Test
     void aroundAdviceCanSkipProceed() throws Throwable {
-        BeanFactory bf = beanFactoryWith("skipAspect", new SkipProceedAspect());
-        AspectRegistry registry = new AspectRegistry();
-        registry.register("skipAspect", SkipProceedAspect.class);
-
-        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        AdviceInterceptor interceptor = interceptorFor("skipAspect", new SkipProceedAspect());
         Target target = new Target();
         Method greet = Target.class.getMethod("greet", String.class);
         Callable<Object> superCall = () -> {
@@ -79,21 +159,150 @@ class AdviceInterceptorTest {
 
     @Test
     void methodWithoutMatchingAnnotationCallsSuperDirectly() throws Throwable {
-        BeanFactory bf = beanFactoryWith("countingAspect", new CountingAroundAspect());
-        AspectRegistry registry = new AspectRegistry();
-        registry.register("countingAspect", CountingAroundAspect.class);
-
-        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        AdviceInterceptor interceptor = interceptorFor("countingAspect", new CountingAroundAspect());
         Target target = new Target();
         Method greet = Target.class.getMethod("plain", String.class);  // 매칭 애노테이션 없음
         Object[] args = {"x"};
         Callable<Object> superCall = () -> target.plain((String) args[0]);
 
-        CountingAroundAspect.callCount.set(0);
         Object result = interceptor.intercept(superCall, greet, args, target);
 
         assertThat(result).isEqualTo("plain x");
         assertThat(CountingAroundAspect.callCount.get()).isEqualTo(0);
+    }
+
+    @Test
+    void beforeAdviceRunsBeforeMethodCall() throws Throwable {
+        AdviceInterceptor interceptor = interceptorFor("beforeAndAround", new BeforeAndAroundAspect());
+        Target target = new Target();
+        Method greet = Target.class.getMethod("greet", String.class);
+        Object[] args = {"x"};
+        Callable<Object> superCall = () -> {
+            BeforeAndAroundAspect.calls.add("super");
+            return target.greet((String) args[0]);
+        };
+
+        interceptor.intercept(superCall, greet, args, target);
+
+        assertThat(BeforeAndAroundAspect.calls)
+                .containsExactly("around-enter", "before", "super", "around-exit");
+    }
+
+    @Test
+    void beforeAdviceThrowingPreventsMethodCall() throws Throwable {
+        AdviceInterceptor interceptor = interceptorFor("throwAspect", new ThrowingBeforeAspect());
+        Target target = new Target();
+        Method greet = Target.class.getMethod("greet", String.class);
+        AtomicBoolean superCalled = new AtomicBoolean(false);
+        Callable<Object> superCall = () -> { superCalled.set(true); return null; };
+
+        assertThatThrownBy(() -> interceptor.intercept(superCall, greet, new Object[]{"x"}, target))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("blocked");
+        assertThat(superCalled.get()).isFalse();  // 진짜 메서드 차단됨
+    }
+
+    @Test
+    void aroundlessBeforeOnlyInvokesInnerCallDirectly() throws Throwable {
+        // @Around 없이 @Before만 적용 시 innerCall 직통 분기(@Around 없을 때 innerCall.call() 직접 호출)를 검증
+        AdviceInterceptor interceptor = interceptorFor("beforeOnly", new BeforeOnlyAspect());
+        Target target = new Target();
+        Method greet = Target.class.getMethod("greet", String.class);
+        Object[] args = {"world"};
+        Callable<Object> superCall = () -> target.greet((String) args[0]);
+
+        Object result = interceptor.intercept(superCall, greet, args, target);
+
+        assertThat(result).isEqualTo("hello world");
+        assertThat(BeforeOnlyAspect.beforeCount).isEqualTo(1);  // @Before가 정확히 1회 invoke됨
+    }
+
+    @Test
+    void aroundComposesBeforeAndAfter() throws Throwable {
+        AdviceInterceptor interceptor = interceptorFor("triadic", new BeforeAfterAroundAspect());
+        Target target = new Target();
+        Method greet = Target.class.getMethod("greet", String.class);
+        Object[] args = {"x"};
+        Callable<Object> superCall = () -> {
+            BeforeAfterAroundAspect.calls.add("super");
+            return target.greet((String) args[0]);
+        };
+
+        interceptor.intercept(superCall, greet, args, target);
+
+        assertThat(BeforeAfterAroundAspect.calls)
+                .containsExactly("around-enter", "before", "super", "after", "around-exit");
+    }
+
+    @Test
+    void afterAdviceRunsEvenWhenMethodThrows() throws Throwable {
+        AdviceInterceptor interceptor = interceptorFor("afterOnThrow", new AfterOnThrowAspect());
+        Target target = new Target();
+        Method greet = Target.class.getMethod("greet", String.class);
+        Callable<Object> superCall = () -> { throw new RuntimeException("biz fail"); };
+
+        assertThatThrownBy(() -> interceptor.intercept(superCall, greet, new Object[]{"x"}, target))
+                .isInstanceOf(RuntimeException.class).hasMessage("biz fail");
+
+        assertThat(AfterOnThrowAspect.afterCalled).isTrue();  // finally에서 호출됨
+    }
+
+    @Test
+    void beforeThrowingSkipsAfter() throws Throwable {
+        AdviceInterceptor interceptor = interceptorFor("throwingBeforeWithAfter", new ThrowingBeforeWithAfterAspect());
+        Target target = new Target();
+        Method greet = Target.class.getMethod("greet", String.class);
+        Callable<Object> superCall = () -> target.greet("x");
+
+        assertThatThrownBy(() -> interceptor.intercept(superCall, greet, new Object[]{"x"}, target))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("before fail");
+
+        assertThat(ThrowingBeforeWithAfterAspect.afterCalled)
+                .as("@Before가 throw하면 try 진입 전이라 finally 미실행 — @After 호출 안 됨")
+                .isFalse();
+    }
+
+    public static class FirstAroundAspect {
+        @Around(Loggable.class)
+        public Object first(ProceedingJoinPoint pjp) throws Throwable { return pjp.proceed(); }
+    }
+
+    public static class SecondAroundAspect {
+        @Around(Loggable.class)
+        public Object second(ProceedingJoinPoint pjp) throws Throwable { return pjp.proceed(); }
+    }
+
+    @Test
+    void multipleAroundAdvicesThrow() throws Throwable {
+        // 두 @Aspect 빈이 같은 메서드에 @Around 정의 시 intercept 호출에서 IllegalStateException
+        DefaultListableBeanFactory bf = new DefaultListableBeanFactory();
+        bf.registerBeanDefinition("firstAround", new BeanDefinition(FirstAroundAspect.class));
+        bf.registerBeanDefinition("secondAround", new BeanDefinition(SecondAroundAspect.class));
+        bf.registerSingleton("firstAround", new FirstAroundAspect());
+        bf.registerSingleton("secondAround", new SecondAroundAspect());
+
+        AspectRegistry registry = new AspectRegistry();
+        registry.register("firstAround", FirstAroundAspect.class);
+        registry.register("secondAround", SecondAroundAspect.class);
+
+        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        Target target = new Target();
+        Method greet = Target.class.getMethod("greet", String.class);
+        Object[] args = {"x"};
+        java.util.concurrent.Callable<Object> superCall = () -> target.greet((String) args[0]);
+
+        assertThatThrownBy(() -> interceptor.intercept(superCall, greet, args, target))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("firstAround")
+                .hasMessageContaining("secondAround");
+    }
+
+    private static AdviceInterceptor interceptorFor(String name, Object bean) {
+        BeanFactory bf = beanFactoryWith(name, bean);
+        AspectRegistry registry = new AspectRegistry();
+        registry.register(name, bean.getClass());
+        return new AdviceInterceptor(bf, registry);
     }
 
     private static BeanFactory beanFactoryWith(String name, Object bean) {

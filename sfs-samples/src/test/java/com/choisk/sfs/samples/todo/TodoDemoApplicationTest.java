@@ -38,5 +38,38 @@ class TodoDemoApplicationTest {
         assertThat(lines)
                 .filteredOn(l -> l.startsWith("[Around id=") && l.contains("complete 실행 시간"))
                 .hasSize(1);
+        // @Before advice 출력 1개 — complete 호출 직전, args=[1] (Long 1L → Arrays.toString → "[1]")
+        assertThat(lines)
+                .filteredOn(l -> l.startsWith("[Before] complete 호출") && l.contains("args="))
+                .hasSize(1);
+        // @After advice 출력 1개 — finally 블록에서 호출, 정상/예외 종료 모두 보장
+        assertThat(lines)
+                .filteredOn(l -> l.equals("[After] complete 종료"))
+                .hasSize(1);
+        // 호출 순서 박제: [Before] → 진짜 메서드 → [After](finally) → [Around] 종료
+        assertThat(lines).containsSubsequence(
+                "[Before] complete 호출 — args=[1]",
+                "[TodoController] Todo 1 completed",
+                "[After] complete 종료"
+        );
+
+        // [After] 다음에 [Around 종료] 순서 박제 (spec § 4.2 합성 순서)
+        // [Around id=N] complete 실행 시간 X ms — 동적 id/시간 때문에 인덱스 비교로 순서 검증
+        java.util.List<String> lineList = java.util.Arrays.asList(lines);
+        int afterIdx = lineList.indexOf("[After] complete 종료");
+        int aroundEndIdx = -1;
+        for (int i = 0; i < lineList.size(); i++) {
+            String line = lineList.get(i);
+            if (line.startsWith("[Around id=") && line.contains("complete 실행 시간")) {
+                aroundEndIdx = i;
+                break;
+            }
+        }
+        assertThat(aroundEndIdx)
+                .as("[Around id=...] complete 실행 시간 라인 존재")
+                .isGreaterThanOrEqualTo(0);
+        assertThat(aroundEndIdx)
+                .as("[After] 다음에 [Around 종료]가 와야 함 (spec § 4.2 합성 순서)")
+                .isGreaterThan(afterIdx);
     }
 }

@@ -1,7 +1,6 @@
 package com.choisk.sfs.aop.support;
 
 import java.lang.reflect.Method;
-import java.util.concurrent.Callable;
 
 /**
  * {@link JoinPoint}와 {@link ProceedingJoinPoint}의 단일 구현.
@@ -14,9 +13,9 @@ public class MethodInvocationJoinPoint implements ProceedingJoinPoint {
     private final Object target;
     private final Method method;
     private final Object[] args;
-    private final Callable<Object> innerCall;
+    private final ThrowingCallable innerCall;
 
-    public MethodInvocationJoinPoint(Object target, Method method, Object[] args, Callable<Object> innerCall) {
+    public MethodInvocationJoinPoint(Object target, Method method, Object[] args, ThrowingCallable innerCall) {
         this.target = target;
         this.method = method;
         this.args = args;
