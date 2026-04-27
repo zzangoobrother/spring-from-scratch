@@ -132,11 +132,7 @@ class AdviceInterceptorTest {
 
     @Test
     void aroundAdviceWrapsMethodCall() throws Throwable {
-        BeanFactory bf = beanFactoryWith("countingAspect", new CountingAroundAspect());
-        AspectRegistry registry = new AspectRegistry();
-        registry.register("countingAspect", CountingAroundAspect.class);
-
-        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        AdviceInterceptor interceptor = interceptorFor("countingAspect", new CountingAroundAspect());
         Target target = new Target();
         Method greet = Target.class.getMethod("greet", String.class);
         Object[] args = {"world"};
@@ -150,11 +146,7 @@ class AdviceInterceptorTest {
 
     @Test
     void aroundAdviceCanSkipProceed() throws Throwable {
-        BeanFactory bf = beanFactoryWith("skipAspect", new SkipProceedAspect());
-        AspectRegistry registry = new AspectRegistry();
-        registry.register("skipAspect", SkipProceedAspect.class);
-
-        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        AdviceInterceptor interceptor = interceptorFor("skipAspect", new SkipProceedAspect());
         Target target = new Target();
         Method greet = Target.class.getMethod("greet", String.class);
         Callable<Object> superCall = () -> {
@@ -167,11 +159,7 @@ class AdviceInterceptorTest {
 
     @Test
     void methodWithoutMatchingAnnotationCallsSuperDirectly() throws Throwable {
-        BeanFactory bf = beanFactoryWith("countingAspect", new CountingAroundAspect());
-        AspectRegistry registry = new AspectRegistry();
-        registry.register("countingAspect", CountingAroundAspect.class);
-
-        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        AdviceInterceptor interceptor = interceptorFor("countingAspect", new CountingAroundAspect());
         Target target = new Target();
         Method greet = Target.class.getMethod("plain", String.class);  // 매칭 애노테이션 없음
         Object[] args = {"x"};
@@ -185,11 +173,7 @@ class AdviceInterceptorTest {
 
     @Test
     void beforeAdviceRunsBeforeMethodCall() throws Throwable {
-        BeanFactory bf = beanFactoryWith("beforeAndAround", new BeforeAndAroundAspect());
-        AspectRegistry registry = new AspectRegistry();
-        registry.register("beforeAndAround", BeforeAndAroundAspect.class);
-
-        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        AdviceInterceptor interceptor = interceptorFor("beforeAndAround", new BeforeAndAroundAspect());
         Target target = new Target();
         Method greet = Target.class.getMethod("greet", String.class);
         Object[] args = {"x"};
@@ -206,11 +190,7 @@ class AdviceInterceptorTest {
 
     @Test
     void beforeAdviceThrowingPreventsMethodCall() throws Throwable {
-        BeanFactory bf = beanFactoryWith("throwAspect", new ThrowingBeforeAspect());
-        AspectRegistry registry = new AspectRegistry();
-        registry.register("throwAspect", ThrowingBeforeAspect.class);
-
-        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        AdviceInterceptor interceptor = interceptorFor("throwAspect", new ThrowingBeforeAspect());
         Target target = new Target();
         Method greet = Target.class.getMethod("greet", String.class);
         AtomicBoolean superCalled = new AtomicBoolean(false);
@@ -225,11 +205,7 @@ class AdviceInterceptorTest {
     @Test
     void aroundlessBeforeOnlyInvokesInnerCallDirectly() throws Throwable {
         // @Around 없이 @Before만 적용 시 innerCall 직통 분기(@Around 없을 때 innerCall.call() 직접 호출)를 검증
-        BeanFactory bf = beanFactoryWith("beforeOnly", new BeforeOnlyAspect());
-        AspectRegistry registry = new AspectRegistry();
-        registry.register("beforeOnly", BeforeOnlyAspect.class);
-
-        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        AdviceInterceptor interceptor = interceptorFor("beforeOnly", new BeforeOnlyAspect());
         Target target = new Target();
         Method greet = Target.class.getMethod("greet", String.class);
         Object[] args = {"world"};
@@ -243,11 +219,7 @@ class AdviceInterceptorTest {
 
     @Test
     void aroundComposesBeforeAndAfter() throws Throwable {
-        BeanFactory bf = beanFactoryWith("triadic", new BeforeAfterAroundAspect());
-        AspectRegistry registry = new AspectRegistry();
-        registry.register("triadic", BeforeAfterAroundAspect.class);
-
-        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        AdviceInterceptor interceptor = interceptorFor("triadic", new BeforeAfterAroundAspect());
         Target target = new Target();
         Method greet = Target.class.getMethod("greet", String.class);
         Object[] args = {"x"};
@@ -264,11 +236,7 @@ class AdviceInterceptorTest {
 
     @Test
     void afterAdviceRunsEvenWhenMethodThrows() throws Throwable {
-        BeanFactory bf = beanFactoryWith("afterOnThrow", new AfterOnThrowAspect());
-        AspectRegistry registry = new AspectRegistry();
-        registry.register("afterOnThrow", AfterOnThrowAspect.class);
-
-        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        AdviceInterceptor interceptor = interceptorFor("afterOnThrow", new AfterOnThrowAspect());
         Target target = new Target();
         Method greet = Target.class.getMethod("greet", String.class);
         Callable<Object> superCall = () -> { throw new RuntimeException("biz fail"); };
@@ -281,11 +249,7 @@ class AdviceInterceptorTest {
 
     @Test
     void beforeThrowingSkipsAfter() throws Throwable {
-        BeanFactory bf = beanFactoryWith("throwingBeforeWithAfter", new ThrowingBeforeWithAfterAspect());
-        AspectRegistry registry = new AspectRegistry();
-        registry.register("throwingBeforeWithAfter", ThrowingBeforeWithAfterAspect.class);
-
-        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        AdviceInterceptor interceptor = interceptorFor("throwingBeforeWithAfter", new ThrowingBeforeWithAfterAspect());
         Target target = new Target();
         Method greet = Target.class.getMethod("greet", String.class);
         Callable<Object> superCall = () -> target.greet("x");
@@ -332,6 +296,13 @@ class AdviceInterceptorTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("firstAround")
                 .hasMessageContaining("secondAround");
+    }
+
+    private static AdviceInterceptor interceptorFor(String name, Object bean) {
+        BeanFactory bf = beanFactoryWith(name, bean);
+        AspectRegistry registry = new AspectRegistry();
+        registry.register(name, bean.getClass());
+        return new AdviceInterceptor(bf, registry);
     }
 
     private static BeanFactory beanFactoryWith(String name, Object bean) {
