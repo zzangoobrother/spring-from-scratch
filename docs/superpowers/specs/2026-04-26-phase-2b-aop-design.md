@@ -108,10 +108,27 @@ Phase 2A를 통해 다음이 완성됨:
 - `samples/todo/TodoDemoApplication.java` — 변경 없음 (출력 라인이 advice로 인해 자동 증가)
 - `samples/todo/TodoDemoApplicationTest.java` — 출력 박제 갱신 (8라인 → 11라인, B2/C1/C2 task별 갱신)
 
-**변경 없음 (본 phase의 정상 동작 신호):**
+**변경 없음 (본 phase의 정상 동작 신호 — *spec 작성 시점 가정*):**
 - `sfs-core` 전체
 - `sfs-beans` 전체
 - `sfs-context` 전체 — Phase 2A 마감 게이트가 *충분했다*는 진짜 시험. 만약 변경이 필요하면 *발견 자체가 박제 가치*이며 Phase 2C로 이월
+
+> **실행 중 가정 갱신 (2026-04-27 — Task B2 진행 중 발견):**
+>
+> 위 *변경 없음 가정*은 **B2 시연이 작동하려는 시점에 깨졌다**. *Phase 2A 마감 게이트가 놓친 인프라 결함 2건*이 LoggingAspect를 처음 *컨테이너 위에서 작동시키는 시점*에 드러남:
+>
+> 1. **`sfs-context/AbstractApplicationContext.registerBeanPostProcessors()`** — 본문이 `/* no-op (확장점) */`로 비어있었음. Phase 1B에서 *자리만 만들고 미룬 상태*가 Phase 2A 마감 게이트도 통과. AnnotationConfigUtils가 직접 등록하는 BPP(AutowiredAnnotation/CommonAnnotation)만 작동했고, **사용자 `@Bean BPP`는 컨테이너에 등록만 되고 BPP 체인에는 들어가지 않는 결함**. → `getBeanNamesForType(BeanPostProcessor.class)` 순회 + 중복 방지 후 `addBeanPostProcessor()` 호출로 채움.
+>
+> 2. **`sfs-beans/AbstractAutowireCapableBeanFactory.doCreateBean()`** — `@Bean` 팩토리 메서드 경로가 `initializeBean()` + `registerDisposableIfNeeded()`를 호출하지 않고 *팩토리 결과를 그대로 반환*. → `@Bean`으로 만든 빈은 `BeanFactoryAware`/`@PostConstruct`/BPP after 콜백을 *받지 못하는* 결함. AspectEnhancingBeanPostProcessor가 `setBeanFactory()`도 못 받아 `sharedInterceptor`가 null이 되는 시점에 발견. → 4줄 추가로 `initializeBean` + `registerDisposableIfNeeded` 적용.
+>
+> **두 결함 수정 모두 *기능 추가가 아닌 미완 인프라의 완성*** — Phase 2A 정신과 일관. 본 phase에서 *즉시 수정*한 이유:
+> - B2 DoD(*시연 9 라인 박제*)가 두 결함 수정 없이 만족 불가
+> - spec § 3.1 line 113~114의 *"변경이 필요하면 박제 가치"* 정신과 일치 (발견은 환영)
+> - *"수정은 Phase 2C 이월"* 부분만 본 phase에서 침범 — 이월하면 phase 2B 자체가 *시연 비완성 상태로 박제* 되어야 하는데 plan B2 DoD가 그걸 허용 안 함 (모순)
+>
+> **메타 학습 박제:** *"spec 가정이 깨지는 것이 발견 가치 가장 큰 시점"*. Phase 2A의 145 PASS가 두 결함을 못 잡은 *진짜 이유* — `@Bean`으로 BPP를 등록하는 시연 자체가 phase 2A에 없었기 때문. 시연 단위 안전망이 *추상 단위 안전망*보다 깊은 결함을 드러낸다는 메타 결론.
+>
+> **수정된 커밋:** `117c69e feat(sfs-samples): LoggingAspect 첫 시연 …` — 7 파일 통합 (sfs-aop 1, sfs-beans 1, sfs-context 1, sfs-samples 4).
 
 ---
 
