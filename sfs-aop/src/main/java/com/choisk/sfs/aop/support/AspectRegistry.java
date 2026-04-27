@@ -109,12 +109,15 @@ public class AspectRegistry {
 
     /**
      * 클래스에 매칭 advice가 *하나라도* 있는지 — BPP의 enhance 결정에 사용 (전 메서드 순회 회피).
+     *
+     * <p>{@link Class#getMethods()}로 public 상속 메서드까지 포함해 검사한다.
+     * private/package-private 메서드는 advice 비대상이므로 검사 대상에서 제외해도 무방하다.
      */
     public boolean findAnyApplicable(Class<?> targetClass) {
         for (AdviceInfo info : advices) {
             Class<? extends Annotation> ann = info.targetAnnotation();
             if (targetClass.isAnnotationPresent(ann)) return true;
-            for (Method m : targetClass.getDeclaredMethods()) {
+            for (Method m : targetClass.getMethods()) {
                 if (m.isAnnotationPresent(ann)) return true;
             }
         }

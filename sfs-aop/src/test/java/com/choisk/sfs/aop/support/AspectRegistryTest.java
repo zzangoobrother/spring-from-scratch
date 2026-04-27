@@ -97,6 +97,26 @@ class AspectRegistryTest {
                 .containsExactlyInAnyOrder("aspectA", "aspectA", "aspectA", "aspectB", "aspectB", "aspectB");
     }
 
+    // ---- 상속 메서드 매칭 픽스처 ----
+
+    static class ParentWithLoggable {
+        @Loggable
+        public void greet() {}
+    }
+
+    static class ChildWithoutOverride extends ParentWithLoggable {
+        // greet()를 오버라이드하지 않음 — 상속 메서드만 존재
+    }
+
+    @Test
+    void findAnyApplicableMatchesInheritedMethod() {
+        AspectRegistry registry = new AspectRegistry();
+        registry.register("testAspect", TestAspect.class);
+
+        // 부모 클래스의 @Loggable 메서드를 자식이 오버라이드하지 않은 경우도 매칭되어야 함
+        assertThat(registry.findAnyApplicable(ChildWithoutOverride.class)).isTrue();
+    }
+
     // ---- 시그니처 검증 실패 케이스 픽스처 ----
 
     static class InvalidAroundAspect {
