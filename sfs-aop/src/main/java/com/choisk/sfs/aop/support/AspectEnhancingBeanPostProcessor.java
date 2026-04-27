@@ -63,9 +63,7 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
     @Override
     public void setBeanFactory(BeanFactory beanFactory) {
         this.beanFactory = beanFactory;
-        // registry는 생성자에서 final 초기화 — setBeanFactory 진입 시점에 안전 사용 가능
         this.sharedInterceptor = new AdviceInterceptor(beanFactory, registry);
-        // @Aspect BD 사전 수집 — two-pass: 등록 순서 무관하게 모든 Aspect 미리 등록
         preRegisterAspects(beanFactory);
     }
 

@@ -53,11 +53,9 @@ public class AdviceInterceptor {
 
         AdviceInfo around = findAtMostOne(applicable, AdviceType.AROUND);
         if (around != null) {
-            // @Around 있으면 ProceedingJoinPoint에 innerCall 위임 — proceed() 호출이 innerCall 실행
             ProceedingJoinPoint pjp = new MethodInvocationJoinPoint(self, method, args, innerCall);
             return invokeAdvice(around, pjp);
         }
-        // @Around 없으면 innerCall 직통 (@Before invoke + superCall)
         return innerCall.call();
     }
 
