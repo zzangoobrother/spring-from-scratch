@@ -36,8 +36,12 @@ class AspectIntegrationTest {
 
         @Around(Loggable.class)
         public Object trace(ProceedingJoinPoint pjp) throws Throwable {
-            log.entries.add("around:" + pjp.getMethod().getName());
-            return pjp.proceed();
+            log.entries.add("around-enter:" + pjp.getMethod().getName());
+            try {
+                return pjp.proceed();
+            } finally {
+                log.entries.add("around-exit:" + pjp.getMethod().getName());
+            }
         }
 
         @Before(Loggable.class)
@@ -87,7 +91,7 @@ class AspectIntegrationTest {
             String result = target.greet("world");
 
             assertThat(result).isEqualTo("hello world");
-            assertThat(log.entries).containsExactly("around:greet", "before:greet", "after:greet");
+            assertThat(log.entries).containsExactly("around-enter:greet", "before:greet", "after:greet", "around-exit:greet");
         }
     }
 
@@ -101,7 +105,8 @@ class AspectIntegrationTest {
             target.greet("y");
 
             // CallLog 빈이 advice에 주입되어 *동일 인스턴스*에 누적
-            assertThat(log.entries).hasSize(6);  // 3 advice × 2 호출
+            // around-enter, before, after, around-exit = 4 entries × 2 호출 = 8
+            assertThat(log.entries).hasSize(8);  // 4 advice entries × 2 호출
         }
     }
 
