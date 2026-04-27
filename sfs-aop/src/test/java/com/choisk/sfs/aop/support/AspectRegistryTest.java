@@ -10,6 +10,7 @@ import java.lang.reflect.Method;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AspectRegistryTest {
 
@@ -94,6 +95,53 @@ class AspectRegistryTest {
         assertThat(all).hasSize(6);  // 3(aspectA) + 3(aspectB)
         assertThat(all).extracting(AdviceInfo::aspectBeanName)
                 .containsExactlyInAnyOrder("aspectA", "aspectA", "aspectA", "aspectB", "aspectB", "aspectB");
+    }
+
+    // ---- 시그니처 검증 실패 케이스 픽스처 ----
+
+    static class InvalidAroundAspect {
+        /** @Around 첫 인자가 ProceedingJoinPoint 아님 — 시그니처 위반 */
+        @Around(Loggable.class)
+        public Object aroundWithWrongArg(String wrongParam) { return null; }
+    }
+
+    static class InvalidBeforeReturnAspect {
+        /** @Before 반환 타입이 void 아님 — 시그니처 위반 */
+        @Before(Loggable.class)
+        public Object beforeWithReturnType(JoinPoint jp) { return null; }
+    }
+
+    static class InvalidAfterNoJoinPointAspect {
+        /** @After 첫 인자가 JoinPoint 아님 — 시그니처 위반 */
+        @After(Loggable.class)
+        public void afterWithWrongArg(String wrongParam) {}
+    }
+
+    @Test
+    void aroundWithoutProceedingJoinPointThrows() {
+        AspectRegistry registry = new AspectRegistry();
+        assertThatThrownBy(() -> registry.register("bad", InvalidAroundAspect.class))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("@Around")
+                .hasMessageContaining("ProceedingJoinPoint");
+    }
+
+    @Test
+    void beforeWithReturnTypeThrows() {
+        AspectRegistry registry = new AspectRegistry();
+        assertThatThrownBy(() -> registry.register("bad", InvalidBeforeReturnAspect.class))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("@Before")
+                .hasMessageContaining("void");
+    }
+
+    @Test
+    void afterWithoutJoinPointThrows() {
+        AspectRegistry registry = new AspectRegistry();
+        assertThatThrownBy(() -> registry.register("bad", InvalidAfterNoJoinPointAspect.class))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("@After")
+                .hasMessageContaining("JoinPoint");
     }
 
     private static Method targetMethod(Class<?> cls, String name) {
