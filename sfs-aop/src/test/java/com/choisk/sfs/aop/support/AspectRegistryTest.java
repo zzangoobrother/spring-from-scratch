@@ -84,6 +84,19 @@ class AspectRegistryTest {
         assertThat(registry.findAnyApplicable(NoLoggable.class)).isFalse();
     }
 
+    @Test
+    void registerTwoAspectsAccumulatesAllAdvices() {
+        // LOW-4: 다중 @Aspect 등록 시 advice 누적 검증 — ArrayList 기반 registry가 진짜 누적하는지 안전망
+        AspectRegistry registry = new AspectRegistry();
+        registry.register("aspectA", TestAspect.class);
+        registry.register("aspectB", TestAspect.class);  // 같은 클래스 두 번 등록
+
+        List<AdviceInfo> all = registry.findApplicable(targetMethod(TargetWithLoggable.class, "annotatedMethod"));
+        assertThat(all).hasSize(6);  // 3(aspectA) + 3(aspectB)
+        assertThat(all).extracting(AdviceInfo::aspectBeanName)
+                .containsExactlyInAnyOrder("aspectA", "aspectA", "aspectA", "aspectB", "aspectB", "aspectB");
+    }
+
     private static Method targetMethod(Class<?> cls, String name) {
         try { return cls.getMethod(name); }
         catch (NoSuchMethodException e) { throw new RuntimeException(e); }
