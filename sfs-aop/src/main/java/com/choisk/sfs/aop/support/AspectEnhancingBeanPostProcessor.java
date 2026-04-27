@@ -35,6 +35,11 @@ import java.lang.reflect.Modifier;
  * <p><strong>등록 순서 의존:</strong> {@code @Aspect} 빈이 <em>대상 빈보다 먼저</em> 생성되지 않아도 advice가 적용되도록,
  * {@link #setBeanFactory} 시점에 {@link #preRegisterAspects two-pass 사전 수집}을 수행한다.
  * BeanDefinition만 읽어 registry에 등록 — 빈 인스턴스 생성 없음 → 순환 의존 회피.
+ *
+ * <p><strong>스레드 안전성</strong>: 컨테이너 refresh 단일 스레드 가정.
+ * {@code setBeanFactory}(advice 등록 write)는 refresh 직렬 흐름에서만 호출되고,
+ * {@code postProcessAfterInitialization}(enhance read) 역시 {@code doCreateBean} 직렬 흐름 안에서만 발생한다.
+ * 멀티스레드 환경에서 여러 ApplicationContext가 동일 BPP 인스턴스를 공유하는 경우 외부 동기화 필요.
  */
 public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, BeanFactoryAware {
 
