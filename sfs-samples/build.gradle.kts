@@ -4,4 +4,5 @@ plugins {
 
 dependencies {
     implementation(project(":sfs-context"))
+    implementation(project(":sfs-aop"))
 }
