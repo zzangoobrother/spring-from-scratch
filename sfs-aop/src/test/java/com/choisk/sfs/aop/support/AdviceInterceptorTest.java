@@ -299,6 +299,41 @@ class AdviceInterceptorTest {
                 .isFalse();
     }
 
+    public static class FirstAroundAspect {
+        @Around(Loggable.class)
+        public Object first(ProceedingJoinPoint pjp) throws Throwable { return pjp.proceed(); }
+    }
+
+    public static class SecondAroundAspect {
+        @Around(Loggable.class)
+        public Object second(ProceedingJoinPoint pjp) throws Throwable { return pjp.proceed(); }
+    }
+
+    @Test
+    void multipleAroundAdvicesThrow() throws Throwable {
+        // 두 @Aspect 빈이 같은 메서드에 @Around 정의 시 intercept 호출에서 IllegalStateException
+        DefaultListableBeanFactory bf = new DefaultListableBeanFactory();
+        bf.registerBeanDefinition("firstAround", new BeanDefinition(FirstAroundAspect.class));
+        bf.registerBeanDefinition("secondAround", new BeanDefinition(SecondAroundAspect.class));
+        bf.registerSingleton("firstAround", new FirstAroundAspect());
+        bf.registerSingleton("secondAround", new SecondAroundAspect());
+
+        AspectRegistry registry = new AspectRegistry();
+        registry.register("firstAround", FirstAroundAspect.class);
+        registry.register("secondAround", SecondAroundAspect.class);
+
+        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        Target target = new Target();
+        Method greet = Target.class.getMethod("greet", String.class);
+        Object[] args = {"x"};
+        java.util.concurrent.Callable<Object> superCall = () -> target.greet((String) args[0]);
+
+        assertThatThrownBy(() -> interceptor.intercept(superCall, greet, args, target))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("firstAround")
+                .hasMessageContaining("secondAround");
+    }
+
     private static BeanFactory beanFactoryWith(String name, Object bean) {
         DefaultListableBeanFactory bf = new DefaultListableBeanFactory();
         BeanDefinition bd = new BeanDefinition(bean.getClass());

@@ -8,6 +8,7 @@ import net.bytebuddy.implementation.bind.annotation.SuperCall;
 import net.bytebuddy.implementation.bind.annotation.This;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;  // byte-buddy @SuperCall 강제 타입 — 제거 불가
 
@@ -50,7 +51,7 @@ public class AdviceInterceptor {
             }
         };
 
-        AdviceInfo around = findOne(applicable, AdviceType.AROUND);
+        AdviceInfo around = findAtMostOne(applicable, AdviceType.AROUND);
         if (around != null) {
             // @Around 있으면 ProceedingJoinPoint에 innerCall 위임 — proceed() 호출이 innerCall 실행
             ProceedingJoinPoint pjp = new MethodInvocationJoinPoint(self, method, args, innerCall);
@@ -70,11 +71,31 @@ public class AdviceInterceptor {
         }
     }
 
-    private AdviceInfo findOne(List<AdviceInfo> list, AdviceType type) {
+    /**
+     * 지정 {@code type}의 advice를 최대 1개 반환한다. 2개 이상이면 {@link IllegalStateException} throw.
+     *
+     * <p>복수 {@code @Around}를 허용하지 않는 이유: 실행 체인(advice 우선순위)을 지원하지 않는 상황에서
+     * 두 번째 {@code @Around}가 silent drop 되면 런타임 동작이 의도와 달라지므로, 등록 즉시 fail-fast가
+     * 누락된 경우 intercept 시점에 명확한 오류로 알린다.
+     * advice 우선순위(@Order) 도입 시 이 제한을 chain으로 교체한다.
+     */
+    private AdviceInfo findAtMostOne(List<AdviceInfo> list, AdviceType type) {
+        List<AdviceInfo> found = new ArrayList<>();
         for (AdviceInfo info : list) {
-            if (info.type() == type) return info;
+            if (info.type() == type) found.add(info);
         }
-        return null;
+        if (found.size() > 1) {
+            StringBuilder names = new StringBuilder();
+            for (AdviceInfo info : found) {
+                if (!names.isEmpty()) names.append(", ");
+                names.append(info.aspectBeanName());
+            }
+            throw new IllegalStateException(
+                    "동일 메서드에 @Around advice가 " + found.size() + "개 정의됨 — advice 우선순위(@Order) 미지원"
+                            + ". advice bean name: [" + names + "]"
+            );
+        }
+        return found.isEmpty() ? null : found.get(0);
     }
 
     private Object invokeAdvice(AdviceInfo info, JoinPoint jp) throws Throwable {
