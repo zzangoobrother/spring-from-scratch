@@ -166,6 +166,26 @@ class AdviceInterceptorTest {
         assertThat(superCalled.get()).isFalse();  // 진짜 메서드 차단됨
     }
 
+    @Test
+    void aroundlessBeforeOnlyInvokesInnerCallDirectly() throws Throwable {
+        // @Around 없이 @Before만 적용 시 innerCall 직통 분기(@Around 없을 때 innerCall.call() 직접 호출)를 검증
+        BeanFactory bf = beanFactoryWith("beforeOnly", new BeforeOnlyAspect());
+        AspectRegistry registry = new AspectRegistry();
+        registry.register("beforeOnly", BeforeOnlyAspect.class);
+
+        AdviceInterceptor interceptor = new AdviceInterceptor(bf, registry);
+        Target target = new Target();
+        Method greet = Target.class.getMethod("greet", String.class);
+        Object[] args = {"world"};
+        Callable<Object> superCall = () -> target.greet((String) args[0]);
+
+        BeforeOnlyAspect.beforeCount = 0;
+        Object result = interceptor.intercept(superCall, greet, args, target);
+
+        assertThat(result).isEqualTo("hello world");
+        assertThat(BeforeOnlyAspect.beforeCount).isEqualTo(1);  // @Before가 정확히 1회 invoke됨
+    }
+
     private static BeanFactory beanFactoryWith(String name, Object bean) {
         DefaultListableBeanFactory bf = new DefaultListableBeanFactory();
         BeanDefinition bd = new BeanDefinition(bean.getClass());
