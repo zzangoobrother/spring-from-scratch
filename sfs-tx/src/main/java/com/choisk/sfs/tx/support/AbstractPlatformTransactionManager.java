@@ -45,17 +45,20 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
             return;
         }
 
-        if (dts.isNewTransaction()) {
-            try {
-                doCommit(dts.getTransaction());
-            } catch (Throwable t) {
-                throw new TransactionException.CommitFailedException("commit failed", t);
+        try {
+            if (dts.isNewTransaction()) {
+                try {
+                    doCommit(dts.getTransaction());
+                } catch (Throwable t) {
+                    throw new TransactionException.CommitFailedException("commit failed", t);
+                }
             }
-        }
-        // join인 경우 outer가 commit 책임 — 여기서 아무것도 안 함
-
-        if (dts.getSuspendedResources() != null) {
-            doResume(dts.getSuspendedResources());
+            // join인 경우 outer가 commit 책임 — 여기서 아무것도 안 함
+        } finally {
+            // REQUIRES_NEW outer 복원 — doCommit 실패 시에도 반드시 실행 (Spring 본가 패턴 정합)
+            if (dts.getSuspendedResources() != null) {
+                doResume(dts.getSuspendedResources());
+            }
         }
     }
 
@@ -63,19 +66,22 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
     public final void rollback(TransactionStatus status) {
         DefaultTransactionStatus dts = (DefaultTransactionStatus) status;
 
-        if (dts.isNewTransaction()) {
-            try {
-                doRollback(dts.getTransaction());
-            } catch (Throwable t) {
-                throw new TransactionException.RollbackFailedException("rollback failed", t);
+        try {
+            if (dts.isNewTransaction()) {
+                try {
+                    doRollback(dts.getTransaction());
+                } catch (Throwable t) {
+                    throw new TransactionException.RollbackFailedException("rollback failed", t);
+                }
+            } else {
+                // join인 경우 outer에게 rollback 요청
+                dts.setRollbackOnly();
             }
-        } else {
-            // join인 경우 outer에게 rollback 요청
-            dts.setRollbackOnly();
-        }
-
-        if (dts.getSuspendedResources() != null) {
-            doResume(dts.getSuspendedResources());
+        } finally {
+            // REQUIRES_NEW outer 복원 — doRollback 실패 시에도 반드시 실행 (Spring 본가 패턴 정합)
+            if (dts.getSuspendedResources() != null) {
+                doResume(dts.getSuspendedResources());
+            }
         }
     }
 
