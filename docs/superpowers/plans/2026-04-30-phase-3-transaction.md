@@ -3852,5 +3852,31 @@ git commit -m "docs: Plan § 품질 게이트 기록 박제 + DoD 26번 [x] — 
 
 ---
 
+> **품질 게이트 기록 (2026-05-01): simplify 패스**
+>
+> **검토 범위:** sfs-tx 핵심 14개 파일 (annotation/2, support/9, tx/3)
+>
+> **발견한 단순화 후보 전체 목록:**
+>
+> | # | 파일 | 후보 | 결정 |
+> |---|------|------|------|
+> | 1 | AbstractPlatformTransactionManager | commit/rollback finally 블록에서 `if (suspendedResources != null) doResume(...)` 중복 2회 | **적용** — `resumeIfNecessary(dts)` 헬퍼 추출 |
+> | 2 | DataSourceTransactionManager | doCommit/doRollback finally에서 `tsm.unbindResource + closeQuietly` 2줄 중복 | **적용** — `releaseConnection(holder)` 헬퍼 추출 |
+> | 3 | TransactionInterceptor | `invoke(Object target, ...)` — target 파라미터 미사용 (dead parameter) | **skip** — AOP 인터셉터 시그니처 확장 여지 보존, public API 변경 파급 범위(호출처 3곳) 대비 가치 미달 |
+> | 4 | ThreadLocalTsm | `withInitial(HashMap::new)` 최초 조회 시 빈 맵 생성 | **skip** — Spring 본가와 동일 패턴, 박제 의도 보존 |
+> | 5 | MockTransactionManager | `TX_KEY` 상수명 가독성 | **skip** — 취향 수준 |
+> | 6 | AbstractPlatformTransactionManager | commit 내 `// join인 경우 outer가 commit 책임` 주석 | **skip** — WHY(설계 이유) 설명이므로 보존 가치 있음 |
+> | 7 | DataSourceTransactionManager.doBegin | begin 실패 시 `CommitFailedException` 사용 (개념 오류) | **skip** — 동작 변경 범주, simplify 범위 초과 |
+> | 8 | resolveTransactionManager | 3단계 중첩 catch 구조 | **skip** — 동작 변경 없이 구조 개선 불가, WHY 주석으로 설명됨 |
+>
+> **적용한 변경 (커밋 2개, + TransactionalBeanPostProcessor 사전 누락분 1개):**
+> - `refactor(sfs-tx): AbstractPlatformTransactionManager resumeIfNecessary 헬퍼 추출` (commit 6273163)
+> - `refactor(sfs-tx): DataSourceTransactionManager releaseConnection 헬퍼 추출` (commit ed6e77d)
+> - (사전 누락) `refactor(sfs-tx): TransactionalBeanPostProcessor sharedInterceptor 싱글턴화 + copyFields ReflectionUtils 재사용` (commit f7019c0)
+>
+> **회귀:** `./gradlew cleanTest test` → BUILD SUCCESSFUL, 전체 PASS / 0 FAIL 유지
+>
+> **지적사항 8건 / 반영 2건 / 보류 6건**
+
 
 
