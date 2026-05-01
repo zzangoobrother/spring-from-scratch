@@ -118,10 +118,14 @@ public class TransactionalBeanPostProcessor implements SmartInstantiationAwareBe
     }
 
     private void copyFields(Object src, Object dst) throws Exception {
-        Class<?> clazz = src.getClass();
-        for (Field f : clazz.getDeclaredFields()) {
-            f.setAccessible(true);
-            f.set(dst, f.get(src));
+        // superclass 체인 전체 순회 — 상속 빈의 부모 @Autowired 필드 복사 누락 방지
+        // DefaultSingletonBeanRegistry.copyFieldsToEarlyReference와 동일 패턴
+        for (Class<?> c = src.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+            for (Field f : c.getDeclaredFields()) {
+                if (Modifier.isStatic(f.getModifiers())) continue;
+                f.setAccessible(true);
+                f.set(dst, f.get(src));
+            }
         }
     }
 
