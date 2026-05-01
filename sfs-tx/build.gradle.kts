@@ -3,9 +3,9 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":sfs-context"))
     implementation(project(":sfs-aop"))
-    implementation(project(":sfs-tx"))
-    implementation(libs.h2)
+    implementation(project(":sfs-beans"))
+    implementation(libs.bytebuddy)
+
     testImplementation(libs.h2)
 }

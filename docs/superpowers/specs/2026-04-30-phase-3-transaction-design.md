@@ -37,6 +37,8 @@
 
 추상화 인터페이스의 *교환 가능성*이 학습의 정점.
 
+> **학습 정점 박제 한계 (실행 단계 박제 2026-05-01)**: ScopedValueTsm × advice end-to-end 시연은 *의도적으로 박제하지 않음*. ScopedValue의 `runInScope(Runnable)` 강제 진입이 advice 호출 패턴(`interceptor.invoke(...)`)과 *부적합* — § 4.5 박제 의도 자체가 *ScopedValue가 transaction interceptor에 부적합한 이유*. 따라서 본 phase는 *TSM 단위 비교*(`TsmComparisonTest` 3건)로 학습 정점을 박제하고, advice end-to-end는 ThreadLocalTsm으로 한정. *"같은 advice가 두 TSM에서 동일 작동"* 약속은 *인터페이스 호환*(`TransactionSynchronizationManager`) 수준에서만 성립.
+
 ---
 
 ## 1. 의사결정 로그
@@ -110,6 +112,8 @@ sfs-samples ──► sfs-context ──► sfs-beans ──► sfs-core
 - **신규 의존**: `sfs-samples → sfs-tx`, `sfs-tx → sfs-aop`, `sfs-tx → sfs-beans`, `sfs-tx → sfs-core`
 - **`sfs-tx`가 `sfs-context`를 의존하지 않는 이유**: TSM/TM/JdbcTemplate 자체는 `ApplicationContext` 인프라가 필요 없음. Spring 본가의 `spring-tx → spring-aop + spring-beans + spring-core` 의존 그대로.
 - **외부 의존 신규**: `com.h2database:h2` (임베디드 DB, 학습 박제용 — 의사결정 #11)
+
+> **실행 단계 박제 (2026-05-01)**: 본 phase 구현 결과 `sfs-tx`가 `sfs-aop` 인프라(`AspectEnhancingBeanPostProcessor` 등)를 *직접 import하지는 않음*. `TransactionalBeanPostProcessor`가 byte-buddy를 *직접 사용*. 의존 그래프는 *Spring 본가 정합*(spring-tx → spring-aop)을 위해 유지하되, 본 phase에서는 *transitive 의존만* 활용. 후속 phase(예: Phase 5/6에서 transactional advice + AOP 합성)에서 직접 의존이 자연 발현 예상.
 
 ### 2.4 Spring 원본 매핑
 

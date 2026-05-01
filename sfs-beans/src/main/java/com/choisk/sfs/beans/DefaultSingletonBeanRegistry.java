@@ -1,6 +1,8 @@
 package com.choisk.sfs.beans;
 
 import com.choisk.sfs.core.Assert;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -146,13 +148,49 @@ public class DefaultSingletonBeanRegistry {
                 afterSingletonCreation(name);
             }
 
-            // 2차에 조기 노출된 참조가 있으면 그것을 신뢰 (단일 인스턴스 보장)
+            // 2차에 조기 노출된 참조가 있으면 그것을 신뢰 (단일 인스턴스 보장).
+            // early와 created가 다른 인스턴스이면 (BPP after enhance 등): early에 created 필드를 반영해 최신 상태로 동기화.
+            // 이렇게 해야 순환 의존에서 early reference로 받은 빈이 최종 초기화 상태의 필드를 갖게 된다.
             Object early = earlySingletonObjects.get(name);
-            Object toStore = (early != null) ? early : created;
+            Object toStore;
+            if (early != null) {
+                if (early != created) {
+                    // enhanced proxy가 원본과 다른 인스턴스 — early에 created 필드 복사로 동기화
+                    copyFieldsToEarlyReference(early, created);
+                }
+                toStore = early;
+            } else {
+                toStore = created;
+            }
             singletonObjects.put(name, toStore);
             earlySingletonObjects.remove(name);
             singletonFactories.remove(name);
             return toStore;
+        }
+    }
+
+    /**
+     * early reference(2차 캐시)와 최종 created 인스턴스가 다를 때 (BPP enhance로 다른 인스턴스 생성된 경우),
+     * created 인스턴스의 필드를 early reference에 복사해 최신 상태로 동기화한다.
+     * <p>early는 순환 의존 측에 이미 주입된 인스턴스이므로 교체할 수 없다 — 필드만 업데이트.
+     */
+    private void copyFieldsToEarlyReference(Object early, Object created) {
+        // created의 superclass 체인 전체를 순회 (enhanced 서브클래스의 부모 필드도 포함)
+        Class<?> clazz = created.getClass().getSuperclass(); // ByteBuddy 서브클래스라면 부모가 원본 클래스
+        if (clazz == null || clazz == Object.class) {
+            clazz = created.getClass(); // 원본 클래스라면 그대로 사용
+        }
+        // early의 원본 클래스 체인과 created의 체인이 일치하는 지점까지 복사
+        for (Class<?> c = clazz; c != null && c != Object.class; c = c.getSuperclass()) {
+            for (Field f : c.getDeclaredFields()) {
+                if (Modifier.isStatic(f.getModifiers())) continue;
+                f.setAccessible(true);
+                try {
+                    f.set(early, f.get(created));
+                } catch (IllegalAccessException e) {
+                    // 접근 불가 필드는 skip — final 필드 등
+                }
+            }
         }
     }
 

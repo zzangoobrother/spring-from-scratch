@@ -105,23 +105,26 @@ public class DefaultListableBeanFactory
     // ── AbstractBeanFactory 추상 메서드 구현 ──────────────────────────────
 
     /**
-     * 타입으로 빈 이름을 해결한다. @Primary 우선, 복수 후보 시 NoUniqueBeanDefinitionException.
+     * 타입으로 빈 이름을 해결한다. BeanDefinition 기반 + 직접 등록 싱글톤 모두 검색.
+     * @Primary 우선, 복수 후보 시 NoUniqueBeanDefinitionException.
      */
     @Override
     protected String resolveBeanNameByType(Class<?> type) {
-        var matches = getBeanNamesForType(type);
-        if (matches.length == 0) {
+        // BeanDefinition 기반 + 직접 등록 싱글톤 모두 포함
+        Map<String, Object> allMatches = resolveBeansOfType(type);
+        if (allMatches.isEmpty()) {
             throw new NoSuchBeanDefinitionException(
                     "No bean of type " + type.getName() + " registered");
         }
-        if (matches.length == 1) {
-            return matches[0];
+        if (allMatches.size() == 1) {
+            return allMatches.keySet().iterator().next();
         }
 
-        // @Primary 우선 해결
+        // @Primary 우선 해결 (BeanDefinition 있는 빈에 한함)
         var primaries = new ArrayList<String>();
-        for (var name : matches) {
-            if (beanDefinitionMap.get(name).isPrimary()) {
+        for (var name : allMatches.keySet()) {
+            BeanDefinition bd = beanDefinitionMap.get(name);
+            if (bd != null && bd.isPrimary()) {
                 primaries.add(name);
             }
         }
@@ -133,10 +136,11 @@ public class DefaultListableBeanFactory
                     "Multiple @Primary beans of type " + type.getName() + ": " + primaries,
                     primaries);
         }
+        var matchNames = new ArrayList<>(allMatches.keySet());
         throw new NoUniqueBeanDefinitionException(
-                "Multiple beans of type " + type.getName() + ": " + Arrays.asList(matches)
+                "Multiple beans of type " + type.getName() + ": " + matchNames
                         + "\nPossible solutions: annotate one with @Primary or inject by name",
-                Arrays.asList(matches));
+                matchNames);
     }
 
     // ── 의존성 해석 ──────────────────────────────────────────────────────────

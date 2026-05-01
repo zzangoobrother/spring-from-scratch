@@ -105,3 +105,19 @@ com.choisk.sfs.samples.todo/
 ├── controller/UserController.java, TodoController.java
 └── support/IdGenerator.java
 ```
+
+## Phase 3 갱신 사항
+
+- **신규 도메인** — `Order`, `AuditLog` (JDBC 기반). 기존 `Todo`, `User`(in-memory)는 그대로 유지 (의사결정 #3, 두 패러다임 공존).
+- **새 진입점** — `TransactionDemoApplication.main()`. 정상 시연(Book) + 예외 시연(Yacht, BusinessException).
+- **AppConfig 갱신** — DataSource(H2), ThreadLocalTsm, DataSourceTransactionManager, JdbcTemplate, TransactionalBeanPostProcessor 5개 `@Bean` 추가. `@ComponentScan`에 `order` 패키지 추가.
+- **시연 마일스톤**:
+  * 정상: `[OrderController] order placed: Book` + orders 1행 + audit 1행
+  * 예외: `[OrderController] order failed: amount limit exceeded` + orders **0행** + audit **1행** (REQUIRES_NEW 정점)
+
+## 시연 마일스톤 (누적)
+
+- Phase 1C: Todo 기본 시연 (in-memory)
+- Phase 2A: ConfigurationEnhanceDemo (false → true)
+- Phase 2B: LoggingAspect (8 → 11 라인 콘솔 어서션)
+- **Phase 3**: TransactionDemoApplication (orders/audit_log DB 어서션, REQUIRES_NEW 정점)
