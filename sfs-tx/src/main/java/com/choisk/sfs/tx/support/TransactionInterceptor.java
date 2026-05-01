@@ -45,7 +45,13 @@ public class TransactionInterceptor {
             throw t;
         } catch (Throwable t) {
             // checked exception → commit (Spring 본가 정합)
-            tm.commit(status);
+            // commit 자체가 실패하면 원본 t를 suppressed로 첨부해 디버깅 정보 보존
+            try {
+                tm.commit(status);
+            } catch (Throwable c) {
+                c.addSuppressed(t);
+                throw c;
+            }
             throw t;
         }
     }
