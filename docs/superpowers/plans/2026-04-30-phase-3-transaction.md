@@ -1854,7 +1854,7 @@ spec § 7 한계: HikariCP 등 connection pool 미사용, schema migration tool 
 
 **TDD 적용:** ✅ 적용 — `Connection.setAutoCommit(false)` / `commit()` / `rollback()` 실제 호출이 분기. JDBC 외부 경계.
 
-- [ ] **Step 1: 실패 테스트 작성 — `DataSourceTransactionManagerTest` 5건**
+- [x] **Step 1: 실패 테스트 작성 — `DataSourceTransactionManagerTest` 5건**
 
 생성: `sfs-tx/src/test/java/com/choisk/sfs/tx/support/DataSourceTransactionManagerTest.java`
 
@@ -1980,12 +1980,12 @@ class DataSourceTransactionManagerTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 — FAIL 확인**
+- [x] **Step 2: 테스트 실행 — FAIL 확인**
 
 Run: `./gradlew :sfs-tx:test --tests com.choisk.sfs.tx.support.DataSourceTransactionManagerTest`
 Expected: FAIL — `DataSourceTransactionManager`/`ConnectionHolder` 없음
 
-- [ ] **Step 3: `ConnectionHolder` 작성**
+- [x] **Step 3: `ConnectionHolder` 작성**
 
 생성: `sfs-tx/src/main/java/com/choisk/sfs/tx/support/ConnectionHolder.java`
 
@@ -2012,7 +2012,7 @@ public final class ConnectionHolder {
 }
 ```
 
-- [ ] **Step 4: `DataSourceTransactionManager` 작성**
+- [x] **Step 4: `DataSourceTransactionManager` 작성**
 
 생성: `sfs-tx/src/main/java/com/choisk/sfs/tx/support/DataSourceTransactionManager.java`
 
@@ -2108,17 +2108,17 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 }
 ```
 
-- [ ] **Step 5: 테스트 실행 — PASS 확인**
+- [x] **Step 5: 테스트 실행 — PASS 확인**
 
 Run: `./gradlew :sfs-tx:test --tests com.choisk.sfs.tx.support.DataSourceTransactionManagerTest`
 Expected: PASS — 5건
 
-- [ ] **Step 6: 회귀 확인**
+- [x] **Step 6: 회귀 확인**
 
 Run: `./gradlew test`
 Expected: 211~212 PASS / 0 FAIL (206~207 + 5)
 
-- [ ] **Step 7: 커밋**
+- [x] **Step 7: 커밋**
 
 ```bash
 git add sfs-tx/src/main/java/com/choisk/sfs/tx/support/{ConnectionHolder,DataSourceTransactionManager}.java sfs-tx/src/test/java/com/choisk/sfs/tx/support/DataSourceTransactionManagerTest.java
