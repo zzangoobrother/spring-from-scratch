@@ -3691,16 +3691,17 @@ Plan DoD 26항목 모두 [x]. 회귀: 232~233 PASS / 0 FAIL.
 
 **TDD 적용:** N/A — 마감 게이트는 plan 외 의식 (CLAUDE.md "완료 후 품질 게이트").
 
-- [ ] **Step 1: 다관점 코드리뷰 (옵션 C — 병행 reviewer)**
+- [x] **Step 1: 다관점 코드리뷰 (옵션 C — 병행 reviewer)**
 
 Phase 2B 마감 게이트 패턴 그대로 (메모리 `project_phase2b_resume_point.md` 박제):
 - `general-purpose` Sonnet 5관점 통합 reviewer (아키텍처/가독성/테스트/동시성/보안)
 - `feature-dev:code-reviewer` 자동 스캔
-- 두 reviewer 병렬 dispatch
+- `superpowers:code-reviewer` spec/plan 준수 검증
+- 3 reviewer 병렬 dispatch
 
 결과 분류: HIGH (즉시 고칠) / MED (별도 phase 또는 영구 박제) / LOW (남겨둘).
 
-- [ ] **Step 2: 즉시 고칠 finding 반영 (HIGH)**
+- [x] **Step 2: 즉시 고칠 finding 반영 (HIGH)**
 
 각 finding 단위 분리 커밋. 동작 변경 없는 리팩토링은 `refactor(<module>): ...`, 동작 변경은 `fix(<module>): ...`.
 
@@ -3708,13 +3709,13 @@ Phase 2B 마감 게이트 패턴 그대로 (메모리 `project_phase2b_resume_po
 - 해당 모듈 회귀 테스트 PASS 유지 검증
 - 새 테스트 추가 시 별도 `test(<module>): ...` 커밋
 
-- [ ] **Step 3: `/simplify` 패스 (3 agent 병렬)**
+- [x] **Step 3: `/simplify` 패스 (3 agent 병렬)**
 
 `simplify` 스킬 + 3 agent 병렬 dispatch (재사용 / 품질 / 효율). Phase 2B 패턴 그대로:
 - 전수 수용 금지 — 학습 가치 vs simplify 가치 충돌 finding은 보류 결정 박제
 - 반영분은 `refactor(<module>): ...` 또는 `chore: ...` 커밋
 
-- [ ] **Step 4: 품질 게이트 기록 박제**
+- [x] **Step 4: 품질 게이트 기록 박제**
 
 수정: 본 plan § "품질 게이트 기록" 섹션 추가. Phase 2B의 § 13 형식 그대로:
 - 1단계: 다관점 리뷰 결과 (HIGH N건 / MED M건 / LOW L건)
@@ -3723,7 +3724,7 @@ Phase 2B 마감 게이트 패턴 그대로 (메모리 `project_phase2b_resume_po
 - 회귀 카운트 (마감 게이트 종료)
 - 결과 (지적 N건 / 반영 M건 / 보류 K건)
 
-- [ ] **Step 5: 최종 빌드 + 회귀 확인**
+- [x] **Step 5: 최종 빌드 + 회귀 확인**
 
 Run: `./gradlew build`
 Expected: BUILD SUCCESSFUL
@@ -3731,7 +3732,7 @@ Expected: BUILD SUCCESSFUL
 Run: `./gradlew test`
 Expected: 232~240 PASS (마감 게이트 추가분 포함) / 0 FAIL
 
-- [ ] **Step 6: 마감 커밋**
+- [x] **Step 6: 마감 커밋**
 
 ```bash
 git add docs/superpowers/plans/2026-04-30-phase-3-transaction.md
@@ -3852,31 +3853,64 @@ git commit -m "docs: Plan § 품질 게이트 기록 박제 + DoD 26번 [x] — 
 
 ---
 
-> **품질 게이트 기록 (2026-05-01): simplify 패스**
->
-> **검토 범위:** sfs-tx 핵심 14개 파일 (annotation/2, support/9, tx/3)
->
-> **발견한 단순화 후보 전체 목록:**
->
-> | # | 파일 | 후보 | 결정 |
-> |---|------|------|------|
-> | 1 | AbstractPlatformTransactionManager | commit/rollback finally 블록에서 `if (suspendedResources != null) doResume(...)` 중복 2회 | **적용** — `resumeIfNecessary(dts)` 헬퍼 추출 |
-> | 2 | DataSourceTransactionManager | doCommit/doRollback finally에서 `tsm.unbindResource + closeQuietly` 2줄 중복 | **적용** — `releaseConnection(holder)` 헬퍼 추출 |
-> | 3 | TransactionInterceptor | `invoke(Object target, ...)` — target 파라미터 미사용 (dead parameter) | **skip** — AOP 인터셉터 시그니처 확장 여지 보존, public API 변경 파급 범위(호출처 3곳) 대비 가치 미달 |
-> | 4 | ThreadLocalTsm | `withInitial(HashMap::new)` 최초 조회 시 빈 맵 생성 | **skip** — Spring 본가와 동일 패턴, 박제 의도 보존 |
-> | 5 | MockTransactionManager | `TX_KEY` 상수명 가독성 | **skip** — 취향 수준 |
-> | 6 | AbstractPlatformTransactionManager | commit 내 `// join인 경우 outer가 commit 책임` 주석 | **skip** — WHY(설계 이유) 설명이므로 보존 가치 있음 |
-> | 7 | DataSourceTransactionManager.doBegin | begin 실패 시 `CommitFailedException` 사용 (개념 오류) | **skip** — 동작 변경 범주, simplify 범위 초과 |
-> | 8 | resolveTransactionManager | 3단계 중첩 catch 구조 | **skip** — 동작 변경 없이 구조 개선 불가, WHY 주석으로 설명됨 |
->
-> **적용한 변경 (커밋 2개, + TransactionalBeanPostProcessor 사전 누락분 1개):**
-> - `refactor(sfs-tx): AbstractPlatformTransactionManager resumeIfNecessary 헬퍼 추출` (commit 6273163)
-> - `refactor(sfs-tx): DataSourceTransactionManager releaseConnection 헬퍼 추출` (commit ed6e77d)
-> - (사전 누락) `refactor(sfs-tx): TransactionalBeanPostProcessor sharedInterceptor 싱글턴화 + copyFields ReflectionUtils 재사용` (commit f7019c0)
->
-> **회귀:** `./gradlew cleanTest test` → BUILD SUCCESSFUL, 전체 PASS / 0 FAIL 유지
->
-> **지적사항 8건 / 반영 2건 / 보류 6건**
+## 11. 품질 게이트 기록 (2026-05-01)
+
+CLAUDE.md "완료 후 품질 게이트" 3단계 (다관점 리뷰 + 리팩토링 + simplify) 실행 결과.
+
+### 1단계: 다관점 코드리뷰 (3 reviewer 병렬)
+
+옵션 C (Phase 2B 메모리 박제 회수) — 3 reviewer 병렬 dispatch:
+- `general-purpose` Sonnet 5관점 통합 (아키텍처/가독성/테스트/동시성/보안) — 11 finding
+- `feature-dev:code-reviewer` 자동 스캔 — 7 finding
+- `superpowers:code-reviewer` spec/plan 준수 + DoD 검증 — 8 finding (중 2건 spec 갱신)
+
+**총 finding 22건 중복 제거 후**: HIGH 7 / MED 10 / LOW 5
+
+### 2단계: 즉시 수정 (HIGH 7건 모두 반영)
+
+| # | 커밋 | 모듈 | 요약 |
+|---|---|---|---|
+| H1 | `3fb4538` | sfs-tx | `AbstractPlatformTransactionManager.commit/rollback`에서 `doResume` try/finally 보장 — REQUIRES_NEW outer 누수 방지 |
+| H2 | `c7a85b8` | sfs-tx | `JdbcTemplate.query/update`의 `prepareStatement` 실패 시 connection 누수 차단 |
+| H3 | `40cbc21` | sfs-tx | `TransactionalBeanPostProcessor.copyFields`에서 superclass 체인 순회 — 상속 빈 부모 필드 누락 방지 |
+| H4 | `92c1293` | sfs-tx | `TransactionInterceptor` checked exception + commit 실패 시 `addSuppressed` 패턴 — 원본 예외 보존 |
+| H5 | `448c707` | sfs-beans | `DefaultSingletonBeanRegistry.copyFieldsToEarlyReference` 명시 import — CLAUDE.md 컨벤션 |
+| H6 | `8697ae5` | docs(spec) | spec § 2.3 `sfs-tx → sfs-aop` 의존 미사용 사실 박제 (옵션 B) |
+| H7 | `8697ae5` | docs(spec) | spec § 0.3 ScopedValue × advice 한계 박제 (옵션 B — 학습 정점 한정) |
+
+**회귀 영향**: 모든 fix backward-compatible — 232 PASS / 0 FAIL 유지
+
+### 3단계: simplify 패스 (3 agent 병렬)
+
+3 영역 분담:
+- agent #1 (sfs-tx 핵심 14파일): 8 후보 → 적용 2 + 사전 누락분 정리 1 = 3 커밋, 보류 6
+- agent #2 (sfs-tx jdbc+boot 3파일): 3 후보 → 적용 0 (#1이 선처리), 보류 3
+- agent #3 (sfs-samples Phase 3 신규 11파일): 8 후보 → 적용 0, 보류 8 (모두 학습 박제 의도와 충돌)
+
+**적용된 변경 3 커밋:**
+- `f7019c0` — `TransactionalBeanPostProcessor.sharedInterceptor` 싱글턴화 + `copyFields` `ReflectionUtils` 재사용 (Phase 2B 패턴 회수)
+- `6273163` — `AbstractPlatformTransactionManager.resumeIfNecessary` 헬퍼 추출 (H1 도입 후 commit/rollback 중복 제거)
+- `ed6e77d` — `DataSourceTransactionManager.releaseConnection` 헬퍼 추출 (commit/rollback finally 중복 제거)
+
+**보류 17건 사유 분포**:
+- 학습 박제 의도 (spec/plan 명시): 9건 (정적 팩토리, mini abstraction, schema.sql 직접 로드, BusinessException 단순 상속 등)
+- 동작 변경 범주 (simplify 범위 초과): 3건
+- 추상화 오버킬 (mini 규모): 3건
+- 취향/WHY 주석 보존: 2건
+
+**회귀 영향**: 232 PASS / 0 FAIL 유지
+
+### 종합 결과
+
+- **지적 22건 / 반영 10건 (HIGH 7 + simplify 3) / 보류 17건 (보류율 ~63%)**
+- **회귀 시작**: 185 PASS (Phase 2B 종료) → **종료**: 232 PASS / 0 FAIL (+47, spec § 6.3 추정 +48 대비 98%)
+- `./gradlew build` BUILD SUCCESSFUL
+- DoD 26항목 모두 `[x]`
+- main 머지 진입 준비 완료
+
+### 메모리 박제 (마감 후 후속 작업 시 회수)
+
+- `project_phase3_phase1a_gap.md` — Phase 3 작업 중 노출된 *Phase 1A 결함 2건* (B2 `resolveBeanNameByType` + D2 `doCreateBean.factoryMethod`)과 *디자인 우려 1건* (`copyFieldsToEarlyReference` 인프라 계층 오염). Phase 4 진입 전 sfs-beans 테스트 보강 후보.
 
 
 
