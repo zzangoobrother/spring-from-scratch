@@ -1,6 +1,8 @@
 package com.choisk.sfs.beans;
 
 import com.choisk.sfs.core.Assert;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -180,8 +182,8 @@ public class DefaultSingletonBeanRegistry {
         }
         // early의 원본 클래스 체인과 created의 체인이 일치하는 지점까지 복사
         for (Class<?> c = clazz; c != null && c != Object.class; c = c.getSuperclass()) {
-            for (java.lang.reflect.Field f : c.getDeclaredFields()) {
-                if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
+            for (Field f : c.getDeclaredFields()) {
+                if (Modifier.isStatic(f.getModifiers())) continue;
                 f.setAccessible(true);
                 try {
                     f.set(early, f.get(created));
