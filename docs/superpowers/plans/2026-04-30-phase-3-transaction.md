@@ -1749,7 +1749,7 @@ git commit -m "test(sfs-samples): Mock TM end-to-end 통합 테스트 3건 — v
 
 **TDD 적용:** ❌ 제외 — 환경 셋업 (의존성/SQL DDL). 컴파일 + 회귀 테스트만.
 
-- [ ] **Step 1: `libs.versions.toml`에 H2 추가**
+- [x] **Step 1: `libs.versions.toml`에 H2 추가**
 
 수정: `gradle/libs.versions.toml`
 
@@ -1772,7 +1772,7 @@ bytebuddy = { module = "net.bytebuddy:byte-buddy", version.ref = "bytebuddy" }
 h2 = { module = "com.h2database:h2", version.ref = "h2" }
 ```
 
-- [ ] **Step 2: `sfs-tx/build.gradle.kts`에 H2 testImplementation 추가**
+- [x] **Step 2: `sfs-tx/build.gradle.kts`에 H2 testImplementation 추가**
 
 수정: `sfs-tx/build.gradle.kts`
 
@@ -1789,7 +1789,7 @@ dependencies {
 }
 ```
 
-- [ ] **Step 3: `sfs-samples/build.gradle.kts`에 H2 runtimeOnly 추가**
+- [x] **Step 3: `sfs-samples/build.gradle.kts`에 H2 runtimeOnly 추가**
 
 수정: `sfs-samples/build.gradle.kts` — 의존성 블록에 추가
 
@@ -1798,7 +1798,7 @@ runtimeOnly(libs.h2)
 testImplementation(libs.h2)
 ```
 
-- [ ] **Step 4: `schema.sql` 신설**
+- [x] **Step 4: `schema.sql` 신설**
 
 생성: `sfs-samples/src/main/resources/schema.sql`
 
@@ -1820,7 +1820,7 @@ CREATE TABLE audit_log (
 );
 ```
 
-- [ ] **Step 5: 컴파일 + 회귀 확인**
+- [x] **Step 5: 컴파일 + 회귀 확인**
 
 Run: `./gradlew :sfs-tx:compileJava :sfs-samples:compileJava`
 Expected: BUILD SUCCESSFUL
@@ -1828,7 +1828,7 @@ Expected: BUILD SUCCESSFUL
 Run: `./gradlew test`
 Expected: 206~207 PASS / 0 FAIL (변동 없음)
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add gradle/libs.versions.toml sfs-tx/build.gradle.kts sfs-samples/build.gradle.kts sfs-samples/src/main/resources/schema.sql
