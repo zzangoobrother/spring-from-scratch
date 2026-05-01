@@ -159,7 +159,7 @@ sfs-samples/src/test/java/com/choisk/sfs/samples/order/
 
 **TDD 적용:** ❌ 제외 — 설정 파일 + 디렉토리. 컴파일 + 회귀 테스트만 검증.
 
-- [ ] **Step 1: `settings.gradle.kts`에 sfs-tx 모듈 추가**
+- [x] **Step 1: `settings.gradle.kts`에 sfs-tx 모듈 추가**
 
 수정: `settings.gradle.kts`
 
@@ -176,7 +176,7 @@ include(
 )
 ```
 
-- [ ] **Step 2: `sfs-tx/build.gradle.kts` 신설**
+- [x] **Step 2: `sfs-tx/build.gradle.kts` 신설**
 
 생성: `sfs-tx/build.gradle.kts`
 
@@ -193,7 +193,7 @@ dependencies {
 
 > sfs-aop가 transitive로 sfs-context, sfs-beans, sfs-core를 가져옴. byte-buddy는 BPP에서 enhance용 (Phase 2B 패턴 그대로).
 
-- [ ] **Step 3: `sfs-samples/build.gradle.kts`에 sfs-tx 의존 추가**
+- [x] **Step 3: `sfs-samples/build.gradle.kts`에 sfs-tx 의존 추가**
 
 수정: `sfs-samples/build.gradle.kts` — 기존 `implementation(project(":sfs-aop"))` 줄 아래에 추가
 
@@ -201,7 +201,7 @@ dependencies {
 implementation(project(":sfs-tx"))
 ```
 
-- [ ] **Step 4: 디렉토리 구조 생성**
+- [x] **Step 4: 디렉토리 구조 생성**
 
 ```bash
 mkdir -p sfs-tx/src/main/java/com/choisk/sfs/tx/{annotation,support,jdbc,boot}
@@ -210,7 +210,7 @@ touch sfs-tx/src/main/java/com/choisk/sfs/tx/.gitkeep
 touch sfs-tx/src/test/java/com/choisk/sfs/tx/.gitkeep
 ```
 
-- [ ] **Step 5: 컴파일 + 회귀 확인**
+- [x] **Step 5: 컴파일 + 회귀 확인**
 
 Run: `./gradlew :sfs-tx:compileJava :sfs-samples:compileJava`
 Expected: BUILD SUCCESSFUL
@@ -218,7 +218,7 @@ Expected: BUILD SUCCESSFUL
 Run: `./gradlew test`
 Expected: 185 PASS / 0 FAIL (Phase 2B 누적 유지)
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add settings.gradle.kts sfs-tx/ sfs-samples/build.gradle.kts

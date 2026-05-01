@@ -5,5 +5,6 @@ include(
     "sfs-beans",
     "sfs-context",
     "sfs-aop",
+    "sfs-tx",
     "sfs-samples",
 )
