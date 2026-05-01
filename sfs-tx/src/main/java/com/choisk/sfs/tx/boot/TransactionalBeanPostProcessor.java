@@ -85,6 +85,7 @@ public class TransactionalBeanPostProcessor implements BeanPostProcessor, BeanFa
         Class<?> originalClass = bean.getClass();
         TransactionInterceptor interceptor = new TransactionInterceptor(beanFactory);
 
+        // privateLookupIn 사용: 대상 클래스의 패키지와 무관하게 enhance 가능 (AspectEnhancingBeanPostProcessor 정합)
         Class<?> enhanced = new ByteBuddy()
                 .subclass(originalClass)
                 .method(ElementMatchers.isAnnotatedWith(Transactional.class)
@@ -92,7 +93,8 @@ public class TransactionalBeanPostProcessor implements BeanPostProcessor, BeanFa
                 .intercept(MethodDelegation.to(new TxMethodInterceptor(interceptor)))
                 .make()
                 .load(originalClass.getClassLoader(),
-                        ClassLoadingStrategy.UsingLookup.of(MethodHandles.lookup()))
+                        ClassLoadingStrategy.UsingLookup.of(
+                                MethodHandles.privateLookupIn(originalClass, MethodHandles.lookup())))
                 .getLoaded();
 
         Object enhancedInstance = enhanced.getDeclaredConstructor().newInstance();
