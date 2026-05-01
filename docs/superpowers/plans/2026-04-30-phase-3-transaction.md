@@ -3017,7 +3017,7 @@ TransactionDemoApplicationTest 2건:
 
 > **학습 박제 의도** (spec § 4.5): ScopedValueTsm은 *완전한 대체*가 아닌 *비교 학습용*. ScopedValue.where(...).run(...) 패턴은 람다 스코프 안에서만 살아있어, transaction interceptor에서 채택하기 부적합. 따라서 본 task는 *동일 scope 내 동작*만 박제.
 
-- [ ] **Step 1: 실패 테스트 작성 — `ScopedValueTsmTest` 3건**
+- [x] **Step 1: 실패 테스트 작성 — `ScopedValueTsmTest` 3건**
 
 생성: `sfs-tx/src/test/java/com/choisk/sfs/tx/support/ScopedValueTsmTest.java`
 
@@ -3071,12 +3071,12 @@ class ScopedValueTsmTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 — FAIL 확인**
+- [x] **Step 2: 테스트 실행 — FAIL 확인**
 
 Run: `./gradlew :sfs-tx:test --tests com.choisk.sfs.tx.support.ScopedValueTsmTest`
 Expected: FAIL — `ScopedValueTsm` 없음
 
-- [ ] **Step 3: `ScopedValueTsm` 구현 작성**
+- [x] **Step 3: `ScopedValueTsm` 구현 작성**
 
 생성: `sfs-tx/src/main/java/com/choisk/sfs/tx/support/ScopedValueTsm.java`
 
@@ -3148,12 +3148,12 @@ public class ScopedValueTsm implements TransactionSynchronizationManager {
 }
 ```
 
-- [ ] **Step 4: 테스트 실행 — PASS 확인**
+- [x] **Step 4: 테스트 실행 — PASS 확인**
 
 Run: `./gradlew :sfs-tx:test --tests com.choisk.sfs.tx.support.ScopedValueTsmTest`
 Expected: PASS — 3건
 
-- [ ] **Step 5: 실패 테스트 작성 — `TsmComparisonTest` 3건 (비교 박제)**
+- [x] **Step 5: 실패 테스트 작성 — `TsmComparisonTest` 3건 (비교 박제)**
 
 생성: `sfs-tx/src/test/java/com/choisk/sfs/tx/support/TsmComparisonTest.java`
 
@@ -3241,17 +3241,17 @@ class TsmComparisonTest {
 }
 ```
 
-- [ ] **Step 6: 테스트 실행 — PASS 확인**
+- [x] **Step 6: 테스트 실행 — PASS 확인**
 
 Run: `./gradlew :sfs-tx:test --tests com.choisk.sfs.tx.support.TsmComparisonTest`
 Expected: PASS — 3건
 
-- [ ] **Step 7: 회귀 확인**
+- [x] **Step 7: 회귀 확인**
 
 Run: `./gradlew test`
 Expected: 229~230 PASS / 0 FAIL (223~224 + 6)
 
-- [ ] **Step 8: 커밋**
+- [x] **Step 8: 커밋**
 
 ```bash
 git add sfs-tx/src/main/java/com/choisk/sfs/tx/support/ScopedValueTsm.java sfs-tx/src/test/java/com/choisk/sfs/tx/support/{ScopedValueTsmTest,TsmComparisonTest}.java
