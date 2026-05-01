@@ -55,10 +55,7 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
             }
             // join인 경우 outer가 commit 책임 — 여기서 아무것도 안 함
         } finally {
-            // REQUIRES_NEW outer 복원 — doCommit 실패 시에도 반드시 실행 (Spring 본가 패턴 정합)
-            if (dts.getSuspendedResources() != null) {
-                doResume(dts.getSuspendedResources());
-            }
+            resumeIfNecessary(dts);
         }
     }
 
@@ -78,10 +75,17 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
                 dts.setRollbackOnly();
             }
         } finally {
-            // REQUIRES_NEW outer 복원 — doRollback 실패 시에도 반드시 실행 (Spring 본가 패턴 정합)
-            if (dts.getSuspendedResources() != null) {
-                doResume(dts.getSuspendedResources());
-            }
+            resumeIfNecessary(dts);
+        }
+    }
+
+    /**
+     * REQUIRES_NEW outer 복원 — commit/rollback 실패 시에도 반드시 실행 (Spring 본가 패턴 정합).
+     * finally 블록 공통 처리.
+     */
+    private void resumeIfNecessary(DefaultTransactionStatus dts) {
+        if (dts.getSuspendedResources() != null) {
+            doResume(dts.getSuspendedResources());
         }
     }
 
