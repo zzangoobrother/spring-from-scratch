@@ -4,5 +4,6 @@ plugins {
 
 dependencies {
     implementation(project(":sfs-aop"))
+    implementation(project(":sfs-beans"))
     implementation(libs.bytebuddy)
 }
