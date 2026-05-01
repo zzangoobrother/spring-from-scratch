@@ -29,18 +29,21 @@ public class JdbcTemplate {
 
     public <T> List<T> query(String sql, RowMapper<T> mapper, Object... args) {
         ConnHandle h = obtainConnection();
-        try (PreparedStatement ps = h.connection.prepareStatement(sql)) {
-            bindArgs(ps, args);
-            try (ResultSet rs = ps.executeQuery()) {
-                List<T> result = new ArrayList<>();
-                int row = 0;
-                while (rs.next()) {
-                    result.add(mapper.mapRow(rs, row++));
+        try {
+            // prepareStatement 자체가 실패해도 outer finally에서 connection close 보장
+            try (PreparedStatement ps = h.connection.prepareStatement(sql)) {
+                bindArgs(ps, args);
+                try (ResultSet rs = ps.executeQuery()) {
+                    List<T> result = new ArrayList<>();
+                    int row = 0;
+                    while (rs.next()) {
+                        result.add(mapper.mapRow(rs, row++));
+                    }
+                    return result;
                 }
-                return result;
+            } catch (SQLException e) {
+                throw new RuntimeException("query failed: " + sql, e);
             }
-        } catch (SQLException e) {
-            throw new RuntimeException("query failed: " + sql, e);
         } finally {
             h.releaseIfNotBound();
         }
@@ -48,11 +51,14 @@ public class JdbcTemplate {
 
     public int update(String sql, Object... args) {
         ConnHandle h = obtainConnection();
-        try (PreparedStatement ps = h.connection.prepareStatement(sql)) {
-            bindArgs(ps, args);
-            return ps.executeUpdate();
-        } catch (SQLException e) {
-            throw new RuntimeException("update failed: " + sql, e);
+        try {
+            // prepareStatement 자체가 실패해도 outer finally에서 connection close 보장
+            try (PreparedStatement ps = h.connection.prepareStatement(sql)) {
+                bindArgs(ps, args);
+                return ps.executeUpdate();
+            } catch (SQLException e) {
+                throw new RuntimeException("update failed: " + sql, e);
+            }
         } finally {
             h.releaseIfNotBound();
         }
