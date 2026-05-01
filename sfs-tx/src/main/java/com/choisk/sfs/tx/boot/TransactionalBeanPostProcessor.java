@@ -35,9 +35,9 @@ import java.util.concurrent.Callable;
  *   <li>byte-buddy 서브클래스 + interceptor 적용 + 필드 reflection 복사</li>
  * </ol>
  *
- * <p>{@link SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference}는 별도 task에서 구현 (A-2 흡수).
+ * <p>{@link SmartInstantiationAwareBeanPostProcessor#getEarlyBeanReference} 구현: 순환 의존 시 enhance된 early reference 반환 (A-2 흡수).
  */
-public class TransactionalBeanPostProcessor implements BeanPostProcessor, BeanFactoryAware {
+public class TransactionalBeanPostProcessor implements SmartInstantiationAwareBeanPostProcessor, BeanFactoryAware {
 
     private BeanFactory beanFactory;
     private final List<String> lastFinalMethodWarnings = new ArrayList<>();
@@ -45,6 +45,21 @@ public class TransactionalBeanPostProcessor implements BeanPostProcessor, BeanFa
     @Override
     public void setBeanFactory(BeanFactory beanFactory) {
         this.beanFactory = beanFactory;
+    }
+
+    /**
+     * Phase 1A SIABPP 훅 — 순환 의존 시 *enhance된 early reference* 반환.
+     * 3-level cache의 첫 의미 있는 사용 (A-2 흡수, spec § 5.4).
+     */
+    @Override
+    public Object getEarlyBeanReference(Object bean, String beanName) {
+        if (bean instanceof BeanPostProcessor) return bean;
+        if (!hasTransactionalMethod(bean.getClass())) return bean;
+        try {
+            return enhance(bean);
+        } catch (Exception e) {
+            throw new BeanCreationException(beanName, "Failed to enhance early reference", e);
+        }
     }
 
     @Override

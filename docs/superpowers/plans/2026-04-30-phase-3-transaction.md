@@ -3282,7 +3282,14 @@ git commit -m "feat(sfs-tx): ScopedValueTsm + 단위 테스트 3건 + TsmCompari
 >
 > 만약 Phase 1A에 `getEarlyBeanReference` 훅이 *인터페이스만 박제되어 있고 호출 회로가 없다*면 별도 task로 분리 — 실행 단계에서 판단해 Plan에 박제.
 
-- [ ] **Step 1: A-2 흡수를 위한 BPP 보강 (사전 확인)**
+- [x] **Step 1: A-2 흡수를 위한 BPP 보강 (사전 확인)**
+
+> **실행 기록 (2026-05-01):** `doCreateBean` factoryMethod 분기에 3차 캐시 등록 누락 발견.
+> `@Bean` 메서드로 등록된 빈은 `factoryMethodName != null`이므로 early reference 등록 경로(`registerSingletonFactory`)를 타지 않음.
+> `getEarlyBeanReference` SIABPP 훅과 `TransactionalBeanPostProcessor` 보강만으로는 부족 —
+> `AbstractAutowireCapableBeanFactory.doCreateBean`의 factoryMethod 분기에도
+> `registerSingletonFactory(beanName, () -> getEarlyBeanReference(beanName, factoryResult))` 등록 + `populateBean` + `initializeBean` 분리가 필요함.
+> `sfs-beans` 모듈 `AbstractAutowireCapableBeanFactory` 보강 후 테스트 PASS 확인.
 
 먼저 현재 Phase 1A SIABPP 호출 회로를 확인:
 
@@ -3318,7 +3325,7 @@ public class TransactionalBeanPostProcessor implements SmartInstantiationAwareBe
 }
 ```
 
-- [ ] **Step 2: 실패 테스트 작성 — `EarlyReferenceIntegrationTest` 2건**
+- [x] **Step 2: 실패 테스트 작성 — `EarlyReferenceIntegrationTest` 2건**
 
 생성: `sfs-samples/src/test/java/com/choisk/sfs/samples/order/EarlyReferenceIntegrationTest.java`
 
@@ -3402,7 +3409,7 @@ class EarlyReferenceIntegrationTest {
 }
 ```
 
-- [ ] **Step 3: 실패 테스트 작성 — `EnhancedBeanDestroyTest` 1건**
+- [x] **Step 3: 실패 테스트 작성 — `EnhancedBeanDestroyTest` 1건**
 
 생성: `sfs-samples/src/test/java/com/choisk/sfs/samples/order/EnhancedBeanDestroyTest.java`
 
@@ -3475,7 +3482,14 @@ class EnhancedBeanDestroyTest {
 }
 ```
 
-- [ ] **Step 4: 테스트 실행 — FAIL/PASS 확인**
+- [x] **Step 4: 테스트 실행 — FAIL/PASS 확인**
+
+> **실행 기록 (2026-05-01) — 추가 편차:**
+> 1. Plan 코드의 `jakarta.annotation.PreDestroy` → 프로젝트 자체 구현 `com.choisk.sfs.context.annotation.PreDestroy` 사용으로 대체 (프로젝트에 jakarta.annotation 의존성 없음).
+> 2. Plan 코드의 inner static class `@Service` annotation — `AppConfig`의 `@ComponentScan("com.choisk.sfs.samples.order")`에 잡혀 다른 테스트 컨텍스트를 오염시킴. `@Service` 제거, `@Configuration` inner class 스캔 제외 필터를 `ClassPathBeanDefinitionScanner`에 추가.
+> 3. `DefaultSingletonBeanRegistry.getOrCreateSingleton`: early reference와 created가 다른 인스턴스일 때 (`copyFields` enhance 방식) early에 최종 필드 동기화 로직(`copyFieldsToEarlyReference`) 추가.
+> 4. 인프라 변경 범위: `sfs-beans` 3개 파일 + `sfs-context` 1개 파일 + `sfs-tx` 1개 파일.
+> 결과: PASS 3건 (A-2 × 2 + C-3 × 1).
 
 Run: `./gradlew :sfs-samples:test --tests "com.choisk.sfs.samples.order.EarlyReferenceIntegrationTest" --tests "com.choisk.sfs.samples.order.EnhancedBeanDestroyTest"`
 Expected:
@@ -3484,12 +3498,12 @@ Expected:
 
 > **실행 기록 박제 필수:** A-2 결과에 따라 Plan에 *편차 박제* 추가. C-3는 Phase 2B AOP에서 이미 검증된 패턴이라 PASS 예상.
 
-- [ ] **Step 5: 회귀 확인**
+- [x] **Step 5: 회귀 확인**
 
 Run: `./gradlew test`
 Expected: 232~233 PASS / 0 FAIL (229~230 + 3)
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add sfs-tx/src/main/java/com/choisk/sfs/tx/boot/TransactionalBeanPostProcessor.java sfs-samples/src/test/java/com/choisk/sfs/samples/order/{EarlyReferenceIntegrationTest,EnhancedBeanDestroyTest}.java

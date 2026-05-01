@@ -55,10 +55,23 @@ public abstract class AbstractAutowireCapableBeanFactory
 
     protected Object doCreateBean(String beanName, BeanDefinition definition) {
         // factoryMethod 분기 — BD에 factoryMethodName이 있으면 생성자 대신 팩토리 메서드로 인스턴스화
-        // initializeBean(Aware + BPP after)도 적용해야 BeanFactoryAware 콜백 + BPP after 처리됨
+        // Spring 본가와 동일: 인스턴스화 → 3차 캐시 등록 → populateBean → initializeBean 순서 유지
+        // (순환 의존 + SIABPP early reference 훅이 factoryMethod 경로에서도 동작하려면 3차 캐시 등록 필수)
         if (definition.getFactoryMethodName() != null) {
             Object factoryResult = createBeanViaFactoryMethod(beanName, definition);
+
+            // B-3: 3차 캐시에 팩토리 등록 (조기 참조용) — populateBean 이전에 등록해야 순환 의존 시 early reference 반환 가능
+            if (definition.isSingleton()) {
+                final Object rawForEarly = factoryResult;
+                registerSingletonFactory(beanName, () -> getEarlyBeanReference(beanName, rawForEarly));
+            }
+
+            // B-4: @Autowired 필드 주입 — @Bean 메서드 반환 인스턴스에도 적용 (순환 의존 시 필요)
+            populateBean(beanName, definition, factoryResult);
+
+            // B-5: 초기화 (BeanFactoryAware + BPP after)
             Object initialized = initializeBean(beanName, definition, factoryResult);
+
             // initializeBean 실패 시 registerDisposableIfNeeded 미호출 — 초기화 미완 빈은 destroy 대상 아님 (Spring 본가와 동일 정책)
             registerDisposableIfNeeded(beanName, definition, initialized);
             return initialized;

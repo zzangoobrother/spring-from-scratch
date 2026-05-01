@@ -33,6 +33,11 @@ public class ClassPathBeanDefinitionScanner {
                 Class<?> clazz = loadClass(info.className());
                 if (clazz == null) continue;
                 if (clazz.isInterface() || clazz.isAnnotation()) continue;
+                // @Configuration이 달린 nested 클래스는 스캔 제외 — 명시 등록으로만 진입 (Spring 본가 동일 정책)
+                // @Component 등 일반 nested 클래스는 스캔 포함 (test inner class 패턴 허용)
+                if (clazz.getEnclosingClass() != null
+                        && clazz.isAnnotationPresent(
+                                com.choisk.sfs.context.annotation.Configuration.class)) continue;
                 if (!AnnotationUtils.isAnnotated(clazz, Component.class)) continue;
                 BeanDefinition bd = new BeanDefinition(clazz);
                 BeanDefinitionMetadataApplier.apply(bd, clazz);
