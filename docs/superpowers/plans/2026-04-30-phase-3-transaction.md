@@ -2776,7 +2776,7 @@ git commit -m "feat(sfs-samples): Order/Audit 시연 도메인 service/controlle
 
 **TDD 적용:** ✅ 적용 — 시연 박제. 콘솔 출력 + DB 상태 어서션 모두.
 
-- [ ] **Step 1: 실패 테스트 작성 — `TransactionPropagationIntegrationTest` 6건**
+- [x] **Step 1: 실패 테스트 작성 — `TransactionPropagationIntegrationTest` 6건**
 
 생성: `sfs-samples/src/test/java/com/choisk/sfs/samples/order/TransactionPropagationIntegrationTest.java`
 
@@ -2886,7 +2886,7 @@ class TransactionPropagationIntegrationTest {
 }
 ```
 
-- [ ] **Step 2: 실패 테스트 작성 — `TransactionDemoApplicationTest` 2건**
+- [x] **Step 2: 실패 테스트 작성 — `TransactionDemoApplicationTest` 2건**
 
 생성: `sfs-samples/src/test/java/com/choisk/sfs/samples/order/TransactionDemoApplicationTest.java`
 
@@ -2961,7 +2961,7 @@ class TransactionDemoApplicationTest {
 }
 ```
 
-- [ ] **Step 3: 테스트 실행 — FAIL/PASS 확인**
+- [x] **Step 3: 테스트 실행 — FAIL/PASS 확인**
 
 Run: `./gradlew :sfs-samples:test --tests com.choisk.sfs.samples.order.TransactionPropagationIntegrationTest`
 Expected: PASS — 6건 (인프라가 모두 갖춰진 상태)
@@ -2971,12 +2971,12 @@ Expected: PASS — 2건
 
 > 본 task는 Step 1/2가 *시연 박제*라서 RED 단계 없이 바로 GREEN 가능. 인프라는 Task A1~C5에서 모두 완성됨.
 
-- [ ] **Step 4: 회귀 확인**
+- [x] **Step 4: 회귀 확인**
 
 Run: `./gradlew test`
 Expected: 223~224 PASS / 0 FAIL (215~216 + 8)
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-samples/src/test/java/com/choisk/sfs/samples/order/TransactionPropagationIntegrationTest.java sfs-samples/src/test/java/com/choisk/sfs/samples/order/TransactionDemoApplicationTest.java
@@ -2995,6 +2995,12 @@ TransactionDemoApplicationTest 2건:
 회귀: 215~216 → 223~224 PASS. spec § 4.2/4.3 시연 박제 완성.
 "
 ```
+
+> **실행 기록 (2026-05-01):**
+> - **인프라 결함 발생**: `@ComponentScan`이 `MockTransactionIntegrationTest$MockTxAppConfig`를 스캔하여 `tm`이라는 `PlatformTransactionManager` BD를 AppConfig 컨텍스트에 중복 등록 → `beanFactory.getBean(PlatformTransactionManager.class)` 호출 시 `NoUniqueBeanDefinitionException` 발생
+> - **원인**: `ClassPathScanner`가 nested class (`.class` 파일명에 `$` 포함)까지 스캔하고, `MockTxAppConfig`에 `@Configuration`이 붙어 있어 `ConfigurationClassPostProcessor`가 `tm` BD를 등록함
+> - **수정**: `TransactionInterceptor.resolveTransactionManager`에 Spring 본가 fallback 패턴 추가 — type 기반 단일 조회 실패 시 이름 기반 `"transactionManager"` fallback (`sfs-tx/src/main/java/com/choisk/sfs/tx/support/TransactionInterceptor.java`)
+> - **결과**: 6건 + 2건 모두 PASS, 회귀 215 → 223 PASS / 0 FAIL
 
 ---
 

@@ -63,12 +63,18 @@ public class TransactionInterceptor {
         if (!name.isEmpty()) {
             return beanFactory.getBean(name, PlatformTransactionManager.class);
         }
-        // type 기반 fallback (B-2 흡수)
+        // type 기반 조회 시도 (B-2 흡수)
         try {
             return beanFactory.getBean(PlatformTransactionManager.class);
         } catch (Exception e) {
-            throw new TransactionException.NoTransactionManagerException(
-                    "No PlatformTransactionManager bean found");
+            // 복수 TM 등록 환경에서 NoUniqueBeanDefinitionException 발생 시
+            // Spring 본가 기본 규약: "transactionManager" 이름으로 fallback
+            try {
+                return beanFactory.getBean("transactionManager", PlatformTransactionManager.class);
+            } catch (Exception e2) {
+                throw new TransactionException.NoTransactionManagerException(
+                        "No PlatformTransactionManager bean found");
+            }
         }
     }
 }
