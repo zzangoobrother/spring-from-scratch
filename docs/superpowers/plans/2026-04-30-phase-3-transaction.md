@@ -819,7 +819,7 @@ git commit -m "feat(sfs-tx): TransactionSynchronizationManager 인터페이스 +
 
 **TDD 적용:** ✅ 적용 — begin/commit/rollback/suspend/resume 5개 동작이 본질. 콘솔 출력은 학습 박제이지만, 호출 *순서*와 *횟수*가 핵심 어서션.
 
-- [ ] **Step 1: 실패 테스트 작성 — `MockTransactionManagerTest` 4건**
+- [x] **Step 1: 실패 테스트 작성 — `MockTransactionManagerTest` 4건**
 
 생성: `sfs-tx/src/test/java/com/choisk/sfs/tx/support/MockTransactionManagerTest.java`
 
@@ -915,12 +915,12 @@ class MockTransactionManagerTest {
 }
 ```
 
-- [ ] **Step 2: 테스트 실행 — FAIL 확인**
+- [x] **Step 2: 테스트 실행 — FAIL 확인**
 
 Run: `./gradlew :sfs-tx:test --tests com.choisk.sfs.tx.support.MockTransactionManagerTest`
 Expected: FAIL — `MockTransactionManager` 없음
 
-- [ ] **Step 3: `MockTransactionManager` 구현 작성**
+- [x] **Step 3: `MockTransactionManager` 구현 작성**
 
 생성: `sfs-tx/src/main/java/com/choisk/sfs/tx/support/MockTransactionManager.java`
 
@@ -989,17 +989,17 @@ public class MockTransactionManager extends AbstractPlatformTransactionManager {
 }
 ```
 
-- [ ] **Step 4: 테스트 실행 — PASS 확인**
+- [x] **Step 4: 테스트 실행 — PASS 확인**
 
 Run: `./gradlew :sfs-tx:test --tests com.choisk.sfs.tx.support.MockTransactionManagerTest`
 Expected: PASS — 4건
 
-- [ ] **Step 5: 회귀 확인**
+- [x] **Step 5: 회귀 확인**
 
 Run: `./gradlew test`
 Expected: 193 PASS / 0 FAIL (189 + 4)
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add sfs-tx/src/main/java/com/choisk/sfs/tx/support/MockTransactionManager.java sfs-tx/src/test/java/com/choisk/sfs/tx/support/MockTransactionManagerTest.java
