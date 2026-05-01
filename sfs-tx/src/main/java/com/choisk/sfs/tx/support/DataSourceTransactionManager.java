@@ -55,8 +55,7 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
         } catch (SQLException e) {
             throw new TransactionException.CommitFailedException("commit failed", e);
         } finally {
-            tsm.unbindResource(dataSource);
-            closeQuietly(holder.getConnection());
+            releaseConnection(holder);
         }
     }
 
@@ -68,9 +67,14 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
         } catch (SQLException e) {
             throw new TransactionException.RollbackFailedException("rollback failed", e);
         } finally {
-            tsm.unbindResource(dataSource);
-            closeQuietly(holder.getConnection());
+            releaseConnection(holder);
         }
+    }
+
+    /** TSM unbind + Connection close — commit/rollback 양쪽 finally 공통 처리. */
+    private void releaseConnection(ConnectionHolder holder) {
+        tsm.unbindResource(dataSource);
+        closeQuietly(holder.getConnection());
     }
 
     @Override
