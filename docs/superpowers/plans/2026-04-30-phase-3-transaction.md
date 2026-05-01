@@ -2396,7 +2396,7 @@ git commit -m "feat(sfs-tx): JdbcTemplate mini + RowMapper + 단위 테스트 4�
 
 **TDD 적용:** ❌ 제외 — record(데이터 컨테이너) + JdbcTemplate 위 얇은 래퍼. 통합 테스트(Task C6)로 간접 검증.
 
-- [ ] **Step 1: `Order` record 작성**
+- [x] **Step 1: `Order` record 작성**
 
 생성: `sfs-samples/src/main/java/com/choisk/sfs/samples/order/domain/Order.java`
 
@@ -2411,7 +2411,7 @@ public record Order(Long id, String item, int amount) {
 }
 ```
 
-- [ ] **Step 2: `AuditLog` record 작성**
+- [x] **Step 2: `AuditLog` record 작성**
 
 생성: `sfs-samples/src/main/java/com/choisk/sfs/samples/order/domain/AuditLog.java`
 
@@ -2428,7 +2428,7 @@ public record AuditLog(Long id, Instant occurredAt, String message) {
 }
 ```
 
-- [ ] **Step 3: `OrderRepository` 작성**
+- [x] **Step 3: `OrderRepository` 작성**
 
 생성: `sfs-samples/src/main/java/com/choisk/sfs/samples/order/repository/OrderRepository.java`
 
@@ -2462,7 +2462,7 @@ public class OrderRepository {
 }
 ```
 
-- [ ] **Step 4: `AuditRepository` 작성**
+- [x] **Step 4: `AuditRepository` 작성**
 
 생성: `sfs-samples/src/main/java/com/choisk/sfs/samples/order/repository/AuditRepository.java`
 
@@ -2498,7 +2498,7 @@ public class AuditRepository {
 }
 ```
 
-- [ ] **Step 5: 컴파일 + 회귀 확인**
+- [x] **Step 5: 컴파일 + 회귀 확인**
 
 Run: `./gradlew :sfs-samples:compileJava`
 Expected: BUILD SUCCESSFUL
@@ -2506,7 +2506,7 @@ Expected: BUILD SUCCESSFUL
 Run: `./gradlew test`
 Expected: 215~216 PASS / 0 FAIL (변동 없음, 통합 테스트는 Task C6)
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add sfs-samples/src/main/java/com/choisk/sfs/samples/order/domain/ sfs-samples/src/main/java/com/choisk/sfs/samples/order/repository/
