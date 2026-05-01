@@ -3535,7 +3535,7 @@ C-3 (enhanced destroy, EnhancedBeanDestroyTest 1건):
 
 **TDD 적용:** ❌ 제외 — 문서.
 
-- [ ] **Step 1: `sfs-tx/README.md` 신설**
+- [x] **Step 1: `sfs-tx/README.md` 신설**
 
 생성: `sfs-tx/README.md`
 
@@ -3630,7 +3630,7 @@ class OrderService {
 ```
 ```
 
-- [ ] **Step 2: `sfs-samples/README.md` 갱신**
+- [x] **Step 2: `sfs-samples/README.md` 갱신**
 
 수정: `sfs-samples/README.md` — Phase 2B 갱신 사항 섹션 아래에 추가
 
@@ -3652,11 +3652,11 @@ class OrderService {
 - **Phase 3**: TransactionDemoApplication (orders/audit_log DB 어서션, REQUIRES_NEW 정점)
 ```
 
-- [ ] **Step 3: Plan 문서의 DoD 체크박스 갱신**
+- [x] **Step 3: Plan 문서의 DoD 체크박스 갱신**
 
 수정: `docs/superpowers/plans/2026-04-30-phase-3-transaction.md` — § "Definition of Done" 섹션의 모든 항목을 `- [x]`로 갱신.
 
-- [ ] **Step 4: 회귀 + 전체 빌드 확인**
+- [x] **Step 4: 회귀 + 전체 빌드 확인**
 
 Run: `./gradlew build`
 Expected: BUILD SUCCESSFUL
@@ -3664,7 +3664,7 @@ Expected: BUILD SUCCESSFUL
 Run: `./gradlew test`
 Expected: 232~233 PASS / 0 FAIL
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-tx/README.md sfs-samples/README.md docs/superpowers/plans/2026-04-30-phase-3-transaction.md
@@ -3790,32 +3790,32 @@ git commit -m "docs: Plan § 품질 게이트 기록 박제 + DoD 26번 [x] — 
 
 본 spec의 모든 산출물 완성 + 마감 게이트 통과. spec § 9의 26항목.
 
-- [ ] 1. `settings.gradle.kts`에 `sfs-tx` 추가 + `sfs-tx/build.gradle.kts` 신설 — **A1 step 1, 2**
-- [ ] 2. `sfs-samples/build.gradle.kts`에 `implementation(project(":sfs-tx"))` 추가 — **A1 step 3**
-- [ ] 3. `@Transactional`, `Propagation` enum 신설 — **A2 step 1, 2**
-- [ ] 4. `PlatformTransactionManager` / `TransactionStatus` / `TransactionDefinition` 인터페이스/record — **A2 step 3, 4, 5**
-- [ ] 5. `AbstractPlatformTransactionManager` 추상 골격 (propagation 분기 알고리즘) — **A3 step 2**
-- [ ] 6. `MockTransactionManager` + 단위 테스트 4건 — **B1**
-- [ ] 7. `DataSourceTransactionManager` + 단위 테스트 5건 — **C2**
-- [ ] 8. `TransactionSynchronizationManager` 인터페이스 — **A4 step 3**
-- [ ] 9. `ThreadLocalTsm` + 단위 테스트 4건 — **A4**
-- [ ] 10. `ScopedValueTsm` + 단위 테스트 3건 — **D1 step 1~4**
-- [ ] 11. `TsmComparisonTest` 비교 박제 3건 — **D1 step 5, 6**
-- [ ] 12. `TransactionInterceptor` + 단위 테스트 6건 (B-2 흡수) — **B2**
+- [x] 1. `settings.gradle.kts`에 `sfs-tx` 추가 + `sfs-tx/build.gradle.kts` 신설 — **A1 step 1, 2**
+- [x] 2. `sfs-samples/build.gradle.kts`에 `implementation(project(":sfs-tx"))` 추가 — **A1 step 3**
+- [x] 3. `@Transactional`, `Propagation` enum 신설 — **A2 step 1, 2**
+- [x] 4. `PlatformTransactionManager` / `TransactionStatus` / `TransactionDefinition` 인터페이스/record — **A2 step 3, 4, 5**
+- [x] 5. `AbstractPlatformTransactionManager` 추상 골격 (propagation 분기 알고리즘) — **A3 step 2**
+- [x] 6. `MockTransactionManager` + 단위 테스트 4건 — **B1**
+- [x] 7. `DataSourceTransactionManager` + 단위 테스트 5건 — **C2**
+- [x] 8. `TransactionSynchronizationManager` 인터페이스 — **A4 step 3**
+- [x] 9. `ThreadLocalTsm` + 단위 테스트 4건 — **A4**
+- [x] 10. `ScopedValueTsm` + 단위 테스트 3건 — **D1 step 1~4**
+- [x] 11. `TsmComparisonTest` 비교 박제 3건 — **D1 step 5, 6**
+- [x] 12. `TransactionInterceptor` + 단위 테스트 6건 (B-2 흡수) — **B2**
 - [x] 13. `TransactionalBeanPostProcessor` + 단위 테스트 4건 (A-1 흡수, A-3 후속 phase 이월) — **B3**
-- [ ] 14. `JdbcTemplate` mini + 단위 테스트 4건 — **C3**
-- [ ] 15. `Order` / `AuditLog` 도메인 + JDBC Repository 2종 — **C4**
-- [ ] 16. `OrderService` (REQUIRED) + `AuditService` (REQUIRES_NEW) + Controller — **C5**
-- [ ] 17. `AppConfig`에 `DataSource` / `PlatformTransactionManager` / `TransactionalBeanPostProcessor` `@Bean` 추가 — **C5 step 5**
-- [ ] 18. `schema.sql` + 테스트 셋업 hook — **C1 step 4**
-- [ ] 19. `TransactionPropagationIntegrationTest` 6건 — **C6 step 1**
-- [ ] 20. `EarlyReferenceIntegrationTest` 2건 (A-2 흡수) — **D2 step 2**
-- [ ] 21. `EnhancedBeanDestroyTest` 1건 (C-3 흡수) — **D2 step 3**
-- [ ] 22. `TransactionDemoApplicationTest` 2건 (§ 4.2/4.3 시연 박제) — **C6 step 2**
-- [ ] 23. `sfs-tx/README.md` 신설 + `sfs-samples/README.md` Phase 3 갱신 — **E1 step 1, 2**
-- [ ] 24. `./gradlew :sfs-tx:test :sfs-samples:test` 모두 PASS — **E1 step 4**
-- [ ] 25. `./gradlew build` 전체 PASS + 누적 ~230~235 PASS / 0 FAIL — **E1 step 4**
-- [ ] 26. 마감 게이트 3단계 (다관점 리뷰 + 리팩토링 + simplify 패스) 실행 후 기록 — **E2** (Plan 외 마감 의식)
+- [x] 14. `JdbcTemplate` mini + 단위 테스트 4건 — **C3**
+- [x] 15. `Order` / `AuditLog` 도메인 + JDBC Repository 2종 — **C4**
+- [x] 16. `OrderService` (REQUIRED) + `AuditService` (REQUIRES_NEW) + Controller — **C5**
+- [x] 17. `AppConfig`에 `DataSource` / `PlatformTransactionManager` / `TransactionalBeanPostProcessor` `@Bean` 추가 — **C5 step 5**
+- [x] 18. `schema.sql` + 테스트 셋업 hook — **C1 step 4**
+- [x] 19. `TransactionPropagationIntegrationTest` 6건 — **C6 step 1**
+- [x] 20. `EarlyReferenceIntegrationTest` 2건 (A-2 흡수) — **D2 step 2**
+- [x] 21. `EnhancedBeanDestroyTest` 1건 (C-3 흡수) — **D2 step 3**
+- [x] 22. `TransactionDemoApplicationTest` 2건 (§ 4.2/4.3 시연 박제) — **C6 step 2**
+- [x] 23. `sfs-tx/README.md` 신설 + `sfs-samples/README.md` Phase 3 갱신 — **E1 step 1, 2**
+- [x] 24. `./gradlew :sfs-tx:test :sfs-samples:test` 모두 PASS — **E1 step 4**
+- [x] 25. `./gradlew build` 전체 PASS + 누적 ~230~235 PASS / 0 FAIL — **E1 step 4**
+- [x] 26. 마감 게이트 3단계 (다관점 리뷰 + 리팩토링 + simplify 패스) 실행 후 기록 — **E2** (Plan 외 마감 의식)
 
 ---
 
