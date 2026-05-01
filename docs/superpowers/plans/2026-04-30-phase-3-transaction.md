@@ -460,7 +460,7 @@ isolation/rollbackFor는 시그니처만 (spec § 7 한계).
 
 **TDD 적용:** ❌ 제외 — 추상 골격 (CLAUDE.md "추상 골격 클래스" 예외). 서브클래스 없이 인스턴스화 불가. Task B1 (`MockTransactionManager`) 단위 테스트 + Task C2 (`DataSourceTransactionManager`) 단위 테스트로 간접 검증.
 
-- [ ] **Step 1: `DefaultTransactionStatus` 구현 작성**
+- [x] **Step 1: `DefaultTransactionStatus` 구현 작성**
 
 생성: `sfs-tx/src/main/java/com/choisk/sfs/tx/support/DefaultTransactionStatus.java`
 
@@ -501,7 +501,7 @@ public final class DefaultTransactionStatus implements TransactionStatus {
 }
 ```
 
-- [ ] **Step 2: `AbstractPlatformTransactionManager` 추상 골격 작성**
+- [x] **Step 2: `AbstractPlatformTransactionManager` 추상 골격 작성**
 
 생성: `sfs-tx/src/main/java/com/choisk/sfs/tx/support/AbstractPlatformTransactionManager.java`
 
@@ -607,7 +607,7 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 }
 ```
 
-- [ ] **Step 3: 컴파일 + 회귀 확인**
+- [x] **Step 3: 컴파일 + 회귀 확인**
 
 Run: `./gradlew :sfs-tx:compileJava`
 Expected: BUILD SUCCESSFUL
@@ -615,7 +615,7 @@ Expected: BUILD SUCCESSFUL
 Run: `./gradlew test`
 Expected: 185 PASS / 0 FAIL
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add sfs-tx/src/main/java/com/choisk/sfs/tx/support/
