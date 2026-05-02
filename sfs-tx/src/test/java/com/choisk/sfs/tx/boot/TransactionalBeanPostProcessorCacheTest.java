@@ -60,4 +60,25 @@ class TransactionalBeanPostProcessorCacheTest {
         assertThat(after).isNotSameAs(original);
         assertThat(after.getClass().getSuperclass()).isEqualTo(TxTarget.class);
     }
+
+    /**
+     * 시나리오 (c): {@code @Transactional} 메서드가 *없는* 빈은 {@code getEarlyBeanReference}에서
+     * 캐시 등록 자체 안 됨 → {@code postProcessAfterInitialization}에서도 enhance 스킵 → 원본 반환.
+     *
+     * <p>핵심 검증: `hasTransactionalMethod` 가드가 *put 전*에 있어 NoTx 빈이 캐시에 잘못 등록되지 않음.
+     * (AspectBPP A finding fix와 동일 패턴 — 가드 순서가 정상 enhance 경로를 보호)
+     */
+    @Test
+    void noCacheEntryForNonTransactionalBean() {
+        var bpp = new TransactionalBeanPostProcessor();
+        bpp.setBeanFactory(new DefaultListableBeanFactory());
+
+        NoTxTarget original = new NoTxTarget();
+        Object early = bpp.getEarlyBeanReference(original, "noTx");
+        Object after = bpp.postProcessAfterInitialization(original, "noTx");
+
+        // hasTransactionalMethod=false → 양쪽 진입점 모두 원본 그대로 (enhance 자체 발생 안 함)
+        assertThat(early).isSameAs(original);
+        assertThat(after).isSameAs(original);
+    }
 }
