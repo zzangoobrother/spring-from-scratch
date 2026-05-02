@@ -95,11 +95,29 @@ public class AspectEnhancingBeanPostProcessor
     }
 
     /**
-     * 순환 의존 시 호출 — 캐시에 원본 등록 후 enhance 시도 (또는 원본 반환).
+     * 순환 의존 시 호출 — *enhance 대상*에만 캐시 등록 후 enhance.
      * spec § 3.3.1 — 본 phase에서 SIABPP 승격 + 캐시 도입.
+     *
+     * <p>가드 순서 (TxBPP `getEarlyBeanReference`와 정합 — A finding fix):
+     * <ol>
+     *   <li>sharedInterceptor 미초기화 → IllegalStateException (postProcessAfterInitialization과 동일 가드)</li>
+     *   <li>BPP 자기 격리 → 원본 반환 (캐시 미등록)</li>
+     *   <li>@Aspect 빈 → 원본 반환 (캐시 미등록)</li>
+     *   <li>매칭 advice 없음 → 원본 반환 (캐시 미등록)</li>
+     *   <li>이후에만 캐시 put + enhance — postProcessAfterInitialization의 cache hit 분기가 정상 enhance 경로를 잘못 스킵하는 결함 차단</li>
+     * </ol>
      */
     @Override
     public Object getEarlyBeanReference(Object bean, String beanName) {
+        if (sharedInterceptor == null) {
+            throw new IllegalStateException(
+                    "AspectEnhancingBeanPostProcessor가 BeanFactory 주입 전에 사용됨 — setBeanFactory()가 먼저 호출되어야 함"
+            );
+        }
+        if (bean instanceof BeanPostProcessor) return bean;
+        if (bean.getClass().isAnnotationPresent(Aspect.class)) return bean;
+        if (!registry.findAnyApplicable(bean.getClass())) return bean;
+
         earlyProxyReferences.put(beanName, bean);
         return enhanceIfNeeded(bean);
     }
@@ -111,8 +129,9 @@ public class AspectEnhancingBeanPostProcessor
                     "AspectEnhancingBeanPostProcessor가 BeanFactory 주입 전에 사용됨 — setBeanFactory()가 먼저 호출되어야 함"
             );
         }
-        // 캐시 hit: getEarlyBeanReference에서 이미 enhance 처리됨 — 원본 그대로 반환
-        // (early가 2차 캐시에 있고 1차로 승격되며, 본 메서드 반환값은 무시됨)
+        // 캐시 hit: getEarlyBeanReference에서 이미 enhance 처리됨 — 원본 그대로 반환.
+        // remove(key)는 조회+삭제 atomic → 메모리 누수 방지 + ConcurrentHashMap 동시성 안전.
+        // (early가 3-level 캐시 2차에 있고 1차로 승격되며, 본 메서드 반환값은 컨테이너가 무시함 — TxBPP와 동일 패턴)
         if (earlyProxyReferences.remove(beanName) != null) {
             return bean;
         }
