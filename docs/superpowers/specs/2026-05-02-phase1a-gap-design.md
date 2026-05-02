@@ -17,15 +17,22 @@
 
 > **"각 enhance BPP에 `earlyProxyReferences` 캐시를 도입해 *순환 의존 + enhance* 시나리오에서 단일 인스턴스를 *원천 보장*하고, 인프라 계층의 우회 코드(`copyFieldsToEarlyReference`)를 제거. G1·G2 회귀 갭은 함께 메워 Phase 4 (JPA 핵심) 진입 토대 정리."**
 
-### 0.2 학습 정점
+### 0.2 학습 정점 (D1 BLOCKED로 재정의됨 — 2026-05-02)
 
-> *"순환 의존 + BPP enhance 시나리오에서 단일 인스턴스 보장의 *책임 위치*는 어디인가? — 인프라가 아니라 BPP 자신이다."*
+> *"순환 의존 + BPP enhance 시나리오에서 단일 인스턴스 보장의 책임 위치는 *프록시 패턴*에 따라 다르다.
+>  Spring 본가는 *CGLIB wrap-around proxy*(원본에 필드 주입 → 그 원본을 프록시로 위임 wrap)로 `early == created` 보장 → BPP 자신이 책임.
+>  우리 *byte-buddy 서브클래싱 + 필드 복사* 패턴은 `early ≠ created` 항상 성립 → **책임 분담**: BPP가 *재enhance 방지*(CPU 절약 + 의도 명확화), 인프라(DSBR)가 *필드 동기화* 담당."*
 
-**박제 대비**:
+**박제 대비 (D1 시도 + BLOCKED로 발견)**:
 
-| 이전 | 이후 |
+| 본 phase 가설 (D1 시도 전) | 실제 결과 (D1 BLOCKED, 2026-05-02) |
 |---|---|
-| 인프라(`DefaultSingletonBeanRegistry`)가 *증상 보정* (필드 reflection 복사) → **계층 오염** | 각 BPP가 *자신의 enhance 추적 책임* → **단일 인스턴스 원천 보장** |
+| 인프라(`DefaultSingletonBeanRegistry`)가 *증상 보정* (필드 reflection 복사) → **계층 오염** → BPP가 *원천* 보장하면 인프라 우회 코드 제거 가능 | byte-buddy 서브클래싱 패턴에서 `early ≠ created` 항상 성립 (early=프록시 인스턴스, created=원본 인스턴스) → `@Autowired` 필드 주입은 created에만 적용 → BPP 캐시는 *재enhance 방지*만, 인프라의 *필드 동기화는 필수* → **책임 분담 패턴** |
+
+**D1 시도가 박제한 학습** (Phase 4 진입 시 핵심 자산):
+- 본 phase의 spec § 3.3.3 가설(*"DSBR 단순화 가능"*)이 *byte-buddy 서브클래싱 + 필드 복사* 패턴에서 성립 안 함을 *통합 회귀 fail*(`EarlyReferenceIntegrationTest` NPE)로 발견
+- Spring 본가 *CGLIB wrap-around proxy* 패턴과 우리 *서브클래스 + 필드 복사* 패턴의 *근본 차이* 박제
+- *"학습 정점이 가설로 시작 → 시도 → BLOCKED → 박제 재정의"* 자체가 *spec 작성 + 시도가 학습 콘텐츠*임을 시연 (Phase 4의 영속성 컨텍스트 + 프록시 작업에서 동일 함정 회피 자산)
 
 ### 0.3 배경 — Phase 3에서 노출된 Phase 1A 결함
 
@@ -35,7 +42,7 @@ Phase 3 (sfs-tx) 구현 중 Phase 1A 핵심 인프라(`sfs-beans`)의 *테스트
 |---|---|---|---|
 | **G1** | `DefaultListableBeanFactory.resolveBeanNameByType`가 `registerSingleton` 직접 등록 빈을 type lookup 시 못 찾음 | 기능 보강 (커밋 `6a8493b`) — `resolveBeansOfType`이 BeanDefinition + 직접 등록 합산 | 회귀 테스트 신설 (3건) |
 | **G2** | `AbstractAutowireCapableBeanFactory.doCreateBean.factoryMethod` 분기가 *3차 캐시 등록 + populateBean 누락* | 기능 보강 (커밋 `a74a1f6`) — 풀 사이클 보강 + `copyFieldsToEarlyReference` 추가 | 회귀 테스트 신설 (3건) |
-| **G3** | `DefaultSingletonBeanRegistry.copyFieldsToEarlyReference`가 *symptomatic* — BPP가 두 번 enhance하는 근본 원인 미해결 | (D2 추가 — *디자인 우려* 박제) | **근본 해결**: BPP `earlyProxyReferences` 캐시 도입 + `copyFieldsToEarlyReference` 제거 |
+| **G3** | `DefaultSingletonBeanRegistry.copyFieldsToEarlyReference`가 *symptomatic* — BPP가 두 번 enhance하는 근본 원인 미해결 | (D2 추가 — *디자인 우려* 박제) | **부분 해결**: BPP `earlyProxyReferences` 캐시 도입 (재enhance 방지) — `copyFieldsToEarlyReference` 제거는 *D1 BLOCKED*로 보류 (§ 0.2 학습 정점 재정의 박제) |
 
 ---
 
@@ -165,33 +172,50 @@ postProcessAfterInitialization(bean, beanName):  ← 분기 추가
   return enhance(bean);   // 기존 경로
 ```
 
-#### 3.3.3 `DefaultSingletonBeanRegistry` 단순화
+#### 3.3.3 `DefaultSingletonBeanRegistry` 단순화 — **D1 BLOCKED 박제 (2026-05-02)**
+
+> **본 섹션의 가설은 D1 시도로 *반증*됨.** byte-buddy 서브클래싱 패턴에서 `early ≠ created`가 *항상 성립*해 `copyFieldsToEarlyReference`가 *필수*. § 0.2 학습 정점 재정의 참조.
+
+**원래 가설 (D1 시도 전)**:
 
 ```
 getOrCreateSingleton(name, factory):
-  ... (lock 진입, beforeSingletonCreation, factory.getObject) ...
-
-  // ───────── 변경 전 (DSBR.java:151~169) ─────────
-  Object early = earlySingletonObjects.get(name);
-  Object toStore;
-  if (early != null) {
-      if (early != created) {
-          copyFieldsToEarlyReference(early, created);   // ← 제거
-      }
-      toStore = early;
-  } else {
-      toStore = created;
-  }
-
-  // ───────── 변경 후 ─────────
+  // ───────── 변경 후 (가설) ─────────
   Object early = earlySingletonObjects.get(name);
   Object toStore = (early != null) ? early : created;
-  // ↑ early ≠ created 분기 자체가 사라짐 (BPP가 원천 보장)
+  // ↑ early ≠ created 분기 자체가 사라짐 (BPP가 원천 보장 — 가설)
 
   ... (1차 캐시 저장, 2·3차 정리) ...
 ```
 
-`copyFieldsToEarlyReference` private 메서드 + `import java.lang.reflect.Modifier`/`Field` 둘 다 *완전 제거*.
+**D1 시도 결과 (2026-05-02)**:
+
+| 단계 | 결과 |
+|---|---|
+| `copyFieldsToEarlyReference` 제거 + 분기 단순화 시도 | `EarlyReferenceIntegrationTest` 2건 FAIL (NullPointerException) |
+| 근본 원인 | byte-buddy 서브클래스 프록시(`early`)와 원본 인스턴스(`created`)는 *항상 다른 인스턴스* — `@Autowired` 필드 주입은 `created`에만 적용, `early`의 대응 필드는 null 유지 |
+| 해결 가능성 | byte-buddy를 *wrap-around delegation* 패턴으로 전환 시 가능 (별도 phase) — 본 phase 범위 초과 |
+| 결정 | `copyFieldsToEarlyReference` *유지*, `getOrCreateSingleton` 분기 *유지*. BPP 캐시(B1, C1)의 *재enhance 방지*만으로 부분 진보 박제 |
+
+**유지되는 현행 코드** (변경 없음 — D1 BLOCKED 후 그대로):
+
+```java
+Object early = earlySingletonObjects.get(name);
+Object toStore;
+if (early != null) {
+    if (early != created) {
+        copyFieldsToEarlyReference(early, created);   // ← 유지 (필드 동기화 필수)
+    }
+    toStore = early;
+} else {
+    toStore = created;
+}
+```
+
+**부분 진보** (B1, C1 캐시 도입 효과):
+- enhance 호출 *2회 → 1회*로 감소 (CPU 절약)
+- *의도 명확화*: BPP가 자신의 enhance 추적 책임 (early reference에 대해서는 *재enhance하지 않음*) 코드로 박제
+- DSBR의 `copyFieldsToEarlyReference`는 *symptomatic 봉합*이 아닌 *byte-buddy 패턴의 필수 인프라 책임*으로 재정의됨
 
 #### 3.3.4 신설 테스트 (4건)
 
@@ -229,7 +253,9 @@ getOrCreateSingleton(name, factory):
 문제: A_enhanced#2는 GC 대상이지만 *생성 비용 + 필드 복사 비용* 발생, 인프라 계층 오염
 ```
 
-### 4.2 변경 후 (BPP earlyProxyReferences 캐시)
+### 4.2 변경 후 (BPP earlyProxyReferences 캐시 + DSBR 필드 동기화 *유지*)
+
+> **D1 BLOCKED 후 정정 (2026-05-02)**: 원래 가설은 *DSBR 우회 코드 제거*였으나, byte-buddy 서브클래싱 패턴에서 `early ≠ created`가 항상 성립해 *필드 동기화가 필수*. BPP 캐시는 *재enhance 방지*만 담당.
 
 ```
 순환 의존: A → B → A,  A는 @Transactional
@@ -244,13 +270,17 @@ getOrCreateSingleton(name, factory):
        → enhance(A_원본) → A_enhanced 생성 → 2차 캐시 → B에 주입
 6.   getBean("B") 종료 → B 완성
 7. populateBean(A) 종료 → initializeBean(A_원본) → BPP.postProcessAfterInitialization
-   → BPP: earlyProxyReferences.remove("A") != null → ✅ enhance 스킵
-   → A_원본 반환 (created = A_원본)
-8. getOrCreateSingleton(A): early(A_enhanced) 존재 → 그대로 1차 캐시 승격
-   (early != created지만 분기 자체가 단순화 — early 우선)
+   → BPP: earlyProxyReferences.remove("A") != null → ✅ enhance 스킵 (재enhance 방지)
+   → A_원본 반환 (created = A_원본, *필드 주입 적용된 상태*)
+8. getOrCreateSingleton(A): early(A_enhanced) ≠ created(A_원본)
+   → copyFieldsToEarlyReference(A_enhanced, A_원본)  ← 🔑 *필수* — early 인스턴스에 created 필드 동기화
+   → 1차 캐시에 A_enhanced 저장
 
-결과: B에 주입된 인스턴스 = 1차 캐시 인스턴스 = A_enhanced (단일)
-효과: enhance 1회만 발생, 인프라 우회 코드 제거, 책임 위치 정합
+결과: B에 주입된 인스턴스 = 1차 캐시 인스턴스 = A_enhanced (단일, 필드 주입됨)
+효과:
+  - enhance 호출 1회로 감소 (B1+C1 캐시) — CPU 절약 + 의도 명확화 ✅
+  - 인프라 우회 코드 제거 — *불가능* (byte-buddy 서브클래싱 패턴의 필수 책임) ❌
+  - 책임 분담: BPP=재enhance 방지, DSBR=필드 동기화 (§ 0.2 학습 정점 재정의 참조)
 ```
 
 ---
@@ -315,7 +345,9 @@ getOrCreateSingleton(name, factory):
 - **`@Aspect` + `@Transactional` *동시* enhance 시나리오**: 두 BPP 모두 `earlyProxyReferences` 보유하지만 *상호작용*은 별도 phase 후보. 본 phase는 *각 BPP 단독* enhance 박제만
 - **prototype 빈의 `earlyProxyReferences` 동작**: prototype은 매번 호출되므로 캐시 의미 없음 — singleton scope만 캐시 (조건 분기 추가). 본 phase 박제 비목표
 - **`AspectEnhancingBeanPostProcessor` SIABPP 승격의 의미 박제**: 단순 인터페이스 추가만 (§ 3.3.1 사실 박제). *왜 SIABPP가 enhance BPP의 표준 시그니처인가* 깊이 박제는 별도 phase
-- **`copyFieldsToEarlyReference` 제거의 *전제 조건* 박제**: 본 phase는 BPP 캐시로 단일 인스턴스 *원천 보장*되면 제거 가능하다는 *전제* 위에서 수행. 만약 미래에 *다른 우회 경로*(예: BPP 외부에서 enhance)가 등장하면 재검토 필요
+- **`copyFieldsToEarlyReference` 제거의 *전제 조건* 박제 — 본 phase 가정 오류 발견 (D1 BLOCKED, 2026-05-02)**: 본 phase는 BPP 캐시로 단일 인스턴스 *원천 보장*되면 제거 가능하다는 *전제* 위에서 시작했으나, *byte-buddy 서브클래싱 + 필드 복사* 패턴에서 `early ≠ created`가 항상 성립해 *전제가 깨짐*. § 3.3.3 D1 BLOCKED 박제 + § 0.2 학습 정점 재정의 참조.
+
+- **byte-buddy 서브클래싱 vs CGLIB wrap-around proxy 패턴 차이 박제**: Spring 본가 `AbstractAutoProxyCreator`는 *원본에 필드 주입 → 그 원본을 프록시로 위임 wrap*하는 방식이라 `early == created` 가능. 우리는 *서브클래스 + 필드 복사* 방식이라 `early ≠ created` 항상 성립 → 인프라(DSBR)가 *필드 동기화 책임* 보유. 이 차이의 *깊은 박제*(예: byte-buddy를 wrap-around delegation으로 전환)는 *별도 phase* — 본 phase는 *발견 + 가설 재정의*에 그침.
 
 ---
 
@@ -328,11 +360,11 @@ getOrCreateSingleton(name, factory):
 - [ ] 3. `AspectEnhancingBeanPostProcessorCacheTest` 2건 추가 (cache hit 시 enhance 스킵 / cache miss 시 enhance 진행)
 - [ ] 4. `TransactionalBeanPostProcessor`에 동일 패턴 추가 (`earlyProxyReferences` 필드 + `getEarlyBeanReference`/`postProcessAfterInitialization` 캐시 분기)
 - [ ] 5. `TransactionalBeanPostProcessorCacheTest` 2건 추가
-- [ ] 6. `DefaultSingletonBeanRegistry.copyFieldsToEarlyReference` 제거 + `import java.lang.reflect.Modifier`/`Field` 정리
-- [ ] 7. `DefaultSingletonBeanRegistry.getOrCreateSingleton` 분기 단순화 (early ≠ created 분기 제거)
+- [ ] ~~6. `DefaultSingletonBeanRegistry.copyFieldsToEarlyReference` 제거 + `import java.lang.reflect.Modifier`/`Field` 정리~~ → **D1 BLOCKED 박제 (2026-05-02)** — § 0.2 학습 정점 재정의 + § 3.3.3 D1 시도 결과 박제 + § 7 한계 추가 commit으로 대체
+- [ ] ~~7. `DefaultSingletonBeanRegistry.getOrCreateSingleton` 분기 단순화 (early ≠ created 분기 제거)~~ → **D1 BLOCKED 박제** — `copyFieldsToEarlyReference`가 byte-buddy 서브클래싱 패턴에서 *필수 인프라 책임*임이 통합 회귀 fail로 확정. 분기 *유지*
 - [ ] 8. `DefaultListableBeanFactoryTypeLookupTest` 3건 추가 (G1 회귀 갭)
 - [ ] 9. `FactoryMethodEarlyReferenceTest` 3건 추가 (G2 회귀 갭)
-- [ ] 10. `./gradlew :sfs-beans:test :sfs-aop:test :sfs-tx:test :sfs-samples:test` 전부 PASS — 회귀 232 → **242 PASS / 0 FAIL**
+- [ ] 10. `./gradlew :sfs-beans:test :sfs-aop:test :sfs-tx:test :sfs-samples:test` 전부 PASS — 회귀 232 → **242 PASS / 0 FAIL** (B1+C1의 +4 + A1+A2의 +6 = +10, D1 0건)
 - [ ] 11. `./gradlew build` 전체 PASS
 - [ ] 12. 마감 게이트 3단계 (다관점 리뷰 + 리팩토링 + simplify 패스) 실행 후 기록 — Phase 3 패턴 회수
 
