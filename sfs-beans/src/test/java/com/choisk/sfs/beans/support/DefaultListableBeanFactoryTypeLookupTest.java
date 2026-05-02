@@ -41,7 +41,22 @@ class DefaultListableBeanFactoryTypeLookupTest {
     }
 
     /**
-     * 시나리오 2: `BeanDefinition`으로 등록된 빈과 `registerSingleton` 직접 등록 빈이
+     * 시나리오 2a: `BeanDefinition`으로 등록된 빈과 `registerSingleton` 직접 등록 빈이
+     * *공존*하는 상태에서, BeanDefinition 기반 빈이 type lookup으로 정상 매칭됨.
+     */
+    @Test
+    void resolvesByTypeForBeanDefinitionWhenDirectSingletonCoexists() {
+        var bf = new DefaultListableBeanFactory();
+        bf.registerBeanDefinition("hello", new BeanDefinition(Hello.class));
+        bf.registerSingleton("directList", new ArrayList<>());
+
+        // BeanDefinition 기반 빈 정상 lookup
+        Hello hello = bf.getBean(Hello.class);
+        assertThat(hello).isInstanceOf(Hello.class);
+    }
+
+    /**
+     * 시나리오 2b: `BeanDefinition`으로 등록된 빈과 `registerSingleton` 직접 등록 빈이
      * *공존*하는 상태에서, *직접 등록 빈*의 타입(여기서는 `ArrayList`)이
      * type lookup으로 매칭됨 — `getBeansOfType`(BeanDefinition만)으로는 못 찾음을 박제.
      */
@@ -52,13 +67,9 @@ class DefaultListableBeanFactoryTypeLookupTest {
         ArrayList<String> directList = new ArrayList<>();
         bf.registerSingleton("directList", directList);
 
-        // BeanDefinition 기반 빈도 정상 lookup
-        Hello hello = bf.getBean(Hello.class);
-        assertThat(hello).isInstanceOf(Hello.class);
-
         // 직접 등록 빈도 type lookup 가능 — G1 결함 보강의 본질
-        @SuppressWarnings("rawtypes")
-        ArrayList resolved = bf.getBean(ArrayList.class);
+        // getBean(ArrayList.class)는 raw ArrayList를 반환하므로 wildcard로 받아 unchecked 경고 제거
+        ArrayList<?> resolved = (ArrayList<?>) bf.getBean(ArrayList.class);
         assertThat(resolved).isSameAs(directList);
     }
 

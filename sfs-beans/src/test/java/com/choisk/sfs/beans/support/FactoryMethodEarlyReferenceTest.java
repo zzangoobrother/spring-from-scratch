@@ -78,6 +78,12 @@ class FactoryMethodEarlyReferenceTest {
      *
      * <p>이 시나리오가 PASS하려면 factoryMethod 분기가 `registerSingletonFactory`를 호출해야 함
      * (Phase 3 커밋 `a74a1f6`의 본질).
+     *
+     * <p>검증 경로 박제: {@code service}와 {@code helper} 모두
+     * {@code setFactoryBeanName("factory")} + {@code setFactoryMethodName(...)}이 설정되어
+     * 생성자 분기가 아닌 factoryMethod 분기를 탄다.
+     * {@code factory} 빈은 생성자 분기를 타지만 {@code service}/{@code helper}의
+     * 순환 해소 경로(3차 캐시)에 관여하지 않는다.
      */
     @Test
     void factoryMethodBeansSupportCircularDependency() {
