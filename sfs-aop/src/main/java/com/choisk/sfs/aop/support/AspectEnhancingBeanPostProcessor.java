@@ -57,6 +57,11 @@ public class AspectEnhancingBeanPostProcessor
      * 순환 의존 + enhance 시 단일 인스턴스 보장. {@code getEarlyBeanReference}로 enhance한 빈은
      * {@code postProcessAfterInitialization}에서 *재enhance하지 않음* — 원본 그대로 반환.
      * key: beanName (Spring 본가 정합 — {@code AbstractAutoProxyCreator.earlyProxyReferences}).
+     *
+     * <p><strong>누수 조건</strong>: {@code getEarlyBeanReference} 호출 후 {@code postProcessAfterInitialization}이
+     * *미진입*하면 엔트리가 잔류한다. {@code doCreateBean} 풀 사이클에서는 항상 짝지어 호출되므로 정상 흐름에서는
+     * 발생하지 않는다. 비정상 종료(빈 생성 중 예외) 시 BPP 객체 수명 동안 누수 가능 —
+     * 학습 phase 범위(단일 ApplicationContext)에서는 무시 (spec § 3.3 누수 정책 참조).
      */
     private final Map<String, Object> earlyProxyReferences = new ConcurrentHashMap<>();
 
