@@ -65,8 +65,10 @@ class TransactionalBeanPostProcessorCacheTest {
      * 시나리오 (c): {@code @Transactional} 메서드가 *없는* 빈은 {@code getEarlyBeanReference}에서
      * 캐시 등록 자체 안 됨 → {@code postProcessAfterInitialization}에서도 enhance 스킵 → 원본 반환.
      *
-     * <p>핵심 검증: `hasTransactionalMethod` 가드가 *put 전*에 있어 NoTx 빈이 캐시에 잘못 등록되지 않음.
-     * (AspectBPP A finding fix와 동일 패턴 — 가드 순서가 정상 enhance 경로를 보호)
+     * <p>핵심 검증: {@code hasTransactionalMethod} 가드가 *캐시 put 전*에 위치 — NoTx 빈이
+     * {@code earlyProxyReferences}에 잘못 등록되지 않음. 잘못 등록되면
+     * {@code postProcessAfterInitialization}에서 cache-hit 분기가 실제 enhance를 필요로 하는 빈을
+     * 스킵하는 결함으로 이어질 수 있음. *가드 순서가 올바른 캐시 분리를 보장한다*는 불변식 박제.
      */
     @Test
     void noCacheEntryForNonTransactionalBean() {

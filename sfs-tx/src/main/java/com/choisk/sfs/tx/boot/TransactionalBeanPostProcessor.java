@@ -49,7 +49,9 @@ public class TransactionalBeanPostProcessor implements SmartInstantiationAwareBe
     /**
      * 순환 의존 + @Transactional enhance 시 단일 인스턴스 보장. {@code getEarlyBeanReference}로
      * enhance한 빈은 {@code postProcessAfterInitialization}에서 *재enhance하지 않음*.
-     * spec § 3.3.2.
+     *
+     * <p>key: beanName — Spring 본가 {@code AbstractAutoProxyCreator.earlyProxyReferences}와 정합.
+     * spec § 3.3.2. {@code AspectEnhancingBeanPostProcessor.earlyProxyReferences}와 동일 패턴.
      */
     private final Map<String, Object> earlyProxyReferences = new ConcurrentHashMap<>();
 
@@ -118,6 +120,12 @@ public class TransactionalBeanPostProcessor implements SmartInstantiationAwareBe
         }
     }
 
+    /**
+     * byte-buddy 서브클래스 생성 + {@code TxMethodInterceptor} 적용 + 필드 복사.
+     *
+     * <p>{@code getEarlyBeanReference}와 {@code postProcessAfterInitialization} 두 진입점이 공유.
+     * final 메서드는 {@link ElementMatchers#isFinal()} 필터로 enhance 대상에서 제외 (A-1 박제).
+     */
     private Object enhance(Object bean) throws Exception {
         Class<?> originalClass = bean.getClass();
 
