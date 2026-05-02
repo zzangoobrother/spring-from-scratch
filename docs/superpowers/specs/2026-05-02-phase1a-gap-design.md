@@ -19,20 +19,34 @@
 
 ### 0.2 학습 정점 (D1 BLOCKED로 재정의됨 — 2026-05-02)
 
-> *"순환 의존 + BPP enhance 시나리오에서 단일 인스턴스 보장의 책임 위치는 *프록시 패턴*에 따라 다르다.
->  Spring 본가는 *CGLIB wrap-around proxy*(원본에 필드 주입 → 그 원본을 프록시로 위임 wrap)로 `early == created` 보장 → BPP 자신이 책임.
->  우리 *byte-buddy 서브클래싱 + 필드 복사* 패턴은 `early ≠ created` 항상 성립 → **책임 분담**: BPP가 *재enhance 방지*(CPU 절약 + 의도 명확화), 인프라(DSBR)가 *필드 동기화* 담당."*
+> *"순환 의존 + BPP enhance 시나리오에서 단일 인스턴스 보장의 책임 위치는 *BPP의 enhance 반환 정책*에 따라 다르다.
+>  Spring 본가 `AbstractAutoProxyCreator`는 (CGLIB 서브클래싱이지만) `postProcessAfterInitialization`이 *캐시된 enhanced를 반환* → early가 1차로 승격되며 created도 enhanced → `early == created`(둘 다 같은 enhanced 인스턴스) → BPP 자신이 책임.
+>  우리 *byte-buddy 서브클래싱 + 필드 복사* 패턴은 `postProcessAfterInitialization`이 *원본을 반환*해 `early(enhanced) ≠ created(원본)` 항상 성립 → @Autowired 필드 주입은 created에만 적용 → **책임 분담**: BPP가 *재enhance 방지*(CPU 절약 + 의도 명확화), 인프라(DSBR)가 *필드 동기화* 담당."*
 
-**박제 대비 (D1 시도 + BLOCKED로 발견)**:
+**박제 대비 (D1 시도 + BLOCKED로 발견, 2026-05-02 5관점 reviewer 정정 반영)**:
 
 | 본 phase 가설 (D1 시도 전) | 실제 결과 (D1 BLOCKED, 2026-05-02) |
 |---|---|
-| 인프라(`DefaultSingletonBeanRegistry`)가 *증상 보정* (필드 reflection 복사) → **계층 오염** → BPP가 *원천* 보장하면 인프라 우회 코드 제거 가능 | byte-buddy 서브클래싱 패턴에서 `early ≠ created` 항상 성립 (early=프록시 인스턴스, created=원본 인스턴스) → `@Autowired` 필드 주입은 created에만 적용 → BPP 캐시는 *재enhance 방지*만, 인프라의 *필드 동기화는 필수* → **책임 분담 패턴** |
+| 인프라(`DefaultSingletonBeanRegistry`)가 *증상 보정* (필드 reflection 복사) → **계층 오염** → BPP가 *원천* 보장하면 인프라 우회 코드 제거 가능 | byte-buddy 서브클래싱 + *원본 반환* 패턴에서 `early ≠ created` 항상 성립 (early=프록시 인스턴스 enhanced, created=원본 인스턴스 raw) → `@Autowired` 필드 주입은 created에만 적용 → BPP 캐시는 *재enhance 방지*만, 인프라의 *필드 동기화는 필수* → **책임 분담 패턴** |
+
+**Spring 본가와 우리 패턴의 *진짜* 차이 (메커니즘 정확 박제)**:
+
+| 측면 | Spring 본가 (`AbstractAutoProxyCreator`) | 우리 (`AspectEnhancingBeanPostProcessor` + `TransactionalBeanPostProcessor`) |
+|---|---|---|
+| enhance 방식 | CGLIB 서브클래싱 | byte-buddy 서브클래싱 |
+| `getEarlyBeanReference` 반환 | enhanced 인스턴스 | enhanced 인스턴스 |
+| `postProcessAfterInitialization` 캐시 hit 시 반환 | **enhanced 인스턴스** (cache에 저장된 그것) | **원본 raw 인스턴스** (B1, C1 본 phase 변경) |
+| `early == created` ? | ✅ 둘 다 동일 enhanced 인스턴스 | ❌ early=enhanced, created=원본 raw |
+| 필드 주입 적용 위치 | enhanced 인스턴스 (=원본=같은 객체) | created(원본)에 적용 → DSBR이 early로 복사 |
+| 인프라(DSBR) 우회 코드 필요? | ❌ 불필요 | ✅ `copyFieldsToEarlyReference` 필수 |
+
+> **핵심 통찰 (5관점 reviewer 정정)**: "wrap-around delegation 프록시"가 아니다 — Spring 본가도 *서브클래싱*. 진짜 차이는 *postProcessAfterInitialization이 enhanced를 반환하느냐 원본을 반환하느냐*. 우리가 원본을 반환하는 이유는 *enhance 1회만 발생*시키기 위함(B1, C1 캐시) — 그러나 그 결과 `early ≠ created`라 DSBR의 필드 동기화가 필수. *"enhance 1회 vs 단일 인스턴스 보장"의 trade-off*가 본 phase의 진짜 학습 정점.
 
 **D1 시도가 박제한 학습** (Phase 4 진입 시 핵심 자산):
-- 본 phase의 spec § 3.3.3 가설(*"DSBR 단순화 가능"*)이 *byte-buddy 서브클래싱 + 필드 복사* 패턴에서 성립 안 함을 *통합 회귀 fail*(`EarlyReferenceIntegrationTest` NPE)로 발견
-- Spring 본가 *CGLIB wrap-around proxy* 패턴과 우리 *서브클래스 + 필드 복사* 패턴의 *근본 차이* 박제
-- *"학습 정점이 가설로 시작 → 시도 → BLOCKED → 박제 재정의"* 자체가 *spec 작성 + 시도가 학습 콘텐츠*임을 시연 (Phase 4의 영속성 컨텍스트 + 프록시 작업에서 동일 함정 회피 자산)
+- 본 phase의 spec § 3.3.3 가설(*"DSBR 단순화 가능"*)이 *byte-buddy 서브클래싱 + 원본 반환* 패턴에서 성립 안 함을 *통합 회귀 fail*(`EarlyReferenceIntegrationTest` NPE)로 발견
+- Spring 본가와 우리 패턴의 *근본 차이는 enhance 방식이 아니라 enhance 반환 정책*
+- *"학습 정점이 가설로 시작 → 시도 → BLOCKED → 박제 재정의 → reviewer 정정"* 사이클이 *spec 자체가 학습 콘텐츠*임을 시연 (Phase 4의 영속성 컨텍스트 + 프록시 작업에서 동일 함정 회피 자산)
+- *"우리가 enhanced를 반환하도록 변경하면 DSBR 단순화 가능"*이 다음 phase 후보 — 단 그러려면 BPP 캐시에 *enhanced* 저장 + `postProcessAfterInitialization`이 enhanced 반환이 필요
 
 ### 0.3 배경 — Phase 3에서 노출된 Phase 1A 결함
 
@@ -194,7 +208,7 @@ getOrCreateSingleton(name, factory):
 |---|---|
 | `copyFieldsToEarlyReference` 제거 + 분기 단순화 시도 | `EarlyReferenceIntegrationTest` 2건 FAIL (NullPointerException) |
 | 근본 원인 | byte-buddy 서브클래스 프록시(`early`)와 원본 인스턴스(`created`)는 *항상 다른 인스턴스* — `@Autowired` 필드 주입은 `created`에만 적용, `early`의 대응 필드는 null 유지 |
-| 해결 가능성 | byte-buddy를 *wrap-around delegation* 패턴으로 전환 시 가능 (별도 phase) — 본 phase 범위 초과 |
+| 해결 가능성 | BPP 캐시에 *enhanced 저장* + `postProcessAfterInitialization`이 *enhanced 반환* 패턴(Spring 본가 `AbstractAutoProxyCreator` 정합)으로 전환 시 가능 (별도 phase) — 본 phase 범위 초과. *byte-buddy는 그대로 사용 가능*, enhance *반환 정책*만 변경 |
 | 결정 | `copyFieldsToEarlyReference` *유지*, `getOrCreateSingleton` 분기 *유지*. BPP 캐시(B1, C1)의 *재enhance 방지*만으로 부분 진보 박제 |
 
 **유지되는 현행 코드** (변경 없음 — D1 BLOCKED 후 그대로):
@@ -347,7 +361,7 @@ if (early != null) {
 - **`AspectEnhancingBeanPostProcessor` SIABPP 승격의 의미 박제**: 단순 인터페이스 추가만 (§ 3.3.1 사실 박제). *왜 SIABPP가 enhance BPP의 표준 시그니처인가* 깊이 박제는 별도 phase
 - **`copyFieldsToEarlyReference` 제거의 *전제 조건* 박제 — 본 phase 가정 오류 발견 (D1 BLOCKED, 2026-05-02)**: 본 phase는 BPP 캐시로 단일 인스턴스 *원천 보장*되면 제거 가능하다는 *전제* 위에서 시작했으나, *byte-buddy 서브클래싱 + 필드 복사* 패턴에서 `early ≠ created`가 항상 성립해 *전제가 깨짐*. § 3.3.3 D1 BLOCKED 박제 + § 0.2 학습 정점 재정의 참조.
 
-- **byte-buddy 서브클래싱 vs CGLIB wrap-around proxy 패턴 차이 박제**: Spring 본가 `AbstractAutoProxyCreator`는 *원본에 필드 주입 → 그 원본을 프록시로 위임 wrap*하는 방식이라 `early == created` 가능. 우리는 *서브클래스 + 필드 복사* 방식이라 `early ≠ created` 항상 성립 → 인프라(DSBR)가 *필드 동기화 책임* 보유. 이 차이의 *깊은 박제*(예: byte-buddy를 wrap-around delegation으로 전환)는 *별도 phase* — 본 phase는 *발견 + 가설 재정의*에 그침.
+- **Spring 본가 vs 우리 패턴 차이 박제 (5관점 reviewer 정정 — 2026-05-02)**: Spring 본가 `AbstractAutoProxyCreator`도 *CGLIB 서브클래싱* 방식이지만, `postProcessAfterInitialization`이 *캐시된 enhanced 인스턴스를 반환* → `early == created`(둘 다 동일 enhanced) → 인프라 우회 코드 불필요. 우리는 *서브클래스 + 원본 반환(B1/C1 캐시)* 방식이라 `early ≠ created` 항상 성립 → 인프라(DSBR)가 *필드 동기화 책임* 보유. *이전 표현(`CGLIB wrap-around proxy`/`위임 wrap`)은 기술적으로 부정확*이라 정정 — 진짜 차이는 *enhance 반환 정책*. 이 차이의 *깊은 박제*(BPP 캐시에 enhanced 저장 + 반환 정책 변경)는 *별도 phase* — 본 phase는 *발견 + 가설 재정의*에 그침.
 
 ---
 
