@@ -68,7 +68,7 @@
 | # | 결정 영역 | 선택지 | 채택 | 근거 |
 |---|---|---|---|---|
 | Q1 | API 정체성 | A: own minimal / B: jakarta.persistence 호환 / C: SQL mapper (MyBatis 스타일) | **A** | spec 호환 부담 회피 + 학습 정점에 집중. 메모리 *책임 분담 패턴*과 직결되는 own naming 자유. |
-| Q2 | 기능 범위 | A1: 단일 CRUD / A2: + 단방향 N:1 lazy / A3: + collection / A4: + 양방향 + cascade | **A2** | demo 자연 정합. 학습 정점 4개로 깔끔. A3/A4는 별도 mini-phase. |
+| Q2 | 기능 범위 | A1: 단일 CRUD / A2: + 단방향 N:1 lazy / A3: + collection / A4: + 양방향 + cascade | **A2** | demo 자연 정합. § 0.3 학습 정점 3개에 깔끔히 매핑 (write-behind / 1 entity = 1 instance / lazy proxy identity). A3/A4는 별도 mini-phase. |
 | Q3 | EM 라이프사이클 | L1: 트랜잭션 바운드 / L2: resource-local / L3: OSIV | **L1** | sfs-tx 자산 자연 회수. Spring `@PersistenceContext` 정확 박제. |
 | Q4 | lazy 메커니즘 + 모듈 | P1: byte-buddy 직접 + sfs-orm 신설 / P2: sfs-aop 재활용 / P3: JDK 동적 프록시 / P4: 명시 wrapper | **P1** | 도메인 정합 (AOP advice ≠ ORM lazy). 도구만 공유. |
 | Q5 | identity map 정책 | C1: Hibernate 본가 (proxy도 캐시) / C2: 순진한 분리 (Phase 1A gap 함정 재발) / C3: no cache | **C1** | Phase 1A gap *책임 분담 패턴*의 대칭 회수 (단일 SoT). |
@@ -347,54 +347,64 @@ class LazyInterceptor {
 
 ```java
 interface IdentifierGenerator {
-    Object generate(Connection conn, Object entity, EntityMetadata md);
+    Object generate(Object entity, EntityMetadata md);
     boolean isPostInsert();   // true면 generate()가 INSERT까지 수행 (IDENTITY)
 }
 
 class SequenceGenerator implements IdentifierGenerator {
     private final String sequenceName;
+    private final JdbcTemplate jdbc;
     
     @Override public boolean isPostInsert() { return false; }
     
-    @Override public Object generate(Connection conn, Object entity, EntityMetadata md) {
-        return jdbc.queryForObject(conn, "SELECT NEXTVAL('" + sequenceName + "')", Long.class);
+    @Override public Object generate(Object entity, EntityMetadata md) {
+        return jdbc.queryForObject("SELECT NEXTVAL('" + sequenceName + "')", Long.class);
         // 호출자가 entity.id 필드에 set + actionQueue에 InsertAction 추가
     }
 }
 
 class IdentityGenerator implements IdentifierGenerator {
+    private final JdbcTemplate jdbc;
+    
     @Override public boolean isPostInsert() { return true; }
     
-    @Override public Object generate(Connection conn, Object entity, EntityMetadata md) {
+    @Override public Object generate(Object entity, EntityMetadata md) {
         // 학습 정점 박제: persist == INSERT
-        var key = jdbc.executeInsertWithGeneratedKey(conn, md.insertSql(), boundParams(entity));
-        return key;
+        return jdbc.updateAndReturnKey(md.insertSql(), boundParams(entity));
     }
 }
 ```
+
+> **JdbcTemplate(sfs-tx) 신규 메서드 2종 필요** — 본 phase에서 sfs-tx에 추가 (§ 8 DoD 1.5):
+> - `<T> T queryForObject(String sql, Class<T> requiredType, Object... args)` — single value 조회 (SEQUENCE NEXTVAL용)
+> - `Number updateAndReturnKey(String sql, Object... args)` — INSERT 후 generated key 반환 (`Statement.RETURN_GENERATED_KEYS` 활용)
+> 
+> Connection 주입은 *기존 JdbcTemplate 패턴 정합* — TSM이 잡고 있는 Connection을 내부에서 lookup. IdentifierGenerator는 Connection을 받지 않음.
 
 ---
 
 ## 4. 데이터 플로우 (operation별 6개)
 
-### 4.1 persist(order) — SEQUENCE entity (정점 ① 정상 박제)
+### 4.1 persist(user) — SEQUENCE entity (정점 ① 정상 박제)
+
+> *예시 entity*: `User` (SEQUENCE strategy — § 5.3 정합)
 
 ```
-em.persist(order)
+em.persist(user)
     │
     ▼
 SfsTransactionalEntityManager.persist
     └─ TSM.getResource(emf) → realEm
-       └─ realEm.persist(order)
+       └─ realEm.persist(user)
           │
           ▼
        PersistenceContext.persist
           ├─ md.idGenerator() = SequenceGenerator
           ├─ generator.generate() → SEQUENCE NEXTVAL ◄── 1회 SELECT
-          │  → 받은 ID를 order.id 필드에 set
-          ├─ identityMap.put((User, id), order)
-          ├─ snapshots.put((User, id), capture(order))
-          └─ actionQueue.add(new InsertAction(order))   ◄── INSERT는 flush 때
+          │  → 받은 ID를 user.id 필드에 set
+          ├─ identityMap.put((User, id), user)
+          ├─ snapshots.put((User, id), capture(user))
+          └─ actionQueue.add(new InsertAction(user))   ◄── INSERT는 flush 때
           
 *persist 시점에는 INSERT 발생 안 함 — 학습 정점 ① 정상 박제*
 ```
@@ -812,15 +822,16 @@ class BasicCrudIntegrationTest {
 
 | 시작 | 목표 | 차이 | 분배 |
 |---|---|---|---|
-| **244 PASS** (Phase 1A gap 마감 시점) | **~294 PASS** | **+50** | 단위 33 + 통합 19 (+ sfs-samples demo 검증 가능 시 1~2 추가) |
+| **244 PASS** (Phase 1A gap 마감 시점) | **~296 PASS** | **+52** | sfs-orm 단위 33 + sfs-orm 통합 19 + **sfs-tx JdbcTemplate 신규 메서드 +2** (DoD 1.5) |
 
 ---
 
-## 8. DoD (Definition of Done) — 13항목
+## 8. DoD (Definition of Done) — 14항목
 
 | # | 항목 | 검증 방법 |
 |---|---|---|
 | 1 | sfs-orm 모듈 신설 + Gradle 의존 정합 | `./gradlew :sfs-orm:compileJava` PASS |
+| 1.5 | sfs-tx `JdbcTemplate`에 `queryForObject` + `updateAndReturnKey` 신규 메서드 2종 추가 | sfs-tx 단위 테스트 +2 (별도 회귀 카운트 — § 7.4 +50에 미포함) |
 | 2 | 어노테이션 6개 정의 (@SfsEntity, @SfsId, @SfsGeneratedValue, @SfsColumn, @SfsManyToOne, @SfsJoinColumn) | reflection으로 retention/target 검증 |
 | 3 | 예외 4개 (`SfsPersistenceException` 계층) | 각 발생 시나리오 통합 테스트 |
 | 4 | `EntityMetadataAnalyzer` 부팅 시 fail-fast (5종 검증) | 5개 단위 테스트 |
@@ -831,7 +842,7 @@ class BasicCrudIntegrationTest {
 | 9 | `SfsTransactionalEntityManager` proxy + TSM 콜백 (L1) | tx 통합 테스트 + lifecycle 검증 |
 | 10 | `SfsEntityManager` API 6개 (persist/find/remove/flush/merge/contains) 정상 동작 | BasicCrud + Merge 통합 |
 | 11 | `OrmDemoApplication` main 메서드 console output 7개 시연 정상 | manual run 또는 integration smoke test |
-| 12 | 회귀 +50 (244 → 294) PASS, 0 FAIL | `./gradlew build` |
+| 12 | 회귀 +52 (244 → 296) PASS, 0 FAIL | `./gradlew build` |
 | 13 | 마감 게이트 3단계 통과 (다관점 리뷰 + 리팩토링 + simplify 패스) | 게이트 기록 박제 |
 
 ---
