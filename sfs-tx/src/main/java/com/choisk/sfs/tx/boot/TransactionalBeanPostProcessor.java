@@ -22,7 +22,9 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * byte-buddy 기반 {@code @Transactional} BPP. Phase 2B {@code AspectEnhancingBeanPostProcessor}와 동일 패턴.
@@ -44,6 +46,15 @@ public class TransactionalBeanPostProcessor implements SmartInstantiationAwareBe
     private TransactionInterceptor sharedInterceptor;
     private final List<String> lastFinalMethodWarnings = new ArrayList<>();
 
+    /**
+     * 순환 의존 + @Transactional enhance 시 단일 인스턴스 보장. {@code getEarlyBeanReference}로
+     * enhance한 빈은 {@code postProcessAfterInitialization}에서 *재enhance하지 않음*.
+     *
+     * <p>key: beanName — Spring 본가 {@code AbstractAutoProxyCreator.earlyProxyReferences}와 정합.
+     * spec § 3.3.2. {@code AspectEnhancingBeanPostProcessor.earlyProxyReferences}와 동일 패턴.
+     */
+    private final Map<String, Object> earlyProxyReferences = new ConcurrentHashMap<>();
+
     @Override
     public void setBeanFactory(BeanFactory beanFactory) {
         this.beanFactory = beanFactory;
@@ -58,6 +69,9 @@ public class TransactionalBeanPostProcessor implements SmartInstantiationAwareBe
     public Object getEarlyBeanReference(Object bean, String beanName) {
         if (bean instanceof BeanPostProcessor) return bean;
         if (!hasTransactionalMethod(bean.getClass())) return bean;
+
+        // 순환 의존 시 postProcessAfterInitialization에서 재enhance 방지를 위한 추적 등록
+        earlyProxyReferences.put(beanName, bean);
         try {
             return enhance(bean);
         } catch (Exception e) {
@@ -68,6 +82,13 @@ public class TransactionalBeanPostProcessor implements SmartInstantiationAwareBe
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) {
         if (bean instanceof BeanPostProcessor) return bean;
+
+        // 캐시 hit: getEarlyBeanReference에서 이미 enhance 처리됨 — 원본 그대로 반환.
+        // remove(key)는 조회+삭제 atomic → 메모리 누수 방지 + ConcurrentHashMap 동시성 안전.
+        // (early가 3-level 캐시 2차에 있고 1차로 승격되며, 본 메서드 반환값은 컨테이너가 무시함)
+        if (earlyProxyReferences.remove(beanName) != null) {
+            return bean;
+        }
 
         if (!hasTransactionalMethod(bean.getClass())) return bean;
 
@@ -99,6 +120,12 @@ public class TransactionalBeanPostProcessor implements SmartInstantiationAwareBe
         }
     }
 
+    /**
+     * byte-buddy 서브클래스 생성 + {@code TxMethodInterceptor} 적용 + 필드 복사.
+     *
+     * <p>{@code getEarlyBeanReference}와 {@code postProcessAfterInitialization} 두 진입점이 공유.
+     * final 메서드는 {@link ElementMatchers#isFinal()} 필터로 enhance 대상에서 제외 (A-1 박제).
+     */
     private Object enhance(Object bean) throws Exception {
         Class<?> originalClass = bean.getClass();
 

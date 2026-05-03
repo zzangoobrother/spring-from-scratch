@@ -5,6 +5,7 @@ import com.choisk.sfs.beans.BeanFactory;
 import com.choisk.sfs.beans.BeanFactoryAware;
 import com.choisk.sfs.beans.BeanPostProcessor;
 import com.choisk.sfs.beans.ConfigurableListableBeanFactory;
+import com.choisk.sfs.beans.SmartInstantiationAwareBeanPostProcessor;
 import com.choisk.sfs.core.ReflectionUtils;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
@@ -13,6 +14,8 @@ import net.bytebuddy.matcher.ElementMatchers;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Modifier;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * byte-buddy 기반 {@code @Aspect} 라우팅 BPP. 빈 생성 직후({@code postProcessAfterInitialization}) 동작:
@@ -41,12 +44,26 @@ import java.lang.reflect.Modifier;
  * {@code postProcessAfterInitialization}(enhance read) 역시 {@code doCreateBean} 직렬 흐름 안에서만 발생한다.
  * 멀티스레드 환경에서 여러 ApplicationContext가 동일 BPP 인스턴스를 공유하는 경우 외부 동기화 필요.
  */
-public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, BeanFactoryAware {
+public class AspectEnhancingBeanPostProcessor
+        implements SmartInstantiationAwareBeanPostProcessor, BeanFactoryAware {
+    // BeanPostProcessor는 SIABPP가 transitive로 상속 (InstantiationAwareBeanPostProcessor → BeanPostProcessor)
 
     private BeanFactory beanFactory;
     private final AspectRegistry registry = new AspectRegistry();
     // 매 enhance마다 새 인스턴스 생성을 회피 — setBeanFactory 시점에 1회 초기화 후 모든 enhanced 빈에 공유
     private AdviceInterceptor sharedInterceptor;
+
+    /**
+     * 순환 의존 + enhance 시 단일 인스턴스 보장. {@code getEarlyBeanReference}로 enhance한 빈은
+     * {@code postProcessAfterInitialization}에서 *재enhance하지 않음* — 원본 그대로 반환.
+     * key: beanName (Spring 본가 정합 — {@code AbstractAutoProxyCreator.earlyProxyReferences}).
+     *
+     * <p><strong>누수 조건</strong>: {@code getEarlyBeanReference} 호출 후 {@code postProcessAfterInitialization}이
+     * *미진입*하면 엔트리가 잔류한다. {@code doCreateBean} 풀 사이클에서는 항상 짝지어 호출되므로 정상 흐름에서는
+     * 발생하지 않는다. 비정상 종료(빈 생성 중 예외) 시 BPP 객체 수명 동안 누수 가능 —
+     * 학습 phase 범위(단일 ApplicationContext)에서는 무시 (spec § 3.3 누수 정책 참조).
+     */
+    private final Map<String, Object> earlyProxyReferences = new ConcurrentHashMap<>();
 
     /**
      * BeanFactory 주입 시점에 모든 BeanDefinition을 사전 순회하여 {@code @Aspect} 클래스를
@@ -82,6 +99,34 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
         }
     }
 
+    /**
+     * 순환 의존 시 호출 — *enhance 대상*에만 캐시 등록 후 enhance.
+     * spec § 3.3.1 — 본 phase에서 SIABPP 승격 + 캐시 도입.
+     *
+     * <p>가드 순서 (TxBPP `getEarlyBeanReference`와 정합 — A finding fix):
+     * <ol>
+     *   <li>sharedInterceptor 미초기화 → IllegalStateException (postProcessAfterInitialization과 동일 가드)</li>
+     *   <li>BPP 자기 격리 → 원본 반환 (캐시 미등록)</li>
+     *   <li>@Aspect 빈 → 원본 반환 (캐시 미등록)</li>
+     *   <li>매칭 advice 없음 → 원본 반환 (캐시 미등록)</li>
+     *   <li>이후에만 캐시 put + enhance — postProcessAfterInitialization의 cache hit 분기가 정상 enhance 경로를 잘못 스킵하는 결함 차단</li>
+     * </ol>
+     */
+    @Override
+    public Object getEarlyBeanReference(Object bean, String beanName) {
+        if (sharedInterceptor == null) {
+            throw new IllegalStateException(
+                    "AspectEnhancingBeanPostProcessor가 BeanFactory 주입 전에 사용됨 — setBeanFactory()가 먼저 호출되어야 함"
+            );
+        }
+        if (bean instanceof BeanPostProcessor) return bean;
+        if (bean.getClass().isAnnotationPresent(Aspect.class)) return bean;
+        if (!registry.findAnyApplicable(bean.getClass())) return bean;
+
+        earlyProxyReferences.put(beanName, bean);
+        return enhanceIfNeeded(bean);
+    }
+
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) {
         if (sharedInterceptor == null) {
@@ -89,6 +134,23 @@ public class AspectEnhancingBeanPostProcessor implements BeanPostProcessor, Bean
                     "AspectEnhancingBeanPostProcessor가 BeanFactory 주입 전에 사용됨 — setBeanFactory()가 먼저 호출되어야 함"
             );
         }
+        // 캐시 hit: getEarlyBeanReference에서 이미 enhance 처리됨 — 원본 그대로 반환.
+        // remove(key)는 조회+삭제 atomic → 메모리 누수 방지 + ConcurrentHashMap 동시성 안전.
+        // (early가 3-level 캐시 2차에 있고 1차로 승격되며, 본 메서드 반환값은 컨테이너가 무시함 — TxBPP와 동일 패턴)
+        if (earlyProxyReferences.remove(beanName) != null) {
+            return bean;
+        }
+        return enhanceIfNeeded(bean);
+    }
+
+    /**
+     * {@code postProcessAfterInitialization}과 {@code getEarlyBeanReference}가 공유하는 enhance 로직.
+     * BPP 자기 격리, @Aspect 빈 제외, 매칭 검사, byte-buddy enhance까지 인라인.
+     *
+     * <p>WHY 헬퍼 추출: getEarlyBeanReference + postProcessAfterInitialization 두 진입점이
+     * 같은 enhance 로직을 공유하므로 추출. Phase 3 simplify 패턴(releaseConnection/resumeIfNecessary 헬퍼 추출) 회수.
+     */
+    private Object enhanceIfNeeded(Object bean) {
         if (bean instanceof BeanPostProcessor) return bean;  // 자기 참조 격리
 
         // @Aspect 빈은 preRegisterAspects(setBeanFactory 시점)에서 이미 advice 등록 완료 — 여기서는 enhance 대상에서만 제외
