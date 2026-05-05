@@ -8,6 +8,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -43,6 +44,59 @@ public class JdbcTemplate {
                 }
             } catch (SQLException e) {
                 throw new RuntimeException("query failed: " + sql, e);
+            }
+        } finally {
+            h.releaseIfNotBound();
+        }
+    }
+
+    /**
+     * SQL 쿼리 결과 행이 정확히 1건일 때 첫 번째 컬럼 값을 반환한다.
+     *
+     * <p>0건이면 null, 2건 이상이면 {@link IllegalStateException}.
+     *
+     * @param sql SQL 문자열
+     * @param requiredType 반환 타입 (rs.getObject(1, requiredType) 으로 변환)
+     * @param args 바인딩 파라미터
+     * @param <T> 반환 타입
+     * @return 첫 번째 행의 첫 번째 컬럼 값, 또는 결과 없으면 null
+     */
+    public <T> T queryForObject(String sql, Class<T> requiredType, Object... args) {
+        List<T> results = query(sql, (rs, rowNum) -> rs.getObject(1, requiredType), args);
+        if (results.isEmpty()) {
+            return null;
+        }
+        if (results.size() > 1) {
+            throw new IllegalStateException("Expected single result, got " + results.size());
+        }
+        return results.get(0);
+    }
+
+    /**
+     * INSERT/UPDATE 실행 후 DB가 자동 생성한 키(generated key)를 반환한다.
+     *
+     * <p>ORM {@code IdentifierGenerator}가 IDENTITY 전략에서 호출한다.
+     *
+     * @param sql INSERT SQL
+     * @param args 바인딩 파라미터
+     * @return 생성된 키 (Number 하위 타입, DB가 반환한 그대로)
+     * @throws IllegalStateException 키가 반환되지 않은 경우
+     */
+    public Number updateAndReturnKey(String sql, Object... args) {
+        ConnHandle h = obtainConnection();
+        try {
+            // RETURN_GENERATED_KEYS: DB가 auto-increment/identity 컬럼 값을 반환하도록 지시
+            try (PreparedStatement ps = h.connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                bindArgs(ps, args);
+                ps.executeUpdate();
+                try (ResultSet keys = ps.getGeneratedKeys()) {
+                    if (keys.next()) {
+                        return (Number) keys.getObject(1);
+                    }
+                    throw new IllegalStateException("No generated key returned");
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException("updateAndReturnKey failed: " + sql, e);
             }
         } finally {
             h.releaseIfNotBound();
