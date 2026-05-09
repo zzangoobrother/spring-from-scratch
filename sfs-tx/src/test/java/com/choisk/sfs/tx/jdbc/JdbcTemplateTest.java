@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JdbcTemplateTest {
 
@@ -101,5 +102,26 @@ class JdbcTemplateTest {
 
         List<String> names = jdbc.query("SELECT name FROM t", (rs, i) -> rs.getString(1));
         assertThat(names).containsExactly("Alice");
+    }
+
+    @Test
+    void queryForObject_returns_null_when_no_rows() {
+        // 빈 테이블에서 0건 조회 → null 반환 (예외 아님)
+        String name = jdbc.queryForObject(
+            "SELECT name FROM t WHERE id = ?", String.class, 999);
+
+        assertThat(name).isNull();
+    }
+
+    @Test
+    void queryForObject_throws_when_multiple_rows() {
+        jdbc.update("INSERT INTO t VALUES (?, ?)", 1, "Alice");
+        jdbc.update("INSERT INTO t VALUES (?, ?)", 2, "Bob");
+
+        // 2건 → IllegalStateException, fail-fast로 안전망 발동
+        assertThatThrownBy(() ->
+            jdbc.queryForObject("SELECT name FROM t", String.class))
+            .isInstanceOf(IllegalStateException.class)
+            .hasMessageContaining("Expected single result, got 2");
     }
 }
