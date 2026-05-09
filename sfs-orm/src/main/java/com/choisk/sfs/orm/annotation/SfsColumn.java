@@ -1,0 +1,12 @@
+package com.choisk.sfs.orm.annotation;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.FIELD)
+public @interface SfsColumn {
+    String name() default "";   // 빈 문자열이면 필드명 그대로
+}
