@@ -6,5 +6,6 @@ include(
     "sfs-context",
     "sfs-aop",
     "sfs-tx",
+    "sfs-orm",       // ← 추가
     "sfs-samples",
 )
