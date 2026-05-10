@@ -11,6 +11,8 @@ import org.h2.jdbcx.JdbcDataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.BitSet;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class EntityPersisterTest {
@@ -81,5 +83,39 @@ class EntityPersisterTest {
                 "SELECT COUNT(*) FROM epersister_test WHERE id = 7",
                 Long.class);
         assertThat(count).isEqualTo(0L);
+    }
+
+    @Test
+    void executeUpdate_with_single_dirty_column_generates_correct_sql() {
+        // 단일 dirty 컬럼(name만) 업데이트 — age는 변경되지 않아야 함
+        jdbc.update("INSERT INTO epersister_test VALUES (?, ?, ?)", 10L, "old", 20);
+        TestEntity e = new TestEntity();
+        e.id = 10L; e.name = "new_name"; e.age = 20;
+
+        BitSet dirty = new BitSet();
+        dirty.set(0);   // 0번 컬럼만 (name)
+        persister.executeUpdate(e, dirty);
+
+        String name = jdbc.queryForObject("SELECT name FROM epersister_test WHERE id = 10", String.class);
+        Integer age = jdbc.queryForObject("SELECT age_value FROM epersister_test WHERE id = 10", Integer.class);
+        assertThat(name).isEqualTo("new_name");
+        assertThat(age).isEqualTo(20);   // age는 변경 안 됨
+    }
+
+    @Test
+    void executeUpdate_with_multiple_dirty_columns_generates_correct_sql() {
+        // 다중 dirty 컬럼(name + age 모두) 업데이트
+        jdbc.update("INSERT INTO epersister_test VALUES (?, ?, ?)", 11L, "old", 30);
+        TestEntity e = new TestEntity();
+        e.id = 11L; e.name = "n2"; e.age = 99;
+
+        BitSet dirty = new BitSet();
+        dirty.set(0); dirty.set(1);   // name(0) + age(1) 모두 dirty
+        persister.executeUpdate(e, dirty);
+
+        String name = jdbc.queryForObject("SELECT name FROM epersister_test WHERE id = 11", String.class);
+        Integer age = jdbc.queryForObject("SELECT age_value FROM epersister_test WHERE id = 11", Integer.class);
+        assertThat(name).isEqualTo("n2");
+        assertThat(age).isEqualTo(99);
     }
 }

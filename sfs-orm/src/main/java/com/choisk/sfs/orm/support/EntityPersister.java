@@ -7,6 +7,7 @@ import com.choisk.sfs.tx.jdbc.RowMapper;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Map;
 
@@ -83,6 +84,56 @@ public class EntityPersister {
     public void executeInsert(Object entity) {
         Object[] params = buildInsertParams(entity);
         jdbc.update(md.insertSql(), params);
+    }
+
+    /**
+     * 엔티티의 dirty 컬럼만 SET 절에 포함한 동적 UPDATE SQL을 실행한다.
+     *
+     * <p>Hibernate {@code @DynamicUpdate} 패턴 — BitSet 한 비트가 "이 컬럼은 변경됐다"를 표현.
+     * 인덱스 레이아웃: 0..N-1 은 {@code md.columns()}, N..M-1 은 {@code md.manyToOnes()}.
+     *
+     * <p>빈 BitSet no-op 가드: 변경 없는 엔티티가 flush에 흘러들어도
+     * 빈 SET 절 syntax error를 만들지 않는 방어적 설계.
+     *
+     * @param entity       업데이트할 엔티티 인스턴스
+     * @param dirtyColumns dirty 여부를 나타내는 BitSet (비어있으면 no-op)
+     * @throws SfsPersistenceException 필드 reflection 접근 실패 시
+     */
+    public void executeUpdate(Object entity, BitSet dirtyColumns) {
+        // 빈 BitSet no-op 가드 — 빈 SET 절 syntax error 방지
+        if (dirtyColumns.isEmpty()) return;
+
+        List<String> setClauses = new ArrayList<>();
+        List<Object> params = new ArrayList<>();
+        int colIdx = 0;
+        try {
+            // 일반 컬럼: BitSet 인덱스 0..N-1
+            for (FieldMetadata col : md.columns()) {
+                if (dirtyColumns.get(colIdx)) {
+                    setClauses.add(col.columnName() + " = ?");
+                    params.add(col.field().get(entity));
+                }
+                colIdx++;
+            }
+            // @ManyToOne FK 컬럼: BitSet 인덱스 N..M-1 (columns와 같은 공간 공유)
+            for (RelationMetadata rel : md.manyToOnes()) {
+                if (dirtyColumns.get(colIdx)) {
+                    setClauses.add(rel.joinColumnName() + " = ?");
+                    Object related = rel.field().get(entity);
+                    params.add(related == null ? null : extractFk(related, rel.targetEntity()));
+                }
+                colIdx++;
+            }
+            // WHERE 조건용 PK 파라미터를 마지막에 추가
+            params.add(md.idField().field().get(entity));
+        } catch (IllegalAccessException e) {
+            throw new SfsPersistenceException("엔티티 필드 읽기 실패 — UPDATE 파라미터 구성 불가", e);
+        }
+
+        String sql = "UPDATE " + md.tableName()
+                + " SET " + String.join(", ", setClauses)
+                + " WHERE " + md.idField().columnName() + " = ?";
+        jdbc.update(sql, params.toArray());
     }
 
     /**
