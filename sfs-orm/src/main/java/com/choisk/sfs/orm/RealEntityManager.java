@@ -64,8 +64,23 @@ public class RealEntityManager implements SfsEntityManager {
         IdentifierGenerator gen = persister.idGenerator();
 
         if (gen.isPostInsert()) {
-            // IDENTITY: DB가 id를 자동 생성 — G2에서 구현
-            throw new UnsupportedOperationException("IDENTITY 전략은 G2에서 구현");
+            // IDENTITY: 즉시 INSERT (학습 정점 ① 깨짐 함정 박제)
+            // generate()가 INSERT를 수행하고 entity.id를 DB generated key로 채움
+            // actionQueue에 등재하지 않는다 — flush 시 재실행하면 중복 INSERT → UNIQUE 위반
+            gen.generate(entity, md);
+            // entity.id는 IdentityGenerator 내부에서 이미 normalize + set 완료
+            // EntityKey 구성 시 raw Number(반환값)가 아닌 entity 필드 값을 읽어 타입 일관성 확보
+            Object idValue;
+            try {
+                idValue = md.idField().field().get(entity);
+            } catch (IllegalAccessException e) {
+                throw new SfsPersistenceException("@SfsId 필드 읽기 실패 — EntityKey 구성 불가", e);
+            }
+            EntityKey key = new EntityKey(entity.getClass(), idValue);
+            // 1차 캐시 등재 + snapshot 캡처 (SEQUENCE 분기와 공통 — find() cache hit 보장의 전제 조건)
+            context.putEntity(key, entity);
+            context.putSnapshot(key, captureSnapshot(entity, md));
+            // actionQueue 추가 X — 이미 INSERT됨 (write-behind 우회)
         } else {
             // SEQUENCE: pre-insert — id를 먼저 받아 엔티티에 세팅
             Object id = gen.generate(entity, md);
