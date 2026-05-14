@@ -34,7 +34,7 @@ class LazyProxyFactoryTest {
 
     @Test
     void createProxy_returns_subclass_instance_of_target() {
-        var factory = new LazyProxyFactory();
+        var factory = new LazyProxyFactory((c, p) -> null);
         Object proxy = factory.createProxy(LazyTarget.class, 1L, new PersistenceContext());
         assertThat(proxy).isInstanceOf(LazyTarget.class);
         assertThat(proxy.getClass()).isNotEqualTo(LazyTarget.class); // 서브클래스
@@ -42,7 +42,7 @@ class LazyProxyFactoryTest {
 
     @Test
     void createProxy_caches_enhanced_class_per_target() {
-        var factory = new LazyProxyFactory();
+        var factory = new LazyProxyFactory((c, p) -> null);
         Object p1 = factory.createProxy(LazyTarget.class, 1L, new PersistenceContext());
         Object p2 = factory.createProxy(LazyTarget.class, 2L, new PersistenceContext());
         assertThat(p1.getClass()).isSameAs(p2.getClass()); // 같은 enhanced 클래스
@@ -50,7 +50,7 @@ class LazyProxyFactoryTest {
 
     @Test
     void getId_does_not_trigger_initialization() {
-        var factory = new LazyProxyFactory();
+        var factory = new LazyProxyFactory((c, p) -> null);
         var ctx = new PersistenceContext();
         ctx.close(); // closed 영속성 컨텍스트 — getId 외 호출 시 예외
 

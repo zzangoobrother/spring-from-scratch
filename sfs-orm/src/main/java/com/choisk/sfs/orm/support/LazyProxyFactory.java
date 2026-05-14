@@ -17,12 +17,12 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * LAZY 연관 필드용 byte-buddy 프록시 생성기.
  * <p>
- * 학습 정점 ③ (forward stub): lazy proxy의 identity 보장은 J1에서 통합 검증.
+ * 학습 정점 ③: lazy proxy의 identity 보장은 PersistenceContext.identityMap이 단일 SoT.
  * <ul>
- *   <li>PK getter는 enhanced 클래스가 hidden field($$lazyPk)에서 직접 반환 — lazy init 회피
- *       (J1에서 getId()와 find() 통합 시 최종 검증)</li>
+ *   <li>PK getter는 enhanced 클래스가 hidden field($$lazyPk)에서 직접 반환 — lazy init 회피</li>
  *   <li>enhanced 클래스 캐싱은 *클래스 단위*, 인스턴스 단위 아님
  *       — 동일 entity class면 같은 enhanced subclass 재사용</li>
+ *   <li>J1에서 {@link LazyTargetLoader}를 주입받아 DB fallback 로드 지원 완성</li>
  * </ul>
  */
 public class LazyProxyFactory {
@@ -34,6 +34,17 @@ public class LazyProxyFactory {
 
     // 학습 포인트: enhanced 클래스 캐싱은 클래스 단위 — 같은 targetClass면 buildEnhanced 재호출 안 함
     private final Map<Class<?>, Class<?>> enhancedCache = new ConcurrentHashMap<>();
+    // J1: DB fallback 로더 — context.getEntity() miss 시 EntityPersister.loadById() 위임
+    private final LazyTargetLoader loader;
+
+    /**
+     * LazyTargetLoader를 주입받는 생성자 — J1 통합 완성 형태.
+     *
+     * @param loader DB fallback 로더 (context miss 시 EntityPersister.loadById() 위임)
+     */
+    public LazyProxyFactory(LazyTargetLoader loader) {
+        this.loader = loader;
+    }
 
     /**
      * targetClass의 byte-buddy 서브클래스 프록시 인스턴스를 생성한다.
@@ -43,7 +54,7 @@ public class LazyProxyFactory {
      *
      * @param targetClass 프록시 대상 entity 클래스
      * @param pk          지연 로드될 entity의 PK 값
-     * @param context     1차 캐시 — 실제 로드 시 identity 보장에 사용 (I2에서 본격 활용)
+     * @param context     1차 캐시 — 실제 로드 시 identity 보장에 사용
      * @return targetClass의 서브클래스 인스턴스
      */
     public Object createProxy(Class<?> targetClass, Object pk, PersistenceContext context) {
@@ -53,10 +64,10 @@ public class LazyProxyFactory {
             ctor.setAccessible(true);
             Object proxy = ctor.newInstance();
 
-            // 인터셉터 필드 주입 — I2에서 본격 동작
+            // 인터셉터 필드 주입 — J1에서 loader fallback 포함
             Field interceptorField = enhanced.getDeclaredField(INTERCEPTOR_FIELD);
             interceptorField.setAccessible(true);
-            interceptorField.set(proxy, new LazyInterceptor(targetClass, pk, context));
+            interceptorField.set(proxy, new LazyInterceptor(targetClass, pk, context, loader));
 
             // hidden PK 필드 주입 — getId 비-인터셉트 반환용
             Field pkField = enhanced.getDeclaredField(PK_FIELD);

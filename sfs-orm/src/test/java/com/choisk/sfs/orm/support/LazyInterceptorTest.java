@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+// J1: LazyInterceptor 생성자에 LazyTargetLoader 파라미터 추가 — dummy loader로 기존 테스트 유지
+
 class LazyInterceptorTest {
 
     @SfsEntity
@@ -34,7 +36,7 @@ class LazyInterceptorTest {
         // 닫힌 컨텍스트 생성
         var ctx = new PersistenceContext();
         ctx.close();
-        var interceptor = new LazyInterceptor(Tgt.class, 1L, ctx);
+        var interceptor = new LazyInterceptor(Tgt.class, 1L, ctx, (c, p) -> null);
 
         // 메서드 호출 시 lazy init 예외 발생해야 함
         assertThatThrownBy(() -> interceptor.intercept(
@@ -53,7 +55,7 @@ class LazyInterceptorTest {
         original.name = "alice";
         ctx.putEntity(new EntityKey(Tgt.class, 5L), original);
 
-        var interceptor = new LazyInterceptor(Tgt.class, 5L, ctx);
+        var interceptor = new LazyInterceptor(Tgt.class, 5L, ctx, (c, p) -> null);
         // 첫 intercept 호출 — target null 상태에서 identityMap 조회 후 채워짐
         Object result = interceptor.intercept(
             Tgt.class.getMethod("getName"), new Object[0]);
@@ -73,8 +75,8 @@ class LazyInterceptorTest {
         original.name = "bob";
         ctx.putEntity(new EntityKey(Tgt.class, 7L), original);
 
-        var interceptor1 = new LazyInterceptor(Tgt.class, 7L, ctx);
-        var interceptor2 = new LazyInterceptor(Tgt.class, 7L, ctx);
+        var interceptor1 = new LazyInterceptor(Tgt.class, 7L, ctx, (c, p) -> null);
+        var interceptor2 = new LazyInterceptor(Tgt.class, 7L, ctx, (c, p) -> null);
 
         // 두 인터셉터 모두 같은 PersistenceContext의 identityMap에서 같은 인스턴스를 가져옴
         interceptor1.intercept(Tgt.class.getMethod("getName"), new Object[0]);

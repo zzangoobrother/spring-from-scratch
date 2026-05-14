@@ -35,7 +35,6 @@ public class SfsEntityManagerFactory {
         this.dataSource = b.dataSource;
         this.tsm = b.tsm;
         this.jdbcTemplate = new JdbcTemplate(dataSource, tsm);
-        this.lazyProxyFactory = new LazyProxyFactory();
 
         EntityMetadataAnalyzer analyzer = new EntityMetadataAnalyzer();
         this.metadataByClass = new HashMap<>();
@@ -49,6 +48,19 @@ public class SfsEntityManagerFactory {
             IdentifierGenerator gen = createGenerator(entry.getValue().idGeneratorSpec(), jdbcTemplate);
             EntityPersister persister = new EntityPersister(entry.getValue(), gen, jdbcTemplate);
             persisterByClass.put(entry.getKey(), persister);
+        }
+
+        // J1: LazyProxyFactory에 loader 람다 주입
+        // loader의 context는 null 고정 — fallback 로드는 관계를 재귀 채우지 않음 (순환 참조 회피)
+        this.lazyProxyFactory = new LazyProxyFactory(
+                (targetClass, pk) -> {
+                    EntityPersister p = persisterByClass.get(targetClass);
+                    return p == null ? null : p.loadById(pk, null);
+                });
+
+        // J1: 모든 persister 생성 완료 후 emf 역참조 주입 (LAZY/EAGER 분기에서 persisterOf 접근용)
+        for (EntityPersister persister : persisterByClass.values()) {
+            persister.setEmf(this);
         }
     }
 
@@ -66,9 +78,11 @@ public class SfsEntityManagerFactory {
     // package-private getters — RealEntityManager(같은 패키지)에서 접근
     EntityMetadata metadataOf(Class<?> ec) { return metadataByClass.get(ec); }
 
-    EntityPersister persisterOf(Class<?> ec) { return persisterByClass.get(ec); }
+    // J1: EntityPersister(support 패키지)에서 EAGER 재귀 로드 시 접근하므로 public으로 변경
+    public EntityPersister persisterOf(Class<?> ec) { return persisterByClass.get(ec); }
 
-    LazyProxyFactory lazyProxyFactory() { return lazyProxyFactory; }
+    // J1: EntityPersister(support 패키지)에서 LAZY proxy 생성 시 접근하므로 public으로 변경
+    public LazyProxyFactory lazyProxyFactory() { return lazyProxyFactory; }
 
     DataSource dataSource() { return dataSource; }
 
