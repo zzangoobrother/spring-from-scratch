@@ -1,6 +1,7 @@
 package com.choisk.sfs.orm;
 
 import com.choisk.sfs.orm.exception.SfsPersistenceException;
+import com.choisk.sfs.orm.support.DeleteAction;
 import com.choisk.sfs.orm.support.EntityKey;
 import com.choisk.sfs.orm.support.EntityMetadata;
 import com.choisk.sfs.orm.support.EntityPersister;
@@ -174,9 +175,32 @@ public class RealEntityManager implements SfsEntityManager {
         return entityClass.cast(loaded);
     }
 
+    /**
+     * 관리 엔티티를 삭제 대기 상태로 전환한다.
+     *
+     * <p>write-behind 패턴: 즉시 DELETE하지 않고 actionQueue에 DeleteAction을 등록한다.
+     * 실제 DELETE SQL은 flush(K2)에서 실행된다.
+     *
+     * @param entity 삭제할 엔티티 인스턴스 (반드시 1차 캐시에 있는 관리 상태여야 함)
+     * @throws IllegalArgumentException  미관리(detached/new) 엔티티를 넘긴 경우
+     * @throws SfsPersistenceException   알 수 없는 엔티티 클래스이거나 @SfsId 필드 접근 실패 시
+     */
     @Override
     public void remove(Object entity) {
-        throw new UnsupportedOperationException("K1");
+        EntityMetadata md = emf.metadataOf(entity.getClass());
+        if (md == null) {
+            throw new SfsPersistenceException("Unknown entity class: " + entity.getClass());
+        }
+        try {
+            Object pk = md.idField().field().get(entity);
+            EntityKey key = new EntityKey(entity.getClass(), pk);
+            if (!context.contains(key)) {
+                throw new IllegalArgumentException("Entity not managed: " + entity);
+            }
+            context.enqueueAction(new DeleteAction(entity, md));
+        } catch (IllegalAccessException e) {
+            throw new SfsPersistenceException("Cannot read @SfsId for remove", e);
+        }
     }
 
     @Override
