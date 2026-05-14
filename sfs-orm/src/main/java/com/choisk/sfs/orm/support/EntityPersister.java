@@ -1,6 +1,8 @@
 package com.choisk.sfs.orm.support;
 
+import com.choisk.sfs.orm.SfsEntityManagerFactory;
 import com.choisk.sfs.orm.annotation.SfsId;
+import com.choisk.sfs.orm.annotation.SfsManyToOne;
 import com.choisk.sfs.orm.exception.SfsPersistenceException;
 import com.choisk.sfs.tx.jdbc.JdbcTemplate;
 import com.choisk.sfs.tx.jdbc.RowMapper;
@@ -43,11 +45,23 @@ public class EntityPersister {
     private final EntityMetadata md;
     private final IdentifierGenerator idGenerator;
     private final JdbcTemplate jdbc;
+    // J1: LAZY/EAGER 분기에서 연관 persister 조회 + LazyProxyFactory 접근용
+    private SfsEntityManagerFactory emf;
 
     public EntityPersister(EntityMetadata md, IdentifierGenerator idGenerator, JdbcTemplate jdbc) {
         this.md = md;
         this.idGenerator = idGenerator;
         this.jdbc = jdbc;
+    }
+
+    /**
+     * J1 통합: emf 역참조를 주입한다. 모든 persister 생성 완료 후 factory가 호출한다.
+     * (생성자 시점에는 persisterByClass 맵이 완성되지 않아 생성자 주입 불가)
+     *
+     * @param emf EntityManagerFactory 인스턴스
+     */
+    public void setEmf(SfsEntityManagerFactory emf) {
+        this.emf = emf;
     }
 
     /** 이 persister가 사용하는 식별자 생성기를 반환한다. */
@@ -218,11 +232,15 @@ public class EntityPersister {
     /**
      * ResultSet 행을 엔티티 인스턴스로 변환하는 RowMapper를 반환한다.
      *
-     * <p><b>forward stub 주석:</b> J1(다음 task)에서 @SfsManyToOne 필드에 대해
-     * LAZY/EAGER 분기 + lazy proxy 채우기 로직이 추가될 자리.
-     * 현재는 FK 컬럼 값을 ResultSet에서 읽되 엔티티 필드에 반영하지 않는다.
+     * <p>J1 통합: @SfsManyToOne 필드에 대해 LAZY/EAGER 분기를 수행한다.
+     * <ul>
+     *   <li>LAZY: {@link LazyProxyFactory}로 프록시 생성 — 실제 접근 시 DB fallback 로드</li>
+     *   <li>EAGER: {@link EntityPersister#loadById}로 즉시 별도 SELECT (1차 캐시 경유)</li>
+     * </ul>
      *
-     * @param context 영속성 컨텍스트 (J1에서 lazy proxy 구성 시 사용 예정)
+     * <p>context가 null이면 LAZY/EAGER 관계 채우기를 건너뜀 (fallback 로드 순환 회피).
+     *
+     * @param context 영속성 컨텍스트 (null이면 관계 채우기 생략)
      */
     private RowMapper<Object> buildRowMapper(PersistenceContext context) {
         return (rs, rowNum) -> {
@@ -239,14 +257,35 @@ public class EntityPersister {
                 for (FieldMetadata col : md.columns()) {
                     col.field().set(instance, rs.getObject(idx++, toBoxedType(col.javaType())));
                 }
-                // @ManyToOne FK 컬럼 — J1에서 LAZY/EAGER 분기 + lazy proxy 채우기 추가
-                // 현재는 fk 값을 읽어 건너뜀 (Task J1까지 lazy/eager 처리 미구현)
+                // @ManyToOne FK 컬럼 — J1: LAZY/EAGER 분기
                 for (RelationMetadata rel : md.manyToOnes()) {
-                    rs.getObject(idx++); // fk 값 읽기만 하고 미사용
-                    // TODO(J1): fetch == LAZY 이면 LazyProxyFactory로 프록시 생성,
-                    //           fetch == EAGER 이면 persister.loadById(fk, context) 재귀 호출
-                    // rel은 J1 분기 추가 시 사용 예정
-                    @SuppressWarnings("unused") RelationMetadata unusedRel = rel;
+                    Object fk = rs.getObject(idx++);
+                    if (fk == null) {
+                        // FK null: 연관 엔티티 없음 — 필드를 null로 유지
+                        continue;
+                    }
+                    if (context == null) {
+                        // fallback 로드 시 context null — 순환 참조 회피를 위해 관계 채우기 생략
+                        continue;
+                    }
+                    if (rel.fetch() == SfsManyToOne.FetchType.LAZY) {
+                        // LAZY: byte-buddy 프록시 생성 — 실제 접근 시 DB fallback 로드
+                        Object proxy = emf.lazyProxyFactory().createProxy(
+                                rel.targetEntity(), fk, context);
+                        rel.field().set(instance, proxy);
+                    } else {
+                        // EAGER: 즉시 별도 SELECT (1차 캐시 경유)
+                        EntityKey relKey = new EntityKey(rel.targetEntity(), fk);
+                        Object related = context.getEntity(relKey);
+                        if (related == null) {
+                            EntityPersister relPersister = emf.persisterOf(rel.targetEntity());
+                            related = relPersister.loadById(fk, context);
+                            if (related != null) {
+                                context.putEntity(relKey, related);
+                            }
+                        }
+                        rel.field().set(instance, related);
+                    }
                 }
                 return instance;
             } catch (Exception e) {

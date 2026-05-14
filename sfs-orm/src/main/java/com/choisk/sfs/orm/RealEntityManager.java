@@ -1,6 +1,7 @@
 package com.choisk.sfs.orm;
 
 import com.choisk.sfs.orm.exception.SfsPersistenceException;
+import com.choisk.sfs.orm.support.DeleteAction;
 import com.choisk.sfs.orm.support.EntityKey;
 import com.choisk.sfs.orm.support.EntityMetadata;
 import com.choisk.sfs.orm.support.EntityPersister;
@@ -138,14 +139,68 @@ public class RealEntityManager implements SfsEntityManager {
         return snap;
     }
 
+    /**
+     * 1차 캐시 우선 조회, miss 시 DB에서 SELECT.
+     *
+     * <p>학습 정점 ② 1 entity = 1 instance: identityMap에 등재된 인스턴스를 그대로 반환하므로
+     * 같은 PK에 대해 여러 번 find()를 호출해도 항상 동일한 객체 참조를 반환한다.
+     *
+     * <p>forward stub: J1에서 @SfsManyToOne LAZY/EAGER 관계 채우기가 추가된다.
+     * 현재 loadById는 FK 컬럼 값을 읽되 엔티티 필드에 반영하지 않음 (EntityPersister.buildRowMapper 주석 참조).
+     *
+     * @param entityClass 조회할 엔티티 클래스 (@SfsEntity 붙은 클래스)
+     * @param primaryKey  조회할 PK 값
+     * @return 엔티티 인스턴스, 없으면 null
+     * @throws SfsPersistenceException 등록되지 않은 엔티티 클래스인 경우
+     */
     @Override
     public <T> T find(Class<T> entityClass, Object primaryKey) {
-        throw new UnsupportedOperationException("H1");
+        EntityMetadata md = emf.metadataOf(entityClass);
+        if (md == null) throw new SfsPersistenceException("Unknown entity class: " + entityClass);
+
+        EntityKey key = new EntityKey(entityClass, primaryKey);
+
+        // 1차 캐시 hit — identityMap에 등재된 동일 인스턴스 반환 (학습 정점 ②)
+        Object cached = context.getEntity(key);
+        if (cached != null) return entityClass.cast(cached);
+
+        // cache miss → DB SELECT
+        EntityPersister persister = emf.persisterOf(entityClass);
+        Object loaded = persister.loadById(primaryKey, context);
+        if (loaded == null) return null;  // 행 없음
+
+        // DB에서 읽은 인스턴스를 1차 캐시 등재 + snapshot 캡처 (K2 dirty 체크 기준선)
+        context.putEntity(key, loaded);
+        context.putSnapshot(key, captureSnapshot(loaded, md));
+        return entityClass.cast(loaded);
     }
 
+    /**
+     * 관리 엔티티를 삭제 대기 상태로 전환한다.
+     *
+     * <p>write-behind 패턴: 즉시 DELETE하지 않고 actionQueue에 DeleteAction을 등록한다.
+     * 실제 DELETE SQL은 flush(K2)에서 실행된다.
+     *
+     * @param entity 삭제할 엔티티 인스턴스 (반드시 1차 캐시에 있는 관리 상태여야 함)
+     * @throws IllegalArgumentException  미관리(detached/new) 엔티티를 넘긴 경우
+     * @throws SfsPersistenceException   알 수 없는 엔티티 클래스이거나 @SfsId 필드 접근 실패 시
+     */
     @Override
     public void remove(Object entity) {
-        throw new UnsupportedOperationException("K1");
+        EntityMetadata md = emf.metadataOf(entity.getClass());
+        if (md == null) {
+            throw new SfsPersistenceException("Unknown entity class: " + entity.getClass());
+        }
+        try {
+            Object pk = md.idField().field().get(entity);
+            EntityKey key = new EntityKey(entity.getClass(), pk);
+            if (!context.contains(key)) {
+                throw new IllegalArgumentException("Entity not managed: " + entity);
+            }
+            context.enqueueAction(new DeleteAction(entity, md));
+        } catch (IllegalAccessException e) {
+            throw new SfsPersistenceException("Cannot read @SfsId for remove", e);
+        }
     }
 
     @Override
