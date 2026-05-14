@@ -138,9 +138,40 @@ public class RealEntityManager implements SfsEntityManager {
         return snap;
     }
 
+    /**
+     * 1차 캐시 우선 조회, miss 시 DB에서 SELECT.
+     *
+     * <p>학습 정점 ② 1 entity = 1 instance: identityMap에 등재된 인스턴스를 그대로 반환하므로
+     * 같은 PK에 대해 여러 번 find()를 호출해도 항상 동일한 객체 참조를 반환한다.
+     *
+     * <p>forward stub: J1에서 @SfsManyToOne LAZY/EAGER 관계 채우기가 추가된다.
+     * 현재 loadById는 FK 컬럼 값을 읽되 엔티티 필드에 반영하지 않음 (EntityPersister.buildRowMapper 주석 참조).
+     *
+     * @param entityClass 조회할 엔티티 클래스 (@SfsEntity 붙은 클래스)
+     * @param primaryKey  조회할 PK 값
+     * @return 엔티티 인스턴스, 없으면 null
+     * @throws SfsPersistenceException 등록되지 않은 엔티티 클래스인 경우
+     */
     @Override
     public <T> T find(Class<T> entityClass, Object primaryKey) {
-        throw new UnsupportedOperationException("H1");
+        EntityMetadata md = emf.metadataOf(entityClass);
+        if (md == null) throw new SfsPersistenceException("Unknown entity class: " + entityClass);
+
+        EntityKey key = new EntityKey(entityClass, primaryKey);
+
+        // 1차 캐시 hit — identityMap에 등재된 동일 인스턴스 반환 (학습 정점 ②)
+        Object cached = context.getEntity(key);
+        if (cached != null) return entityClass.cast(cached);
+
+        // cache miss → DB SELECT
+        EntityPersister persister = emf.persisterOf(entityClass);
+        Object loaded = persister.loadById(primaryKey, context);
+        if (loaded == null) return null;  // 행 없음
+
+        // DB에서 읽은 인스턴스를 1차 캐시 등재 + snapshot 캡처 (K2 dirty 체크 기준선)
+        context.putEntity(key, loaded);
+        context.putSnapshot(key, captureSnapshot(loaded, md));
+        return entityClass.cast(loaded);
     }
 
     @Override
