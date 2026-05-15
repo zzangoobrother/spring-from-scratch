@@ -1,30 +1,7 @@
 package com.choisk.sfs.orm.integration;
 
-import com.choisk.sfs.orm.SfsEntityManagerFactory;
-import com.choisk.sfs.orm.annotation.SfsColumn;
-import com.choisk.sfs.orm.annotation.SfsEntity;
-import com.choisk.sfs.orm.annotation.SfsGeneratedValue;
-import com.choisk.sfs.orm.annotation.SfsGeneratedValue.GenerationType;
-import com.choisk.sfs.orm.annotation.SfsId;
-import com.choisk.sfs.orm.annotation.SfsJoinColumn;
-import com.choisk.sfs.orm.annotation.SfsManyToOne;
-import com.choisk.sfs.orm.annotation.SfsManyToOne.FetchType;
-import com.choisk.sfs.orm.boot.SfsEntityManagerFactoryBean;
-import com.choisk.sfs.orm.boot.SfsTransactionalEntityManager;
-import com.choisk.sfs.tx.jdbc.JdbcTemplate;
-import com.choisk.sfs.tx.support.DataSourceTransactionManager;
-import com.choisk.sfs.tx.support.ThreadLocalTsm;
-import com.choisk.sfs.tx.support.TransactionSynchronizationManager;
 import com.choisk.sfs.tx.support.TransactionTemplate;
-import org.h2.jdbcx.JdbcDataSource;
-import org.h2.tools.RunScript;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
-
-import java.io.InputStreamReader;
-import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,74 +11,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * <p>H2 in-memory DB + {@link TransactionTemplate}을 사용해 persist/find/remove/flush/TxRequired 5건 검증.
  * K2/K3/L1/L2에서 단위 테스트가 없었던 부분의 통합 안전망.
+ *
+ * <p>공통 인프라는 {@link AbstractOrmIntegrationTest}에서 제공.
  */
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class BasicCrudIntegrationTest {
+class BasicCrudIntegrationTest extends AbstractOrmIntegrationTest {
 
-    @SfsEntity(name = "test_users")
-    public static class TestUser {
-        @SfsId
-        @SfsGeneratedValue(strategy = GenerationType.SEQUENCE, sequenceName = "test_users_seq")
-        Long id;
-        @SfsColumn
-        String name;
-        @SfsColumn
-        String email;
-
-        public Long getId() { return id; }
-    }
-
-    @SfsEntity(name = "test_orders")
-    public static class TestOrder {
-        @SfsId
-        @SfsGeneratedValue(strategy = GenerationType.IDENTITY)
-        Long id;
-        @SfsManyToOne(fetch = FetchType.LAZY)
-        @SfsJoinColumn(name = "user_id")
-        TestUser user;
-        @SfsColumn
-        BigDecimal amount;
-        @SfsColumn
-        String status;
-
-        public Long getId() { return id; }
-    }
-
-    private JdbcDataSource ds;
-    private TransactionSynchronizationManager tsm;
-    private DataSourceTransactionManager tm;
-    private SfsEntityManagerFactory emf;
-    private SfsEntityManagerFactoryBean factoryBean;
-    private SfsTransactionalEntityManager em;
-    private JdbcTemplate jdbc;
-
-    @BeforeAll
-    void setupAll() throws Exception {
-        ds = new JdbcDataSource();
-        ds.setURL("jdbc:h2:mem:basiccrud;DB_CLOSE_DELAY=-1");
-        try (var conn = ds.getConnection();
-             var reader = new InputStreamReader(
-                     getClass().getResourceAsStream("/orm-schema-test.sql"))) {
-            RunScript.execute(conn, reader);
-        }
-        tsm = new ThreadLocalTsm();
-        tm = new DataSourceTransactionManager(ds, tsm);
-        jdbc = new JdbcTemplate(ds, tsm);
-
-        emf = SfsEntityManagerFactory.builder()
-                .dataSource(ds)
-                .transactionSynchronizationManager(tsm)
-                .addEntityClass(TestUser.class)
-                .addEntityClass(TestOrder.class)
-                .build();
-        factoryBean = new SfsEntityManagerFactoryBean(emf, tsm);
-        em = new SfsTransactionalEntityManager(factoryBean, tsm);
-    }
-
-    @BeforeEach
-    void cleanup() {
-        jdbc.update("DELETE FROM test_orders");
-        jdbc.update("DELETE FROM test_users");
+    @Override
+    protected String jdbcUrl() {
+        return "jdbc:h2:mem:basiccrud;DB_CLOSE_DELAY=-1";
     }
 
     /**
