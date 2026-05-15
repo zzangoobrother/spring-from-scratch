@@ -27,4 +27,18 @@ public interface TransactionSynchronizationManager {
 
     /** 테스트 셋업/티어다운용. */
     void clearAll();
+
+    /**
+     * 현재 스레드에 실제(물리) 트랜잭션이 활성화되어 있는지 반환한다.
+     *
+     * <p>Spring 본가 {@code TransactionSynchronizationManager.isActualTransactionActive()}와 동일 시멘틱.
+     * {@link ThreadLocalTsm}은 {@code actualTransactionActive} ThreadLocal flag로 구현.
+     * {@link ScopedValueTsm}은 scope 진입 여부({@code SLOT.isBound()})로 구현.
+     *
+     * <p>이 값은 {@link TransactionInterceptor}가 트랜잭션 시작 시 {@code true},
+     * commit/rollback 완료 후 {@code false}로 관리한다.
+     *
+     * @return 트랜잭션이 활성이면 {@code true}
+     */
+    boolean isActualTransactionActive();
 }

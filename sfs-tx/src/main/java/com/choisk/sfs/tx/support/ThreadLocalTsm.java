@@ -21,6 +21,12 @@ public class ThreadLocalTsm implements TransactionSynchronizationManager {
     /** 현재 스레드의 트랜잭션 동기화 콜백 리스트. */
     private final ThreadLocal<List<TransactionSynchronization>> synchronizations =
             ThreadLocal.withInitial(ArrayList::new);
+    /**
+     * 현재 스레드에 실제(물리) 트랜잭션이 활성화되어 있는지를 나타내는 flag.
+     * Spring 본가 {@code TransactionSynchronizationManager.actualTransactionActive}와 동일 패턴.
+     * {@link TransactionInterceptor}가 begin 시 {@code true}, commit/rollback 완료 후 {@code false}로 관리.
+     */
+    private final ThreadLocal<Boolean> actualTransactionActive = ThreadLocal.withInitial(() -> false);
 
     @Override
     public void bindResource(Object key, Object value) {
@@ -67,8 +73,29 @@ public class ThreadLocalTsm implements TransactionSynchronizationManager {
     }
 
     @Override
+    public boolean isActualTransactionActive() {
+        return Boolean.TRUE.equals(actualTransactionActive.get());
+    }
+
+    /**
+     * 현재 스레드의 트랜잭션 활성 flag를 설정한다.
+     * {@link TransactionInterceptor}가 트랜잭션 시작 시 {@code true},
+     * commit/rollback 완료 후 {@code false}로 호출한다.
+     *
+     * @param active 트랜잭션 활성 여부
+     */
+    public void setActualTransactionActive(boolean active) {
+        if (active) {
+            actualTransactionActive.set(true);
+        } else {
+            actualTransactionActive.remove();
+        }
+    }
+
+    @Override
     public void clearAll() {
         resources.remove();
         synchronizations.remove();
+        actualTransactionActive.remove();
     }
 }
