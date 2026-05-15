@@ -283,9 +283,59 @@ public class RealEntityManager implements SfsEntityManager {
         };
     }
 
+    /**
+     * detached 엔티티의 상태를 managed 인스턴스에 복사하고 managed 인스턴스를 반환한다.
+     *
+     * <p>처리 순서:
+     * <ol>
+     *   <li>1차 캐시에서 managed 인스턴스를 먼저 찾는다.</li>
+     *   <li>없으면 DB에서 find()로 조회한다.</li>
+     *   <li>DB에도 없으면 {@link SfsPersistenceException}을 던진다 (PK null persist 폴백 없음 — spec 단순화).</li>
+     *   <li>shallow copy: {@code md.columns()} + {@code md.manyToOnes()} 필드를 managed에 복사.</li>
+     *   <li>snapshot 갱신: 다음 flush의 dirty 체크 기준선을 현재 상태로 맞춘다.</li>
+     * </ol>
+     *
+     * <p>함정 박제: 호출자가 인자로 넘긴 detached 인스턴스는 여전히 detached.
+     * 반드시 반환된 managed 인스턴스를 사용해야 한다.
+     *
+     * @param entity detached 엔티티 인스턴스
+     * @return 1차 캐시에 등재된 managed 인스턴스 (entity와 다른 객체일 수 있음)
+     * @throws SfsPersistenceException 알 수 없는 클래스, DB에 행 없음, reflection 접근 실패 시
+     */
     @Override
     public <T> T merge(T entity) {
-        throw new UnsupportedOperationException("K3");
+        EntityMetadata md = emf.metadataOf(entity.getClass());
+        if (md == null) throw new SfsPersistenceException("Unknown entity class");
+
+        try {
+            Object pk = md.idField().field().get(entity);
+            EntityKey key = new EntityKey(entity.getClass(), pk);
+
+            Object managed = context.getEntity(key);
+            if (managed == null) {
+                managed = find(entity.getClass(), pk);
+                if (managed == null) {
+                    throw new SfsPersistenceException("Cannot merge: entity not in DB " + key);
+                }
+            }
+
+            // Shallow copy (cascade 없음, EntityListener 없음 — spec 정합)
+            for (FieldMetadata col : md.columns()) {
+                col.field().set(managed, col.field().get(entity));
+            }
+            for (RelationMetadata rel : md.manyToOnes()) {
+                rel.field().set(managed, rel.field().get(entity));
+            }
+
+            // snapshot 갱신 — 갱신 안 하면 다음 flush에서 dirty가 잘못 잡힘
+            context.putSnapshot(key, captureSnapshot(managed, md));
+
+            @SuppressWarnings("unchecked")
+            T result = (T) managed;
+            return result;
+        } catch (IllegalAccessException e) {
+            throw new SfsPersistenceException("Merge failed", e);
+        }
     }
 
     /**
