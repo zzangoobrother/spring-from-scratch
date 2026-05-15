@@ -231,6 +231,12 @@ public class RealEntityManager implements SfsEntityManager {
             EntityMetadata md = emf.metadataOf(key.entityClass());
             Object[] current = captureSnapshot(entity, md);
             Object[] original = context.getSnapshot(key);
+            if (original == null) {
+                // snapshot 없이 identityMap에 등록된 엔티티(LAZY fallback / EAGER 관계 로드 경로).
+                // 방금 DB에서 읽은 상태가 기준선 — 현재 상태를 snapshot으로 등록하고 dirty 없음으로 처리.
+                context.putSnapshot(key, current);
+                continue;
+            }
             BitSet dirty = computeDirty(current, original);
             if (!dirty.isEmpty()) {
                 // 변경된 컬럼이 있으면 UpdateAction을 큐에 등록하고 snapshot 기준선 갱신
