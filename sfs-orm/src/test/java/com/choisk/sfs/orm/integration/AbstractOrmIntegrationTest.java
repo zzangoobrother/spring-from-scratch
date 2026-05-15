@@ -53,6 +53,12 @@ abstract class AbstractOrmIntegrationTest {
         String email;
 
         public Long getId() { return id; }
+        /**
+         * LAZY proxy 초기화 trigger용 getter.
+         * byte-buddy subclass proxy는 필드 직접 접근으로 lazy init이 발생하지 않는다.
+         * 반드시 public 메서드를 통해야 LazyInterceptor가 invoke됨.
+         */
+        public String getName() { return name; }
     }
 
     /**
