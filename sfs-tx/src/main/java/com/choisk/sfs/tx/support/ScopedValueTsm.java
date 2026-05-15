@@ -48,6 +48,18 @@ public class ScopedValueTsm implements TransactionSynchronizationManager {
         return currentMap().remove(key);
     }
 
+    /**
+     * ScopedValue 모델에서는 scope 밖에서 콜백 리스트를 유지할 수 없어 미지원.
+     * 동기화 콜백이 필요한 boot 통합에는 {@link ThreadLocalTsm}을 사용할 것.
+     *
+     * @throws UnsupportedOperationException 항상
+     */
+    @Override
+    public void registerSynchronization(TransactionSynchronization sync) {
+        throw new UnsupportedOperationException(
+                "ScopedValueTsm은 registerSynchronization을 지원하지 않음 — ThreadLocalTsm을 사용하세요");
+    }
+
     @Override
     public void clearAll() {
         // ScopedValue는 외부 명시적 clear 불가 — scope 종료 시 자동

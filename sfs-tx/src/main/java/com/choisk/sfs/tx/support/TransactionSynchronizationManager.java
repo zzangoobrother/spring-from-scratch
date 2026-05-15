@@ -18,6 +18,13 @@ public interface TransactionSynchronizationManager {
 
     Object unbindResource(Object key);
 
+    /**
+     * 현재 트랜잭션에 동기화 콜백을 등록한다.
+     * 트랜잭션 commit 직전 {@link TransactionSynchronization#beforeCommit()},
+     * 완료 후 {@link TransactionSynchronization#afterCompletion(int)}이 호출된다.
+     */
+    void registerSynchronization(TransactionSynchronization sync);
+
     /** 테스트 셋업/티어다운용. */
     void clearAll();
 }
