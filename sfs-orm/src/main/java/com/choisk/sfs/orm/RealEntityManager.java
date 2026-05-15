@@ -2,6 +2,7 @@ package com.choisk.sfs.orm;
 
 import com.choisk.sfs.orm.exception.SfsPersistenceException;
 import com.choisk.sfs.orm.support.DeleteAction;
+import com.choisk.sfs.orm.support.EntityAction;
 import com.choisk.sfs.orm.support.EntityKey;
 import com.choisk.sfs.orm.support.EntityMetadata;
 import com.choisk.sfs.orm.support.EntityPersister;
@@ -10,6 +11,11 @@ import com.choisk.sfs.orm.support.IdentifierGenerator;
 import com.choisk.sfs.orm.support.InsertAction;
 import com.choisk.sfs.orm.support.PersistenceContext;
 import com.choisk.sfs.orm.support.RelationMetadata;
+import com.choisk.sfs.orm.support.UpdateAction;
+
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.Objects;
 
 /**
  * SfsEntityManager 구현체.
@@ -203,9 +209,78 @@ public class RealEntityManager implements SfsEntityManager {
         }
     }
 
+    /**
+     * 영속성 컨텍스트의 변경 사항을 DB에 반영한다.
+     *
+     * <p>Phase 1 — dirty check:
+     * identityMap의 모든 관리 엔티티에 대해 snapshot과 현재 상태를 비교한다.
+     * 변경된 컬럼이 있으면 UpdateAction을 actionQueue에 등록하고 snapshot을 갱신한다.
+     *
+     * <p>Phase 2 — action 실행:
+     * actionQueue를 INSERT → UPDATE → DELETE 순으로 정렬 후 순차 실행한다.
+     * 실행 완료 후 actionQueue를 비운다.
+     *
+     * <p>학습 정점 ③ 완성: flush()가 write-behind 큐의 실제 DB 반영 지점.
+     */
     @Override
     public void flush() {
-        throw new UnsupportedOperationException("K2");
+        // Phase 1: dirty check — identityMap의 모든 관리 엔티티를 순회
+        for (var entry : context.identityMap().entrySet()) {
+            EntityKey key = entry.getKey();
+            Object entity = entry.getValue();
+            EntityMetadata md = emf.metadataOf(key.entityClass());
+            Object[] current = captureSnapshot(entity, md);
+            Object[] original = context.getSnapshot(key);
+            BitSet dirty = computeDirty(current, original);
+            if (!dirty.isEmpty()) {
+                // 변경된 컬럼이 있으면 UpdateAction을 큐에 등록하고 snapshot 기준선 갱신
+                context.enqueueAction(new UpdateAction(entity, md, dirty));
+                context.putSnapshot(key, current);
+            }
+        }
+
+        // Phase 2: action 실행 (INSERT → UPDATE → DELETE 순)
+        var actions = new ArrayList<>(context.actionQueue());
+        actions.sort((a, b) -> typeOrder(a) - typeOrder(b));
+        for (EntityAction action : actions) {
+            EntityPersister p = emf.persisterOf(action.entity().getClass());
+            switch (action) {
+                case InsertAction ia -> p.executeInsert(ia.entity());
+                case UpdateAction ua -> p.executeUpdate(ua.entity(), ua.dirtyColumns());
+                case DeleteAction da -> p.executeDelete(da.entity());
+            }
+        }
+        context.clearActionQueue();
+    }
+
+    /**
+     * 현재 상태와 snapshot을 비교해 변경된 인덱스의 비트를 켠다.
+     *
+     * @param current  현재 엔티티 필드 값 배열
+     * @param original snapshot (flush 이전 기준선)
+     * @return dirty 인덱스의 비트가 설정된 BitSet (변경 없으면 empty)
+     */
+    private BitSet computeDirty(Object[] current, Object[] original) {
+        BitSet dirty = new BitSet();
+        for (int i = 0; i < current.length; i++) {
+            if (!Objects.equals(current[i], original[i])) dirty.set(i);
+        }
+        return dirty;
+    }
+
+    /**
+     * EntityAction의 실행 우선순위를 반환한다.
+     * INSERT(1) → UPDATE(2) → DELETE(3) 순으로 처리한다.
+     *
+     * @param a 정렬 기준을 구할 EntityAction
+     * @return 순서 값 (낮을수록 먼저 실행)
+     */
+    private int typeOrder(EntityAction a) {
+        return switch (a) {
+            case InsertAction ia -> 1;
+            case UpdateAction ua -> 2;
+            case DeleteAction da -> 3;
+        };
     }
 
     @Override
