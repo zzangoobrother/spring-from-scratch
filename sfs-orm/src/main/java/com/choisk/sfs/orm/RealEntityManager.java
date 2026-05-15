@@ -2,6 +2,7 @@ package com.choisk.sfs.orm;
 
 import com.choisk.sfs.orm.exception.SfsPersistenceException;
 import com.choisk.sfs.orm.support.DeleteAction;
+import com.choisk.sfs.orm.support.EntityAction;
 import com.choisk.sfs.orm.support.EntityKey;
 import com.choisk.sfs.orm.support.EntityMetadata;
 import com.choisk.sfs.orm.support.EntityPersister;
@@ -10,6 +11,11 @@ import com.choisk.sfs.orm.support.IdentifierGenerator;
 import com.choisk.sfs.orm.support.InsertAction;
 import com.choisk.sfs.orm.support.PersistenceContext;
 import com.choisk.sfs.orm.support.RelationMetadata;
+import com.choisk.sfs.orm.support.UpdateAction;
+
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.Objects;
 
 /**
  * SfsEntityManager 구현체.
@@ -203,14 +209,139 @@ public class RealEntityManager implements SfsEntityManager {
         }
     }
 
+    /**
+     * 영속성 컨텍스트의 변경 사항을 DB에 반영한다.
+     *
+     * <p>Phase 1 — dirty check:
+     * identityMap의 모든 관리 엔티티에 대해 snapshot과 현재 상태를 비교한다.
+     * 변경된 컬럼이 있으면 UpdateAction을 actionQueue에 등록하고 snapshot을 갱신한다.
+     *
+     * <p>Phase 2 — action 실행:
+     * actionQueue를 INSERT → UPDATE → DELETE 순으로 정렬 후 순차 실행한다.
+     * 실행 완료 후 actionQueue를 비운다.
+     *
+     * <p>학습 정점 ③ 완성: flush()가 write-behind 큐의 실제 DB 반영 지점.
+     */
     @Override
     public void flush() {
-        throw new UnsupportedOperationException("K2");
+        // Phase 1: dirty check — identityMap의 모든 관리 엔티티를 순회
+        for (var entry : context.identityMap().entrySet()) {
+            EntityKey key = entry.getKey();
+            Object entity = entry.getValue();
+            EntityMetadata md = emf.metadataOf(key.entityClass());
+            Object[] current = captureSnapshot(entity, md);
+            Object[] original = context.getSnapshot(key);
+            if (original == null) {
+                // snapshot 없이 identityMap에 등록된 엔티티(LAZY fallback / EAGER 관계 로드 경로).
+                // 방금 DB에서 읽은 상태가 기준선 — 현재 상태를 snapshot으로 등록하고 dirty 없음으로 처리.
+                context.putSnapshot(key, current);
+                continue;
+            }
+            BitSet dirty = computeDirty(current, original);
+            if (!dirty.isEmpty()) {
+                // 변경된 컬럼이 있으면 UpdateAction을 큐에 등록하고 snapshot 기준선 갱신
+                context.enqueueAction(new UpdateAction(entity, md, dirty));
+                context.putSnapshot(key, current);
+            }
+        }
+
+        // Phase 2: action 실행 (INSERT → UPDATE → DELETE 순)
+        var actions = new ArrayList<>(context.actionQueue());
+        actions.sort((a, b) -> typeOrder(a) - typeOrder(b));
+        for (EntityAction action : actions) {
+            EntityPersister p = emf.persisterOf(action.entity().getClass());
+            switch (action) {
+                case InsertAction ia -> p.executeInsert(ia.entity());
+                case UpdateAction ua -> p.executeUpdate(ua.entity(), ua.dirtyColumns());
+                case DeleteAction da -> p.executeDelete(da.entity());
+            }
+        }
+        context.clearActionQueue();
     }
 
+    /**
+     * 현재 상태와 snapshot을 비교해 변경된 인덱스의 비트를 켠다.
+     *
+     * @param current  현재 엔티티 필드 값 배열
+     * @param original snapshot (flush 이전 기준선)
+     * @return dirty 인덱스의 비트가 설정된 BitSet (변경 없으면 empty)
+     */
+    private BitSet computeDirty(Object[] current, Object[] original) {
+        BitSet dirty = new BitSet();
+        for (int i = 0; i < current.length; i++) {
+            if (!Objects.equals(current[i], original[i])) dirty.set(i);
+        }
+        return dirty;
+    }
+
+    /**
+     * EntityAction의 실행 우선순위를 반환한다.
+     * INSERT(1) → UPDATE(2) → DELETE(3) 순으로 처리한다.
+     *
+     * @param a 정렬 기준을 구할 EntityAction
+     * @return 순서 값 (낮을수록 먼저 실행)
+     */
+    private int typeOrder(EntityAction a) {
+        return switch (a) {
+            case InsertAction ia -> 1;
+            case UpdateAction ua -> 2;
+            case DeleteAction da -> 3;
+        };
+    }
+
+    /**
+     * detached 엔티티의 상태를 managed 인스턴스에 복사하고 managed 인스턴스를 반환한다.
+     *
+     * <p>처리 순서:
+     * <ol>
+     *   <li>1차 캐시에서 managed 인스턴스를 먼저 찾는다.</li>
+     *   <li>없으면 DB에서 find()로 조회한다.</li>
+     *   <li>DB에도 없으면 {@link SfsPersistenceException}을 던진다 (PK null persist 폴백 없음 — spec 단순화).</li>
+     *   <li>shallow copy: {@code md.columns()} + {@code md.manyToOnes()} 필드를 managed에 복사.</li>
+     *   <li>snapshot 갱신: 다음 flush의 dirty 체크 기준선을 현재 상태로 맞춘다.</li>
+     * </ol>
+     *
+     * <p>함정 박제: 호출자가 인자로 넘긴 detached 인스턴스는 여전히 detached.
+     * 반드시 반환된 managed 인스턴스를 사용해야 한다.
+     *
+     * @param entity detached 엔티티 인스턴스
+     * @return 1차 캐시에 등재된 managed 인스턴스 (entity와 다른 객체일 수 있음)
+     * @throws SfsPersistenceException 알 수 없는 클래스, DB에 행 없음, reflection 접근 실패 시
+     */
     @Override
     public <T> T merge(T entity) {
-        throw new UnsupportedOperationException("K3");
+        EntityMetadata md = emf.metadataOf(entity.getClass());
+        if (md == null) throw new SfsPersistenceException("Unknown entity class");
+
+        try {
+            Object pk = md.idField().field().get(entity);
+            EntityKey key = new EntityKey(entity.getClass(), pk);
+
+            Object managed = context.getEntity(key);
+            if (managed == null) {
+                managed = find(entity.getClass(), pk);
+                if (managed == null) {
+                    throw new SfsPersistenceException("Cannot merge: entity not in DB " + key);
+                }
+            }
+
+            // Shallow copy (cascade 없음, EntityListener 없음 — spec 정합)
+            for (FieldMetadata col : md.columns()) {
+                col.field().set(managed, col.field().get(entity));
+            }
+            for (RelationMetadata rel : md.manyToOnes()) {
+                rel.field().set(managed, rel.field().get(entity));
+            }
+
+            // snapshot 갱신 — 갱신 안 하면 다음 flush에서 dirty가 잘못 잡힘
+            context.putSnapshot(key, captureSnapshot(managed, md));
+
+            @SuppressWarnings("unchecked")
+            T result = (T) managed;
+            return result;
+        } catch (IllegalAccessException e) {
+            throw new SfsPersistenceException("Merge failed", e);
+        }
     }
 
     /**

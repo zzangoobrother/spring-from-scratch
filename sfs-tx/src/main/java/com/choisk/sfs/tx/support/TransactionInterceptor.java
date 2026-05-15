@@ -21,6 +21,10 @@ import java.util.concurrent.Callable;
  * </ul>
  *
  * <p>{@link Transactional#transactionManager()}로 다중 TM 빈 라우팅 (Phase 2B B-2 흡수).
+ *
+ * <p>TSM flag 관리 및 동기화 콜백 실행은 {@link DataSourceTransactionManager}가 담당
+ * (Spring 본가 {@code AbstractPlatformTransactionManager.prepareSynchronization()} 정합).
+ * {@code TransactionInterceptor}는 flag 관리 책임 없음 — 단순 AOP 경계 역할.
  */
 public class TransactionInterceptor {
 

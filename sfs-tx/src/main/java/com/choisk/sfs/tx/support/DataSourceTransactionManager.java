@@ -10,11 +10,20 @@ import java.sql.SQLException;
 /**
  * JDBC {@link Connection} 기반 TM. Spring 본가 {@code DataSourceTransactionManager}와 동명/다른 패키지.
  *
- * <p>begin: getConnection → setAutoCommit(false) → ConnectionHolder bind to TSM
- * <br>commit: doCommit(connection) → connection.close → unbind
- * <br>rollback: doRollback(connection) → connection.close → unbind
+ * <p>begin: getConnection → setAutoCommit(false) → ConnectionHolder bind to TSM → flag=true
+ * <br>commit: beforeCommit 콜백 → doCommit(connection) → connection.close → unbind → afterCompletion(0) → flag=false
+ * <br>rollback: doRollback(connection) → connection.close → unbind → afterCompletion(1) → flag=false
  * <br>suspend: unbind만 (보관본 = ConnectionHolder)
  * <br>resume: bind 보관본
+ *
+ * <p>TSM flag 관리: 신규 트랜잭션 begin 시 {@code isActualTransactionActive=true},
+ * commit/rollback 완료 후 {@code false}로 설정한다. Spring 본가 {@code AbstractPlatformTransactionManager}의
+ * {@code prepareSynchronization()} 패턴 정합. TSM이 {@link ThreadLocalTsm}인 경우에만 적용.
+ *
+ * <p>동기화 콜백 위임: TSM이 {@link ThreadLocalTsm}인 경우 commit 직전
+ * {@link ThreadLocalTsm#invokeSynchronizationsBeforeCommit()},
+ * commit/rollback 완료 후 {@link ThreadLocalTsm#invokeSynchronizationsAfterCompletion(int)}을 호출한다.
+ * 이를 통해 {@code SfsEntityManagerFactoryBean}이 등록한 flush/close 콜백이 올바른 시점에 실행된다.
  */
 public class DataSourceTransactionManager extends AbstractPlatformTransactionManager {
 
@@ -41,6 +50,8 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
             conn.setAutoCommit(false);
             ConnectionHolder holder = new ConnectionHolder(conn);
             tsm.bindResource(dataSource, holder);
+            // 신규 트랜잭션 시작 — flag 활성화 (Spring 본가 prepareSynchronization 패턴 정합)
+            setActive(true);
             return holder;
         } catch (SQLException e) {
             throw new TransactionException.CommitFailedException("failed to begin", e);
@@ -49,13 +60,15 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 
     @Override
     protected void doCommit(Object transaction) {
+        // commit 직전 beforeCommit 콜백 실행 — em.flush() 등
+        invokeBeforeCommit();
         ConnectionHolder holder = (ConnectionHolder) transaction;
         try {
             holder.getConnection().commit();
         } catch (SQLException e) {
             throw new TransactionException.CommitFailedException("commit failed", e);
         } finally {
-            releaseConnection(holder);
+            releaseConnection(holder, 0);
         }
     }
 
@@ -67,14 +80,23 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
         } catch (SQLException e) {
             throw new TransactionException.RollbackFailedException("rollback failed", e);
         } finally {
-            releaseConnection(holder);
+            releaseConnection(holder, 1);
         }
     }
 
-    /** TSM unbind + Connection close — commit/rollback 양쪽 finally 공통 처리. */
-    private void releaseConnection(ConnectionHolder holder) {
+    /**
+     * TSM unbind + Connection close + afterCompletion 콜백 + flag 비활성화
+     * — commit/rollback 양쪽 finally 공통 처리.
+     *
+     * @param status 0 = commit, 1 = rollback
+     */
+    private void releaseConnection(ConnectionHolder holder, int status) {
         tsm.unbindResource(dataSource);
         closeQuietly(holder.getConnection());
+        // afterCompletion 콜백 실행 — em.context().close() + resource unbind 등
+        invokeAfterCompletion(status);
+        // 트랜잭션 종료 — flag 비활성화
+        setActive(false);
     }
 
     @Override
@@ -89,5 +111,35 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 
     private static void closeQuietly(Connection c) {
         try { c.close(); } catch (SQLException ignored) {}
+    }
+
+    /**
+     * TSM이 {@link ThreadLocalTsm}이면 {@code isActualTransactionActive} flag를 설정한다.
+     * 그 외 TSM 구현체는 자체 메커니즘으로 활성 여부를 표현하므로 무시.
+     */
+    private void setActive(boolean active) {
+        if (tsm instanceof ThreadLocalTsm threadLocalTsm) {
+            threadLocalTsm.setActualTransactionActive(active);
+        }
+    }
+
+    /**
+     * TSM이 {@link ThreadLocalTsm}이면 commit 직전 등록된 동기화 콜백을 실행한다.
+     */
+    private void invokeBeforeCommit() {
+        if (tsm instanceof ThreadLocalTsm threadLocalTsm) {
+            threadLocalTsm.invokeSynchronizationsBeforeCommit();
+        }
+    }
+
+    /**
+     * TSM이 {@link ThreadLocalTsm}이면 commit/rollback 완료 후 등록된 동기화 콜백을 실행한다.
+     *
+     * @param status 0 = commit, 1 = rollback
+     */
+    private void invokeAfterCompletion(int status) {
+        if (tsm instanceof ThreadLocalTsm threadLocalTsm) {
+            threadLocalTsm.invokeSynchronizationsAfterCompletion(status);
+        }
     }
 }
