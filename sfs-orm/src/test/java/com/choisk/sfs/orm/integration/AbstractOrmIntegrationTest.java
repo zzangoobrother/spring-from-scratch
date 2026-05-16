@@ -79,6 +79,34 @@ abstract class AbstractOrmIntegrationTest {
         String status;
 
         public Long getId() { return id; }
+        /**
+         * LAZY proxy 초기화 trigger용 getter.
+         * byte-buddy subclass proxy는 필드 직접 접근으로 lazy init이 발생하지 않는다.
+         */
+        public TestUser getUser() { return user; }
+    }
+
+    /**
+     * M3: EAGER 관계 검증용 audit log 엔티티.
+     * IDENTITY 전략 + EAGER ManyToOne 연관 (spec § 4.7 + § 5.3 AuditLog 정합).
+     */
+    @SfsEntity(name = "test_audit_logs")
+    public static class TestAuditLog {
+        @SfsId
+        @SfsGeneratedValue(strategy = GenerationType.IDENTITY)
+        Long id;
+        @SfsManyToOne(fetch = FetchType.EAGER)
+        @SfsJoinColumn(name = "order_id")
+        TestOrder order;
+        @SfsColumn
+        String action;
+
+        public Long getId() { return id; }
+        /**
+         * EAGER 관계 접근용 getter.
+         * find() 시점에 이미 별도 SELECT로 로드됨 — proxy가 아닌 실제 인스턴스.
+         */
+        public TestOrder getOrder() { return order; }
     }
 
     // -------- 공유 인프라 필드 --------
@@ -121,6 +149,7 @@ abstract class AbstractOrmIntegrationTest {
                 .transactionSynchronizationManager(tsm)
                 .addEntityClass(TestUser.class)
                 .addEntityClass(TestOrder.class)
+                .addEntityClass(TestAuditLog.class)
                 .build();
         factoryBean = new SfsEntityManagerFactoryBean(emf, tsm);
         em = new SfsTransactionalEntityManager(factoryBean, tsm);
@@ -129,10 +158,12 @@ abstract class AbstractOrmIntegrationTest {
     /**
      * 각 테스트 전 데이터 정리.
      *
-     * <p>test_orders → test_users 순서로 삭제해 FK 제약 위반을 피한다.
+     * <p>FK 제약 위반을 피하기 위해 자식 → 부모 순서로 삭제한다.
+     * test_audit_logs → test_orders → test_users 순서.
      */
     @BeforeEach
     void cleanup() {
+        jdbc.update("DELETE FROM test_audit_logs");
         jdbc.update("DELETE FROM test_orders");
         jdbc.update("DELETE FROM test_users");
     }
