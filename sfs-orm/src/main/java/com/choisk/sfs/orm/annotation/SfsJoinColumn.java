@@ -8,5 +8,6 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.FIELD)
 public @interface SfsJoinColumn {
-    String name();   // FK 컬럼명 (필수)
+    // FK 컬럼명 필수 — @SfsColumn과 달리 필드명 규칙이 없어 default 없음
+    String name();
 }

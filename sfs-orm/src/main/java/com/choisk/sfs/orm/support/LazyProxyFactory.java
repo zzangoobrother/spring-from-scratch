@@ -32,13 +32,16 @@ public class LazyProxyFactory {
     /** byte-buddy 생성 서브클래스에 주입되는 PK hidden 필드명 */
     public static final String PK_FIELD = "$$lazyPk";
 
-    // 학습 포인트: enhanced 클래스 캐싱은 클래스 단위 — 같은 targetClass면 buildEnhanced 재호출 안 함
+    // enhanced 클래스 캐싱은 클래스 단위 — 같은 targetClass면 buildEnhanced 재호출 안 함.
+    // WHY 메모리 안전: 도메인 엔티티 클래스 수는 부팅 시 fixed.
+    // ClassLoadingStrategy.UsingLookup(privateLookupIn)으로 targetClass의 classloader에 정의되므로,
+    // classloader unload 시 enhanced class도 함께 회수 — unbounded 캐시지만 leak 아님.
     private final Map<Class<?>, Class<?>> enhancedCache = new ConcurrentHashMap<>();
-    // J1: DB fallback 로더 — context.getEntity() miss 시 EntityPersister.loadById() 위임
+    // DB fallback 로더 — context.getEntity() miss 시 EntityPersister.loadById() 위임
     private final LazyTargetLoader loader;
 
     /**
-     * LazyTargetLoader를 주입받는 생성자 — J1 통합 완성 형태.
+     * LazyTargetLoader를 주입받는 생성자.
      *
      * @param loader DB fallback 로더 (context miss 시 EntityPersister.loadById() 위임)
      */
