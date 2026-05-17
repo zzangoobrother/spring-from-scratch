@@ -99,8 +99,11 @@ class DirtyCheckingIntegrationTest extends AbstractOrmIntegrationTest {
      * 엔티티를 수정하지 않고 flush 호출 시 UPDATE가 발생하지 않아
      * DB 값이 원래 그대로 유지되는지 검증.
      *
-     * <p>K2의 {@code if (!dirty.isEmpty())} 가드 검증.
-     * JdbcTemplate spy 미사용 — "DB 값 변경 없음 + 예외 없음"으로 충분.
+     * <p>WHY: 빈 BitSet → "UPDATE ... SET  WHERE ..." SQL syntax error 방지 가드.
+     * 추가로 변경 없는 entity에 대해 불필요한 UPDATE round-trip 회피 (성능).
+     * 학습 정점 ②(snapshot 비교)의 no-op 경로 박제.
+     *
+     * <p>JdbcTemplate spy 미사용 — "DB 값 변경 없음 + 예외 없음"으로 충분.
      */
     @Test
     void no_dirty_fields_skips_UPDATE() {
