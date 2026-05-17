@@ -820,30 +820,40 @@ class BasicCrudIntegrationTest {
 
 ### 7.4 회귀 카운트 추정 표
 
-| 시작 | 목표 | 차이 | 분배 |
-|---|---|---|---|
-| **244 PASS** (Phase 1A gap 마감 시점) | **~296 PASS** | **+52** | sfs-orm 단위 33 + sfs-orm 통합 19 + **sfs-tx JdbcTemplate 신규 메서드 +2** (DoD 1.5) |
+| 시작 | 추정 목표 | 실측 (O1 마감) | 차이 | 분배 |
+|---|---|---|---|---|
+| **244 PASS** (Phase 1A gap 마감 시점) | ~296 PASS (+52) | **304 PASS (+60)** | **+8 초과 달성** | sfs-orm 단위 33 + sfs-orm 통합 23 (+4) + sfs-tx JdbcTemplate +2 + I-1 회수 +2 |
+
+> **+8 초과 사유 (O1, 2026-05-17 박제)**:
+> - PRE 마감 시 code review I-1 회수 +2 (`queryForObject` 0건/다건 분기 안전망)
+> - M1 통합 시 L1 dead-code 결함 자연 노출 → 보강 테스트 +2
+> - M2 통합 시 `flush()` snapshot null 결함 자연 노출 → 보강 시나리오 +0 (시나리오에 흡수)
+> - M4 통합 +4 (plan 추정과 일치, 시나리오 1 재설계로 의도 정정)
+>
+> 모두 *production 결함 자연 노출형* 보강이므로 *학습 가치가 회귀 카운트에 반영된 양*. 마감 게이트(O2)에서 retrospective 회수.
 
 ---
 
 ## 8. DoD (Definition of Done) — 14항목
 
-| # | 항목 | 검증 방법 |
-|---|---|---|
-| 1 | sfs-orm 모듈 신설 + Gradle 의존 정합 | `./gradlew :sfs-orm:compileJava` PASS |
-| 1.5 | sfs-tx `JdbcTemplate`에 `queryForObject` + `updateAndReturnKey` 신규 메서드 2종 추가 | sfs-tx 단위 테스트 +2 (별도 회귀 카운트 — § 7.4 +50에 미포함) |
-| 2 | 어노테이션 6개 정의 (@SfsEntity, @SfsId, @SfsGeneratedValue, @SfsColumn, @SfsManyToOne, @SfsJoinColumn) | reflection으로 retention/target 검증 |
-| 3 | 예외 4개 (`SfsPersistenceException` 계층) | 각 발생 시나리오 통합 테스트 |
-| 4 | `EntityMetadataAnalyzer` 부팅 시 fail-fast (5종 검증) | 5개 단위 테스트 |
-| 5 | `PersistenceContext` 1차 캐시 + snapshot + actionQueue | 6 단위 + 통합 검증 |
-| 6 | `EntityPersister` 동적 SQL 생성 + dirty UPDATE | 5 단위 |
-| 7 | `LazyProxyFactory` + `LazyInterceptor` (byte-buddy 서브클래싱) | 3+3 단위 + 통합 |
-| 8 | `IdentityGenerator` / `SequenceGenerator` (I4 두 전략) | 2+2 단위 + 비교 통합 |
-| 9 | `SfsTransactionalEntityManager` proxy + TSM 콜백 (L1) | tx 통합 테스트 + lifecycle 검증 |
-| 10 | `SfsEntityManager` API 6개 (persist/find/remove/flush/merge/contains) 정상 동작 | BasicCrud + Merge 통합 |
-| 11 | `OrmDemoApplication` main 메서드 console output 7개 시연 정상 | manual run 또는 integration smoke test |
-| 12 | 회귀 +52 (244 → 296) PASS, 0 FAIL | `./gradlew build` |
-| 13 | 마감 게이트 3단계 통과 (다관점 리뷰 + 리팩토링 + simplify 패스) | 게이트 기록 박제 |
+| # | 상태 | 항목 | 검증 방법 | 회수 박제 |
+|---|---|---|---|---|
+| 1 | [x] | sfs-orm 모듈 신설 + Gradle 의존 정합 | `./gradlew :sfs-orm:compileJava` PASS | A1 (`ddf0c7e`) |
+| 1.5 | [x] | sfs-tx `JdbcTemplate`에 `queryForObject` + `updateAndReturnKey` 신규 메서드 2종 추가 | sfs-tx 단위 테스트 +2 | PRE (`b933219`) + I-1 회수 (`4a60f65`) |
+| 2 | [x] | 어노테이션 6개 정의 (@SfsEntity, @SfsId, @SfsGeneratedValue, @SfsColumn, @SfsManyToOne, @SfsJoinColumn) | reflection으로 retention/target 검증 | A2 (`d93bb8f`) |
+| 3 | [x] | 예외 4개 (`SfsPersistenceException` 계층) | 각 발생 시나리오 통합 테스트 | A3 (`7192a2b`) + M3·M4 통합 |
+| 4 | [x] | `EntityMetadataAnalyzer` 부팅 시 fail-fast (5종 검증) | 5개 단위 테스트 | B2 (`229058e`) +8 |
+| 5 | [x] | `PersistenceContext` 1차 캐시 + snapshot + actionQueue | 6 단위 + 통합 검증 | D1 (`5670a52`) +6 |
+| 6 | [x] | `EntityPersister` 동적 SQL 생성 + dirty UPDATE | 5 단위 | F1+F2 (`b5befc3`/`a587cb5`) +5 |
+| 7 | [x] | `LazyProxyFactory` + `LazyInterceptor` (byte-buddy 서브클래싱) | 3+3 단위 + 통합 | I1+I2 (`326bb08`/`5349276`) +6 |
+| 8 | [x] | `IdentityGenerator` / `SequenceGenerator` (I4 두 전략) | 2+2 단위 + 비교 통합 | E1+E2 (`fad0ebe`/`7d07df1`) +4 + M5 +2 |
+| 9 | [x] | `SfsTransactionalEntityManager` proxy + TSM 콜백 (L1) | tx 통합 테스트 + lifecycle 검증 | L1+L2 + M1 (`a22ed6f`) |
+| 10 | [x] | `SfsEntityManager` API 6개 (persist/find/remove/flush/merge/contains) 정상 동작 | BasicCrud + Merge 통합 | M1+M4 (`a22ed6f`/`af65771`) |
+| 11 | [x] | `OrmDemoApplication` main 메서드 console output 7개 시연 정상 | manual run | N1+N2 (`ecfc9f9`/`16ab108`) + `ormDemo` JavaExec 검증 |
+| 12 | [x] | 회귀 +52 (244 → 296) PASS, 0 FAIL → **실측 +60 (244→304)**, § 7.4 정정 박제 | `./gradlew clean build` BUILD SUCCESSFUL | O1 (2026-05-17) |
+| 13 | [ ] | 마감 게이트 3단계 통과 (다관점 리뷰 + 리팩토링 + simplify 패스) | 게이트 기록 박제 | O2 대기 |
+
+> **O1 마감 박제 (2026-05-17)**: 14항목 중 13개 `[x]`, 1개 `[ ]` (O2 대기). 회귀 304 PASS / 0 FAIL / 0 errors. 학습 정점 4개 모두 통합 박제 완료(M1~M5 통합 23건) + demo 시연 7건 manual 실행 검증 완료(N2). 자율 판단 6건 누적(D1·F1·I1·M1·M4·N2). 마감 게이트는 O2에서 3 reviewer + 3 simplify 병행 패턴(Phase 2B/3/1A gap 답습).
 
 ---
 
