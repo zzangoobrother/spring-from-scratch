@@ -55,7 +55,7 @@ public class RealEntityManager implements SfsEntityManager {
      *   <li>actionQueue에 InsertAction을 등록한다 (write-behind).</li>
      * </ol>
      *
-     * <p>IDENTITY 전략(post-insert): G2에서 구현. id는 INSERT 후 generated key에서 받는다.
+     * <p>IDENTITY 전략(post-insert): id는 INSERT 후 DB가 생성한 generated key에서 받는다.
      *
      * @param entity 영속화할 엔티티 인스턴스
      * @throws SfsPersistenceException 알 수 없는 엔티티 클래스이거나 reflection 접근 실패 시

@@ -1,10 +1,8 @@
 package com.choisk.sfs.orm.support;
 
-import com.choisk.sfs.orm.annotation.SfsId;
 import com.choisk.sfs.orm.exception.SfsPersistenceException;
 import com.choisk.sfs.tx.jdbc.JdbcTemplate;
 
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -74,7 +72,7 @@ public class IdentityGenerator implements IdentifierGenerator {
             }
             for (RelationMetadata rel : md.manyToOnes()) {
                 Object related = rel.field().get(entity);
-                params.add(related == null ? null : extractFk(related, rel.targetEntity()));
+                params.add(related == null ? null : EntityMetadataAnalyzer.extractIdFieldValue(related, rel.targetEntity()));
             }
         } catch (IllegalAccessException e) {
             throw new SfsPersistenceException("Cannot read entity fields", e);
@@ -82,21 +80,4 @@ public class IdentityGenerator implements IdentifierGenerator {
         return params.toArray();
     }
 
-    /**
-     * 연관 엔티티의 @SfsId 필드값을 FK로 추출한다.
-     * 임시로 reflection 사용 — analyzer 결과 캐싱은 추후 과제.
-     */
-    private Object extractFk(Object related, Class<?> targetType) {
-        for (Field f : targetType.getDeclaredFields()) {
-            if (f.isAnnotationPresent(SfsId.class)) {
-                f.setAccessible(true);
-                try {
-                    return f.get(related);
-                } catch (IllegalAccessException e) {
-                    throw new SfsPersistenceException("Cannot extract FK", e);
-                }
-            }
-        }
-        throw new SfsPersistenceException("Related entity has no @SfsId");
-    }
 }

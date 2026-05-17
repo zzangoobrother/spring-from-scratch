@@ -10,7 +10,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 /**
- * byte-buddy lazy proxy 인터셉터 — J1 통합 완성.
+ * byte-buddy lazy proxy 인터셉터.
  *
  * <p>동작 원리:
  * <ul>
@@ -32,7 +32,7 @@ public class LazyInterceptor {
     private final Class<?> targetClass;
     private final Object pk;
     private final PersistenceContext context;
-    // J1: DB fallback 로더 — context.getEntity() miss 시 EntityPersister.loadById() 위임
+    // DB fallback 로더 — context.getEntity() miss 시 EntityPersister.loadById() 위임
     private final LazyTargetLoader loader;
     // 학습 정점 ③: 한 번 초기화된 후 불변 — identityMap 보장으로 같은 PK = 같은 인스턴스
     private Object target;

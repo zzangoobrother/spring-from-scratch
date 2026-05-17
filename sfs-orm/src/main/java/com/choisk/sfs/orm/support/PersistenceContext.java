@@ -27,11 +27,18 @@ public class PersistenceContext {
         identityMap.put(key, entity);
     }
 
+    /**
+     * WHY: closed 상태에서 read 경로는 silent null 반환.
+     * LazyInterceptor가 context.isClosed()를 직접 확인해 SfsLazyInitializationException을 던지므로,
+     * PC의 read는 write를 막는 우산이 아니라 오작동 우산 역할.
+     * putEntity/enqueueAction은 ensureOpen으로 IllegalStateException을 던져 비대칭 의도적 설계.
+     */
     public Object getEntity(EntityKey key) {
         if (closed) return null;
         return identityMap.get(key);
     }
 
+    /** closed 시 false — {@link #getEntity}와 동일 의도 (위 Javadoc 참조). */
     public boolean contains(EntityKey key) {
         return !closed && identityMap.containsKey(key);
     }

@@ -60,7 +60,11 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 
     @Override
     protected void doCommit(Object transaction) {
-        // commit 직전 beforeCommit 콜백 실행 — em.flush() 등
+        // WHY: beforeCommit()에서 flush() 예외 발생 시 commit()은 실행되지 않고
+        // finally의 releaseConnection()이 status=0(commit)으로 afterCompletion을 호출.
+        // 실제로는 commit이 미수행이나 JDBC autoCommit=false + connection.close() 시
+        // 미커밋 트랜잭션 rollback 보장으로 데이터 정합성은 유지됨. afterCompletion(0)을
+        // "commit 완료" 신호로 해석하는 콜백은 본 sfs-orm에는 없음 (PC.close + unbind만).
         invokeBeforeCommit();
         ConnectionHolder holder = (ConnectionHolder) transaction;
         try {
