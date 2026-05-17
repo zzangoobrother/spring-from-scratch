@@ -8,14 +8,15 @@ import com.choisk.sfs.orm.annotation.SfsId;
 import com.choisk.sfs.orm.annotation.SfsJoinColumn;
 import com.choisk.sfs.orm.annotation.SfsManyToOne;
 import com.choisk.sfs.orm.exception.SfsEntityMappingException;
+import com.choisk.sfs.orm.exception.SfsPersistenceException;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * 엔티티 클래스를 리플렉션으로 분석해 EntityMetadata를 생성하는 분석기.
@@ -38,6 +39,36 @@ public class EntityMetadataAnalyzer {
      */
     public EntityMetadata analyze(Class<?> entityClass) {
         return cache.computeIfAbsent(entityClass, this::doAnalyze);
+    }
+
+    // -------- static 헬퍼 (외부 공개) --------
+
+    /**
+     * 관련 엔티티 인스턴스에서 {@code @SfsId} 필드 값을 추출. FK 컬럼 값으로 사용.
+     *
+     * <p>WHY: IdentityGenerator(post-insert key 회수)와 EntityPersister(INSERT/SELECT FK 컬럼)가
+     * 동일한 reflection 루프를 두 곳에서 가지면 메시지 문구만 달라 한 쪽만 수정하는 버그 위험 발생.
+     * 본 static 헬퍼로 단일화하여 동일 분기 안전망 공유.
+     *
+     * @param related    연관 엔티티 인스턴스
+     * @param targetType 연관 엔티티 클래스
+     * @return FK 값 (연관 엔티티의 {@code @SfsId} 필드 값)
+     * @throws SfsPersistenceException {@code @SfsId} 필드가 없거나 접근 불가 시
+     */
+    public static Object extractIdFieldValue(Object related, Class<?> targetType) {
+        for (Field f : targetType.getDeclaredFields()) {
+            if (f.isAnnotationPresent(SfsId.class)) {
+                f.setAccessible(true);
+                try {
+                    return f.get(related);
+                } catch (IllegalAccessException e) {
+                    throw new SfsPersistenceException(
+                            "Cannot extract @SfsId value from " + targetType.getName(), e);
+                }
+            }
+        }
+        throw new SfsPersistenceException(
+                "Related entity has no @SfsId: " + targetType.getName());
     }
 
     // -------- 내부 분석 로직 --------
@@ -152,11 +183,8 @@ public class EntityMetadataAnalyzer {
                                   List<RelationMetadata> rels,
                                   IdGeneratorSpec spec) {
         boolean includeId = spec.strategy() != GenerationType.IDENTITY;
-        List<String> colNames = new ArrayList<>();
-        if (includeId) colNames.add(columnNameOf(idField));
-        cols.forEach(c -> colNames.add(c.columnName()));
-        rels.forEach(r -> colNames.add(r.joinColumnName()));
-        String placeholders = colNames.stream().map(c -> "?").collect(Collectors.joining(", "));
+        List<String> colNames = allColumnNames(idField, cols, rels, includeId);
+        String placeholders = String.join(", ", Collections.nCopies(colNames.size(), "?"));
         return "INSERT INTO " + table + " (" + String.join(", ", colNames)
                 + ") VALUES (" + placeholders + ")";
     }
@@ -165,10 +193,7 @@ public class EntityMetadataAnalyzer {
     private String buildSelectByIdSql(String table, Field idField,
                                       List<FieldMetadata> cols,
                                       List<RelationMetadata> rels) {
-        List<String> colNames = new ArrayList<>();
-        colNames.add(columnNameOf(idField));
-        cols.forEach(c -> colNames.add(c.columnName()));
-        rels.forEach(r -> colNames.add(r.joinColumnName()));
+        List<String> colNames = allColumnNames(idField, cols, rels, true);
         return "SELECT " + String.join(", ", colNames) + " FROM " + table
                 + " WHERE " + columnNameOf(idField) + " = ?";
     }
@@ -176,5 +201,28 @@ public class EntityMetadataAnalyzer {
     /** DELETE WHERE id = ? SQL 생성 */
     private String buildDeleteSql(String table, Field idField) {
         return "DELETE FROM " + table + " WHERE " + columnNameOf(idField) + " = ?";
+    }
+
+    /**
+     * INSERT/SELECT용 컬럼명 리스트 조립. 순서 불변 규약: id → columns → fk.
+     *
+     * <p>WHY: 두 SQL 빌더가 동일한 순서 규약을 갖되 한 쪽만 수정 시 SQL 컬럼/value mismatch 발생.
+     * 단일 헬퍼로 <em>순서 불변</em>을 한 곳에 박제.
+     *
+     * @param idField   엔티티 PK 필드
+     * @param cols      일반 컬럼 목록
+     * @param rels      연관 관계(FK) 목록
+     * @param includeId true이면 id 컬럼을 첫 번째로 포함
+     * @return 순서가 보장된 컬럼명 리스트
+     */
+    private List<String> allColumnNames(Field idField,
+                                        List<FieldMetadata> cols,
+                                        List<RelationMetadata> rels,
+                                        boolean includeId) {
+        List<String> names = new ArrayList<>();
+        if (includeId) names.add(columnNameOf(idField));
+        cols.forEach(c -> names.add(c.columnName()));
+        rels.forEach(r -> names.add(r.joinColumnName()));
+        return names;
     }
 }

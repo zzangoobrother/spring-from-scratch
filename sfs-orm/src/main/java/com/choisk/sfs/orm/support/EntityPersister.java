@@ -1,13 +1,11 @@
 package com.choisk.sfs.orm.support;
 
 import com.choisk.sfs.orm.SfsEntityManagerFactory;
-import com.choisk.sfs.orm.annotation.SfsId;
 import com.choisk.sfs.orm.annotation.SfsManyToOne;
 import com.choisk.sfs.orm.exception.SfsPersistenceException;
 import com.choisk.sfs.tx.jdbc.JdbcTemplate;
 import com.choisk.sfs.tx.jdbc.RowMapper;
 
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
@@ -45,7 +43,7 @@ public class EntityPersister {
     private final EntityMetadata md;
     private final IdentifierGenerator idGenerator;
     private final JdbcTemplate jdbc;
-    // J1: LAZY/EAGER 분기에서 연관 persister 조회 + LazyProxyFactory 접근용
+    // LAZY/EAGER 분기에서 연관 persister 조회 + LazyProxyFactory 접근용
     private SfsEntityManagerFactory emf;
 
     public EntityPersister(EntityMetadata md, IdentifierGenerator idGenerator, JdbcTemplate jdbc) {
@@ -55,8 +53,8 @@ public class EntityPersister {
     }
 
     /**
-     * J1 통합: emf 역참조를 주입한다. 모든 persister 생성 완료 후 factory가 호출한다.
-     * (생성자 시점에는 persisterByClass 맵이 완성되지 않아 생성자 주입 불가)
+     * emf 역참조를 주입한다. 모든 persister 생성 완료 후 factory가 호출한다.
+     * 생성자 시점에는 persisterByClass 맵이 완성되지 않아 생성자 주입 불가 — 2단계 초기화.
      *
      * @param emf EntityManagerFactory 인스턴스
      */
@@ -134,7 +132,7 @@ public class EntityPersister {
                 if (dirtyColumns.get(colIdx)) {
                     setClauses.add(rel.joinColumnName() + " = ?");
                     Object related = rel.field().get(entity);
-                    params.add(related == null ? null : extractFk(related, rel.targetEntity()));
+                    params.add(related == null ? null : EntityMetadataAnalyzer.extractIdFieldValue(related, rel.targetEntity()));
                 }
                 colIdx++;
             }
@@ -187,7 +185,7 @@ public class EntityPersister {
             // @ManyToOne FK 파라미터 추가 (관련 엔티티의 @SfsId 값 추출)
             for (RelationMetadata rel : md.manyToOnes()) {
                 Object related = rel.field().get(entity);
-                params.add(related == null ? null : extractFk(related, rel.targetEntity()));
+                params.add(related == null ? null : EntityMetadataAnalyzer.extractIdFieldValue(related, rel.targetEntity()));
             }
         } catch (IllegalAccessException e) {
             throw new SfsPersistenceException("엔티티 필드 읽기 실패 — INSERT 파라미터 구성 불가", e);
@@ -195,28 +193,6 @@ public class EntityPersister {
         return params.toArray();
     }
 
-    /**
-     * 연관 엔티티의 @SfsId 필드 값을 추출한다 (FK 값 추출).
-     *
-     * @param related    연관 엔티티 인스턴스
-     * @param targetType 연관 엔티티 클래스
-     * @return FK 값 (연관 엔티티의 @SfsId 필드 값)
-     * @throws SfsPersistenceException @SfsId 필드가 없거나 접근 불가 시
-     */
-    private Object extractFk(Object related, Class<?> targetType) {
-        for (Field f : targetType.getDeclaredFields()) {
-            if (f.isAnnotationPresent(SfsId.class)) {
-                f.setAccessible(true);
-                try {
-                    return f.get(related);
-                } catch (IllegalAccessException e) {
-                    throw new SfsPersistenceException("FK 추출 실패: " + targetType.getName(), e);
-                }
-            }
-        }
-        throw new SfsPersistenceException(
-                "@SfsId 누락 — FK 추출 불가: " + targetType.getName());
-    }
 
     /**
      * 프리미티브 타입을 대응 박싱 타입으로 변환한다.
@@ -257,17 +233,11 @@ public class EntityPersister {
                 for (FieldMetadata col : md.columns()) {
                     col.field().set(instance, rs.getObject(idx++, toBoxedType(col.javaType())));
                 }
-                // @ManyToOne FK 컬럼 — J1: LAZY/EAGER 분기
+                // @ManyToOne FK 컬럼 — LAZY/EAGER 분기
                 for (RelationMetadata rel : md.manyToOnes()) {
                     Object fk = rs.getObject(idx++);
-                    if (fk == null) {
-                        // FK null: 연관 엔티티 없음 — 필드를 null로 유지
-                        continue;
-                    }
-                    if (context == null) {
-                        // fallback 로드 시 context null — 순환 참조 회피를 위해 관계 채우기 생략
-                        continue;
-                    }
+                    // fk null: 연관 엔티티 없음 / context null: fallback 로드(순환 참조 회피)
+                    if (fk == null || context == null) continue;
                     if (rel.fetch() == SfsManyToOne.FetchType.LAZY) {
                         // LAZY: byte-buddy 프록시 생성 — 실제 접근 시 DB fallback 로드
                         Object proxy = emf.lazyProxyFactory().createProxy(
