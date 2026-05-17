@@ -851,9 +851,11 @@ class BasicCrudIntegrationTest {
 | 10 | [x] | `SfsEntityManager` API 6개 (persist/find/remove/flush/merge/contains) 정상 동작 | BasicCrud + Merge 통합 | M1+M4 (`a22ed6f`/`af65771`) |
 | 11 | [x] | `OrmDemoApplication` main 메서드 console output 7개 시연 정상 | manual run | N1+N2 (`ecfc9f9`/`16ab108`) + `ormDemo` JavaExec 검증 |
 | 12 | [x] | 회귀 +52 (244 → 296) PASS, 0 FAIL → **실측 +60 (244→304)**, § 7.4 정정 박제 | `./gradlew clean build` BUILD SUCCESSFUL | O1 (2026-05-17) |
-| 13 | [ ] | 마감 게이트 3단계 통과 (다관점 리뷰 + 리팩토링 + simplify 패스) | 게이트 기록 박제 | O2 대기 |
+| 13 | [x] | 마감 게이트 3단계 통과 (다관점 리뷰 + 리팩토링 + simplify 패스) | 게이트 기록 박제 | O2 (`afb132a`, 2026-05-17) |
 
 > **O1 마감 박제 (2026-05-17)**: 14항목 중 13개 `[x]`, 1개 `[ ]` (O2 대기). 회귀 304 PASS / 0 FAIL / 0 errors. 학습 정점 4개 모두 통합 박제 완료(M1~M5 통합 23건) + demo 시연 7건 manual 실행 검증 완료(N2). 자율 판단 6건 누적(D1·F1·I1·M1·M4·N2). 마감 게이트는 O2에서 3 reviewer + 3 simplify 병행 패턴(Phase 2B/3/1A gap 답습).
+>
+> **O2 마감 게이트 박제 (2026-05-17)**: **14/14 [x]** — Phase 4 ORM 완전 마감. 지적사항 18건 / 반영 13건 / 거부 2건 / 보류 5건 (보류율 28%). 5 refactor 커밋, 회귀 304 PASS 유지. main 머지는 사용자 직접 진행.
 
 ---
 
