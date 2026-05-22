@@ -15,8 +15,10 @@ public record EntityMetadata(
         IdGeneratorSpec idGeneratorSpec,
         List<FieldMetadata> columns,
         List<RelationMetadata> manyToOnes,
+        List<CollectionMetadata> oneToManies,    // 신설 — manyToOnes 인접 (관계 도메인 묶음)
         String insertSql,
         String selectByIdSql,
+        String selectAllSql,                      // 신설 — SELECT * 사전 빌드 (Phase 4 SQL 캐싱 패턴)
         String deleteSql
 ) {
     /** LAZY fetch 연관 필드가 하나라도 있으면 true — 프록시 생성 여부 판단 기준 */

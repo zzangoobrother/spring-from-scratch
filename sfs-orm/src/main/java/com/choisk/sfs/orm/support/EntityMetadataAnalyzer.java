@@ -120,12 +120,17 @@ public class EntityMetadataAnalyzer {
         }
 
         // 5) SQL 미리 생성
+        // B1에서 @SfsOneToMany 분기 추가 예정 — A3는 빈 리스트로 시작
+        List<CollectionMetadata> oneToManies = new ArrayList<>();
+
         String insertSql = buildInsertSql(tableName, idField, columns, manyToOnes, idGeneratorSpec);
         String selectSql = buildSelectByIdSql(tableName, idField, columns, manyToOnes);
+        String selectAllSql = buildSelectAllSql(tableName, idField, columns, manyToOnes); // 신설
         String deleteSql = buildDeleteSql(tableName, idField);
 
         return new EntityMetadata(entityClass, tableName, idMeta, idGeneratorSpec,
-                columns, manyToOnes, insertSql, selectSql, deleteSql);
+                columns, manyToOnes, oneToManies,
+                insertSql, selectSql, selectAllSql, deleteSql);
     }
 
     /**
@@ -196,6 +201,14 @@ public class EntityMetadataAnalyzer {
         List<String> colNames = allColumnNames(idField, cols, rels, true);
         return "SELECT " + String.join(", ", colNames) + " FROM " + table
                 + " WHERE " + columnNameOf(idField) + " = ?";
+    }
+
+    /** SELECT * FROM <table> SQL 생성 — findAll(Class<T>)에서 사용. */
+    private String buildSelectAllSql(String table, Field idField,
+                                     List<FieldMetadata> cols,
+                                     List<RelationMetadata> rels) {
+        List<String> colNames = allColumnNames(idField, cols, rels, true);
+        return "SELECT " + String.join(", ", colNames) + " FROM " + table;
     }
 
     /** DELETE WHERE id = ? SQL 생성 */
