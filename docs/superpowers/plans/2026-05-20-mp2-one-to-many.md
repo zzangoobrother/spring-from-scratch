@@ -583,11 +583,13 @@ git commit -m "feat(sfs-orm): EntityMetadataAnalyzer @SfsOneToMany 분기 + gene
 
 ### Task C1: `SfsPersistentList<T>` (lazy 발화 + closed 예외 + identity 보장)
 
+> **실행 기록 (2026-05-22):** plan의 `FakeCollectionLoader`가 `List.of(...)`(불변)를 반환해 `add_write_메서드도_lazy_init_trigger` 테스트가 `UnsupportedOperationException`으로 실패. fake를 `new ArrayList<>(List.of("a","b","c"))`(가변)로 정정 — 테스트 의도(write 메서드도 init trigger)는 그대로, fake 구현 버그만 수정. 커밋 `914ced6`, 회귀 312 PASS.
+
 **Files:**
 - Create: `sfs-orm/src/main/java/com/choisk/sfs/orm/support/SfsPersistentList.java`
 - Create: `sfs-orm/src/test/java/com/choisk/sfs/orm/support/SfsPersistentListTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성 (4건: lazy 발화 / closed 예외 / write 메서드도 trigger / 캐시 hit)**
+- [x] **Step 1: 실패 테스트 작성 (4건: lazy 발화 / closed 예외 / write 메서드도 trigger / 캐시 hit)**
 
 ```java
 package com.choisk.sfs.orm.support;
@@ -665,12 +667,12 @@ class SfsPersistentListTest {
 }
 ```
 
-- [ ] **Step 2: FAIL 확인**
+- [x] **Step 2: FAIL 확인**
 
 Run: `./gradlew :sfs-orm:test --tests SfsPersistentListTest`
 Expected: 4건 모두 FAIL — `SfsPersistentList` 클래스 미존재.
 
-- [ ] **Step 3: `SfsPersistentList<T>` 구현**
+- [x] **Step 3: `SfsPersistentList<T>` 구현**
 
 ```java
 package com.choisk.sfs.orm.support;
@@ -766,17 +768,17 @@ public interface CollectionLoader {
 }
 ```
 
-- [ ] **Step 4: PASS 확인**
+- [x] **Step 4: PASS 확인**
 
 Run: `./gradlew :sfs-orm:test --tests SfsPersistentListTest`
 Expected: 4건 모두 PASS.
 
-- [ ] **Step 5: 회귀 검증**
+- [x] **Step 5: 회귀 검증**
 
 Run: `./gradlew :sfs-orm:test`
 Expected: 308 + 4 = **312 PASS / 0 FAIL**.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add sfs-orm/src/main/java/com/choisk/sfs/orm/support/SfsPersistentList.java \
@@ -785,7 +787,7 @@ git add sfs-orm/src/main/java/com/choisk/sfs/orm/support/SfsPersistentList.java 
 git commit -m "feat(sfs-orm): SfsPersistentList<T> wrapper + CollectionLoader 인터페이스 stub — 모든 메서드 lazy init trigger + closed 예외 (C1)"
 ```
 
-- [ ] **Step 7: plan 체크박스 갱신**
+- [x] **Step 7: plan 체크박스 갱신**
 
 ---
 
