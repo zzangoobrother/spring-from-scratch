@@ -1252,7 +1252,7 @@ git commit -m "feat(sfs-orm): EntityPersister.findAll — SELECT * + identityMap
 > **TDD 제외** — M2 통합 테스트가 회수.
 > **정정 ②:** `SfsEntityManager` 구현체는 `RealEntityManager` + `SfsTransactionalEntityManager` 둘뿐이며, 후자는 *동적 프록시가 아니라 손수 위임 메서드를 작성한* 구현체다. 인터페이스에 `findAll`을 추가하면 후자가 미구현이 되어 **컴파일 에러** → 반드시 위임 메서드를 함께 추가해야 한다. (M1/M2가 `em.findAll`을 이 클래스 인스턴스에서 호출.)
 
-- [ ] **Step 1: `SfsEntityManager` 인터페이스에 시그니처 추가**
+- [x] **Step 1: `SfsEntityManager` 인터페이스에 시그니처 추가**
 
 ```java
 public interface SfsEntityManager {
@@ -1266,7 +1266,7 @@ public interface SfsEntityManager {
 }
 ```
 
-- [ ] **Step 2: `RealEntityManager.findAll` 구현**
+- [x] **Step 2: `RealEntityManager.findAll` 구현**
 
 ```java
 @Override
@@ -1277,7 +1277,7 @@ public <T> List<T> findAll(Class<T> entityClass) {
 }
 ```
 
-- [ ] **Step 2.5: `SfsTransactionalEntityManager.findAll` 위임 추가 (정정 ②)**
+- [x] **Step 2.5: `SfsTransactionalEntityManager.findAll` 위임 추가 (정정 ②)**
 
 기존 `find` 위임 메서드(SfsTransactionalEntityManager.java:58~61) 옆에 추가:
 
@@ -1290,12 +1290,12 @@ public <T> List<T> findAll(Class<T> entityClass) {
 
 추가 import: `import java.util.List;`. (이 메서드 없이는 `:sfs-orm:compileJava`가 *abstract method not implemented*로 실패.)
 
-- [ ] **Step 3: 컴파일 + 회귀 검증**
+- [x] **Step 3: 컴파일 + 회귀 검증**
 
 Run: `./gradlew :sfs-orm:test`
 Expected: 314 PASS 유지 (시그니처 추가만, 회귀 영향 0).
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add sfs-orm/src/main/java/com/choisk/sfs/orm/SfsEntityManager.java \
@@ -1304,7 +1304,7 @@ git add sfs-orm/src/main/java/com/choisk/sfs/orm/SfsEntityManager.java \
 git commit -m "feat(sfs-orm): SfsEntityManager.findAll 시그니처 + RealEntityManager 구현 + SfsTransactionalEntityManager 위임 (E3)"
 ```
 
-- [ ] **Step 5: plan 체크박스 갱신**
+- [x] **Step 5: plan 체크박스 갱신**
 
 ---
 
