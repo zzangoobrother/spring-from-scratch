@@ -1596,7 +1596,7 @@ git commit -m "test(sfs-orm): OneToManyLazyIntegrationTest 2건 + SqlCountingJdb
 **Files:**
 - Create: `sfs-orm/src/test/java/com/choisk/sfs/orm/integration/NPlusOneIntegrationTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성 (2건: N+1 정확 카운트 + 재실행 캐시 hit)**
+- [x] **Step 1: 실패 테스트 작성 (2건: N+1 정확 카운트 + 재실행 캐시 hit)**
 
 > M1과 동일 패턴 (`TransactionTemplate.execute(tm, () -> {})` + `SfsTransactionalEntityManager em` + 자체 fixture).
 
@@ -1717,33 +1717,33 @@ class NPlusOneIntegrationTest {
 }
 ```
 
-- [ ] **Step 2: FAIL 확인**
+- [x] **Step 2: FAIL 확인**
 
 Run: `./gradlew :sfs-orm:test --tests NPlusOneIntegrationTest`
 Expected: FAIL — `em.findAll` 미구현 또는 spy 주입 미완성 (M1에서 박제된 patterns 사용).
 
-- [ ] **Step 3: 구현은 E2 + E3에서 완성 — 본 task는 통합 시나리오 PASS만 검증**
+- [x] **Step 3: 구현은 E2 + E3에서 완성 — 본 task는 통합 시나리오 PASS만 검증**
 
 만약 FAIL 원인이 *spy 주입 패턴*이면 M1과 같은 패턴 재사용. *findAll API*는 E2+E3에서 완성됨.
 
-- [ ] **Step 4: PASS 확인**
+- [x] **Step 4: PASS 확인**
 
 Run: `./gradlew :sfs-orm:test --tests NPlusOneIntegrationTest`
 Expected: 2건 모두 PASS.
 
-- [ ] **Step 5: 회귀 검증**
+- [x] **Step 5: 회귀 검증**
 
 Run: `./gradlew :sfs-orm:test`
 Expected: 316 + 2 = **318 PASS / 0 FAIL**. spec § 7.2 추정 +14 정확히 정합.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add sfs-orm/src/test/java/com/choisk/sfs/orm/integration/NPlusOneIntegrationTest.java
 git commit -m "test(sfs-orm): NPlusOneIntegrationTest 2건 — findAll + for-loop = N+1 정확 카운트 + 재실행 캐시 hit (M2)"
 ```
 
-- [ ] **Step 7: plan 체크박스 갱신**
+- [x] **Step 7: plan 체크박스 갱신**
 
 ---
 
