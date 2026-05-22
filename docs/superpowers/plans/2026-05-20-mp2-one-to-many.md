@@ -168,7 +168,7 @@ docs/superpowers/specs/2026-05-19-mp2-one-to-many-design.md  # § 8 DoD 14/14 [x
 **Files:**
 - Create: `sfs-orm/src/main/java/com/choisk/sfs/orm/annotation/SfsOneToMany.java`
 
-- [ ] **Step 1: 어노테이션 신설**
+- [x] **Step 1: 어노테이션 신설**
 
 ```java
 package com.choisk.sfs.orm.annotation;
@@ -205,21 +205,21 @@ public @interface SfsOneToMany {
 }
 ```
 
-- [ ] **Step 2: 컴파일 확인**
+- [x] **Step 2: 컴파일 확인**
 
 Run: `./gradlew :sfs-orm:compileJava`
 Expected: BUILD SUCCESSFUL
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add sfs-orm/src/main/java/com/choisk/sfs/orm/annotation/SfsOneToMany.java
 git commit -m "feat(sfs-orm): @SfsOneToMany 어노테이션 신설 — LAZY only + joinColumn 속성 (A1)"
 ```
 
-- [ ] **Step 4: plan 체크박스 갱신**
+- [x] **Step 4: plan 체크박스 갱신**
 
-Plan 문서의 Task A1 모든 Step `- [ ]` → `- [x]`.
+Plan 문서의 Task A1 모든 Step `- [x]` → `- [x]`.
 
 ---
 
@@ -228,7 +228,7 @@ Plan 문서의 Task A1 모든 Step `- [ ]` → `- [x]`.
 **Files:**
 - Create: `sfs-orm/src/main/java/com/choisk/sfs/orm/support/CollectionMetadata.java`
 
-- [ ] **Step 1: record 신설**
+- [x] **Step 1: record 신설**
 
 ```java
 package com.choisk.sfs.orm.support;
@@ -252,19 +252,19 @@ public record CollectionMetadata(
 ) { }
 ```
 
-- [ ] **Step 2: 컴파일 확인**
+- [x] **Step 2: 컴파일 확인**
 
 Run: `./gradlew :sfs-orm:compileJava`
 Expected: BUILD SUCCESSFUL
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add sfs-orm/src/main/java/com/choisk/sfs/orm/support/CollectionMetadata.java
 git commit -m "feat(sfs-orm): CollectionMetadata record 신설 — RelationMetadata와 분리, 의미 오버로드 회피 (A2)"
 ```
 
-- [ ] **Step 4: plan 체크박스 갱신**
+- [x] **Step 4: plan 체크박스 갱신**
 
 ---
 
@@ -274,7 +274,7 @@ git commit -m "feat(sfs-orm): CollectionMetadata record 신설 — RelationMetad
 - Modify: `sfs-orm/src/main/java/com/choisk/sfs/orm/support/EntityMetadata.java`
 - Modify: `sfs-orm/src/main/java/com/choisk/sfs/orm/support/EntityMetadataAnalyzer.java`
 
-- [ ] **Step 1: `EntityMetadata` record에 `oneToManies` + `selectAllSql` 필드 추가**
+- [x] **Step 1: `EntityMetadata` record에 `oneToManies` + `selectAllSql` 필드 추가**
 
 기존 record:
 ```java
@@ -313,7 +313,7 @@ public record EntityMetadata(
 }
 ```
 
-- [ ] **Step 2: `EntityMetadataAnalyzer.doAnalyze` 호출지 정정 — `oneToManies` + `selectAllSql` 추가**
+- [x] **Step 2: `EntityMetadataAnalyzer.doAnalyze` 호출지 정정 — `oneToManies` + `selectAllSql` 추가**
 
 기존 `doAnalyze` 끝부분:
 ```java
@@ -339,7 +339,7 @@ return new EntityMetadata(entityClass, tableName, idMeta, idGeneratorSpec,
         insertSql, selectByIdSql, selectAllSql, deleteSql);
 ```
 
-- [ ] **Step 3: `Analyzer.buildSelectAllSql` 헬퍼 신설**
+- [x] **Step 3: `Analyzer.buildSelectAllSql` 헬퍼 신설**
 
 기존 `buildSelectByIdSql` 옆에:
 ```java
@@ -354,12 +354,12 @@ private String buildSelectAllSql(String table, Field idField,
 
 (`buildSelectByIdSql`과 거의 동일하나 WHERE 절 없음 — Phase 4 *SQL 사전 빌드 패턴* 정합.)
 
-- [ ] **Step 4: 컴파일 + 회귀 검증**
+- [x] **Step 4: 컴파일 + 회귀 검증**
 
 Run: `./gradlew :sfs-orm:test`
 Expected: BUILD SUCCESSFUL — Phase 4 회귀 304 PASS 그대로 유지. record 시그니처 변경 호출지가 `doAnalyze` 1곳뿐이라 무손실.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-orm/src/main/java/com/choisk/sfs/orm/support/EntityMetadata.java \
@@ -367,7 +367,7 @@ git add sfs-orm/src/main/java/com/choisk/sfs/orm/support/EntityMetadata.java \
 git commit -m "feat(sfs-orm): EntityMetadata에 oneToManies + selectAllSql 필드 2개 추가 + Analyzer.buildSelectAllSql 헬퍼 (A3)"
 ```
 
-- [ ] **Step 6: plan 체크박스 갱신**
+- [x] **Step 6: plan 체크박스 갱신**
 
 ---
 
