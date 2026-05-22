@@ -1120,7 +1120,7 @@ git commit -m "feat(sfs-orm): EntityPersister.buildRowMapper oneToManies(SfsPers
 
 > **의존(정정 ①):** 본 테스트의 `ctx.contains(...)` 단언은 D1에서 보강한 `buildRowMapper`의 `context.putEntity` 등록에 의존한다. D1이 선행되어야 PASS.
 
-- [ ] **Step 1: 실패 테스트 작성 (1건: findAll 반환 + identityMap 등재)**
+- [x] **Step 1: 실패 테스트 작성 (1건: findAll 반환 + identityMap 등재)**
 
 ```java
 package com.choisk.sfs.orm.support;
@@ -1197,12 +1197,12 @@ class EntityPersisterFindAllTest {
 }
 ```
 
-- [ ] **Step 2: FAIL 확인**
+- [x] **Step 2: FAIL 확인**
 
 Run: `./gradlew :sfs-orm:test --tests EntityPersisterFindAllTest`
 Expected: FAIL — `EntityPersister.findAll` 메서드 미존재.
 
-- [ ] **Step 3: `EntityPersister.findAll` 신설**
+- [x] **Step 3: `EntityPersister.findAll` 신설**
 
 기존 `loadById` 또는 `findByForeignKey` 옆에:
 
@@ -1220,17 +1220,17 @@ public List<Object> findAll(PersistenceContext context) {
 }
 ```
 
-- [ ] **Step 4: PASS 확인**
+- [x] **Step 4: PASS 확인**
 
 Run: `./gradlew :sfs-orm:test --tests EntityPersisterFindAllTest`
 Expected: 1건 PASS.
 
-- [ ] **Step 5: 회귀 검증**
+- [x] **Step 5: 회귀 검증**
 
 Run: `./gradlew :sfs-orm:test`
 Expected: 313 + 1 = **314 PASS / 0 FAIL**.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add sfs-orm/src/main/java/com/choisk/sfs/orm/support/EntityPersister.java \
@@ -1238,7 +1238,7 @@ git add sfs-orm/src/main/java/com/choisk/sfs/orm/support/EntityPersister.java \
 git commit -m "feat(sfs-orm): EntityPersister.findAll — SELECT * + identityMap 등재 (E2)"
 ```
 
-- [ ] **Step 7: plan 체크박스 갱신**
+- [x] **Step 7: plan 체크박스 갱신**
 
 ---
 
