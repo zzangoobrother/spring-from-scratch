@@ -1079,7 +1079,7 @@ git commit -m "feat(sfs-orm): DefaultCollectionLoader + EntityPersister.findByFo
 
 > **정정 ①: cache-hit read·identityMap 등록·idx rewrite는 D1으로 이동됨.** E1은 *이미 D1에서 rewrite된* `buildRowMapper`에 oneToManies 채우기 루프만 삽입한다. (cache-hit `return existing` 직후 fresh instance에만 컬렉션 stub이 주입되도록, manyToOnes 루프 뒤 · putEntity 등록 앞에 위치.)
 
-- [ ] **Step 1: `buildRowMapper`에 oneToManies 채우기 분기 추가**
+- [x] **Step 1: `buildRowMapper`에 oneToManies 채우기 분기 추가**
 
 D1에서 rewrite된 `buildRowMapper`의 manyToOnes 루프 뒤, `context.putEntity(...)` 등록 *앞*에 삽입 (코드 주석 `// (E1에서 oneToManies ... 삽입됨)` 위치):
 
@@ -1096,19 +1096,19 @@ for (CollectionMetadata col : md.oneToManies()) {
 
 (cache-hit으로 `existing`을 반환한 경로는 이 루프를 거치지 않으므로, 이미 초기화된 컬렉션을 stub으로 덮어쓰는 일이 없다 — 정점 ② 일관.)
 
-- [ ] **Step 3: 컴파일 + 회귀 검증**
+- [x] **Step 3: 컴파일 + 회귀 검증**
 
 Run: `./gradlew :sfs-orm:test`
 Expected: 313 PASS 유지 (분기 추가만, 회귀 영향 0). 만약 *findAll 통합 흐름*에서 cache hit 검증이 회귀로 잡힌다면 M2가 회수.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add sfs-orm/src/main/java/com/choisk/sfs/orm/support/EntityPersister.java
 git commit -m "feat(sfs-orm): EntityPersister.buildRowMapper oneToManies(SfsPersistentList) 채우기 (E1)"
 ```
 
-- [ ] **Step 5: plan 체크박스 갱신**
+- [x] **Step 5: plan 체크박스 갱신**
 
 ---
 
