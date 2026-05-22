@@ -53,27 +53,33 @@ public class UserService {
     }
 
     /**
-     * DI: user.getOrders().iterator() 첫 호출 시점에 정확히 1 SELECT 발생.
+     * DI: getOrders().isEmpty() 첫 호출 시점에 정확히 1 SELECT 발생.
      * 학습 정점 ①: lazy collection은 실제 접근 전까지 SELECT를 지연함.
-     * getOrders() 호출 자체가 아닌, 내부 원소에 접근(iterator, get, size)하는 시점에 발화.
+     * getOrders() getter 자체가 아닌, isEmpty() 같은 List 메서드 호출 시점에 lazy init이 발화된다.
      */
     @Transactional
     public void describeUserOrders(Long userId) {
         User user = em.find(User.class, userId);
-        System.out.println("[DI] user.getOrders().iterator().next() 호출 직전 (SELECT 미발생)");
+        // getOrders() getter 호출 자체는 SELECT를 발화하지 않음 — SfsPersistentList stub 반환만
+        System.out.println("[DI] getOrders() 첫 메서드 접근 직전 — 아직 SELECT 없음");
         if (!user.getOrders().isEmpty()) {
-            // isEmpty() 자체가 lazy init을 발화 — 정확히 1 SELECT 발생
+            // isEmpty()가 첫 접근 → 여기서 정확히 1 SELECT 발화
             Order first = user.getOrders().iterator().next();
-            System.out.println("[DI] 첫 호출 시점에 1 SELECT 발생 — firstOrderId=" + first.getId());
+            System.out.println("[DI] isEmpty() 호출 시점에 1 SELECT 발생 — firstOrderId=" + first.getId());
         } else {
             System.out.println("[DI] orders 없음 (사전 데이터 확인 필요)");
         }
     }
 
     /**
-     * DJ: user.getOrders().add(newOrder) + persist(user)만 호출 → newOrder INSERT 안 됨.
+     * DJ: 이미 managed인 user의 컬렉션에 add + flush → newOrder는 INSERT되지 않음.
      * 학습 짝패: 단방향 @SfsOneToMany + cascade 미도입 자연 노출.
-     * 해결 방법: em.persist(newOrder) 별도 호출 or MP-3에서 cascade=PERSIST 도입 예정.
+     *
+     * <p>WHY persist(user) 제거: user는 find()로 로드된 managed 엔티티로, persist()를 재호출하면
+     * SEQUENCE 전략이 새 시퀀스 id를 채번·덮어쓰고 중복 INSERT를 큐에 넣는다(managed 가드 부재).
+     * add() + flush()만으로도 cascade 미도입 → newOrder INSERT 안 됨을 동일하게 시연한다.
+     *
+     * <p>해결 방법: em.persist(newOrder) 별도 호출 or MP-3에서 cascade=PERSIST 도입 예정.
      */
     @Transactional
     public void tryAddOrderWithoutCascade(Long userId) {
@@ -84,13 +90,12 @@ public class UserService {
         newOrder.setCreatedAt(LocalDateTime.now());
         newOrder.setUser(user);
 
-        // lazy collection에 add → 내부적으로 lazy init 발화 후 메모리 목록에만 추가
+        // 이미 managed인 user의 컬렉션에 add → 내부적으로 lazy init 발화 후 메모리 목록에만 추가
+        // cascade 미도입이라 newOrder는 managed 상태가 되지 않음 — flush에서 INSERT 발생 안 함
         user.getOrders().add(newOrder);
-        // user는 이미 managed entity — persist 호출은 no-op (detached/new 아님)
-        em.persist(user);
 
         em.flush();
-        System.out.println("[DJ] add() + persist(user)만 호출 → newOrder는 INSERT 안 됨 (단방향 + cascade 미도입)");
+        System.out.println("[DJ] add() + flush() → newOrder는 INSERT 안 됨 (단방향 + cascade 미도입)");
         System.out.println("[DJ] 해결: em.persist(newOrder) 별도 호출 필요 — MP-3에서 cascade=PERSIST로 자동화");
     }
 }
