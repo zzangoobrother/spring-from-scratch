@@ -152,8 +152,9 @@ public class RealEntityManager implements SfsEntityManager {
      * <p>학습 정점 ② 1 entity = 1 instance: identityMap에 등재된 인스턴스를 그대로 반환하므로
      * 같은 PK에 대해 여러 번 find()를 호출해도 항상 동일한 객체 참조를 반환한다.
      *
-     * <p>forward stub: J1에서 @SfsManyToOne LAZY/EAGER 관계 채우기가 추가된다.
-     * 현재 loadById는 FK 컬럼 값을 읽되 엔티티 필드에 반영하지 않음 (EntityPersister.buildRowMapper 주석 참조).
+     * <p>identityMap 등재는 {@code buildRowMapper}가 수행하므로 find()는 dirty 체크 기준선인
+     * snapshot만 추가로 등재한다. loadById 내부에서 buildRowMapper가 putEntity를 수행한 뒤
+     * find()가 putSnapshot을 추가하는 2단계 구조.
      *
      * @param entityClass 조회할 엔티티 클래스 (@SfsEntity 붙은 클래스)
      * @param primaryKey  조회할 PK 값
@@ -171,13 +172,12 @@ public class RealEntityManager implements SfsEntityManager {
         Object cached = context.getEntity(key);
         if (cached != null) return entityClass.cast(cached);
 
-        // cache miss → DB SELECT
+        // cache miss → DB SELECT (buildRowMapper 내부에서 identityMap putEntity 수행)
         EntityPersister persister = emf.persisterOf(entityClass);
         Object loaded = persister.loadById(primaryKey, context);
         if (loaded == null) return null;  // 행 없음
 
-        // DB에서 읽은 인스턴스를 1차 캐시 등재 + snapshot 캡처 (K2 dirty 체크 기준선)
-        context.putEntity(key, loaded);
+        // dirty 체크 기준선 snapshot 등재 — buildRowMapper는 putEntity만 수행, snapshot은 여기서 추가
         context.putSnapshot(key, captureSnapshot(loaded, md));
         return entityClass.cast(loaded);
     }

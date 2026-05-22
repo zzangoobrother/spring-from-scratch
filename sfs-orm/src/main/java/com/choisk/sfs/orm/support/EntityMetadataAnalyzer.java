@@ -248,7 +248,7 @@ public class EntityMetadataAnalyzer {
                 + " WHERE " + columnNameOf(idField) + " = ?";
     }
 
-    /** SELECT * FROM <table> SQL 생성 — findAll(Class<T>)에서 사용. */
+    /** SELECT &lt;columns&gt; FROM &lt;table&gt; — 전체 행 조회용 SQL. findAll(Class&lt;T&gt;)에서 사용. */
     private String buildSelectAllSql(String table, Field idField,
                                      List<FieldMetadata> cols,
                                      List<RelationMetadata> rels) {

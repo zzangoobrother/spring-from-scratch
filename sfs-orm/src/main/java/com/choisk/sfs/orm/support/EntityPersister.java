@@ -238,22 +238,21 @@ public class EntityPersister {
     /**
      * ResultSet 행을 엔티티 인스턴스로 변환하는 RowMapper를 반환한다.
      *
-     * <p>D1 rewrite — 변경점 3가지:
-     * <ol>
-     *   <li>id를 idx=1에서 미리 추출 → cache-hit read (정점 ②: 같은 PK = 같은 인스턴스)</li>
-     *   <li>일반 컬럼 idx를 2부터 시작 (id는 위에서 처리했으므로)</li>
-     *   <li>끝에 putEntity 등록 — findByForeignKey/findAll/loadById/find 모두 이 한 곳으로 일관 등록</li>
-     * </ol>
+     * <p>identityMap에서 먼저 PK로 조회해, 같은 PK가 두 번 로드될 때 동일 인스턴스를 반환한다
+     * (학습 정점 ②: 같은 PK = 같은 인스턴스 보장).
      *
-     * <p>@SfsManyToOne LAZY/EAGER 분기 로직은 그대로 보존.
-     * context가 null이면 LAZY/EAGER 관계 채우기 + 등록을 건너뜀 (fallback 로드 순환 회피).
+     * <p>{@code context == null}이면 관계 채우기(LAZY/EAGER)와 identityMap 등재를 모두 건너뛴다.
+     * 이 경로는 fallback 로드(순환 참조 회피)에서 사용되며, stub 주입 시 NPE를 방지한다.
+     *
+     * <p>매핑 완료 후 {@code putEntity}로 영속성 컨텍스트에 등재하므로
+     * findByForeignKey / findAll / loadById 어느 경로에서 로드해도 1차 캐시 일관성이 유지된다.
      *
      * @param context 영속성 컨텍스트 (null이면 관계 채우기 및 identityMap 등재 생략)
      */
     private RowMapper<Object> buildRowMapper(PersistenceContext context) {
         return (rs, rowNum) -> {
             try {
-                // id를 먼저 추출 — cache-hit read의 키 (정점 ②)
+                // id를 먼저 추출 — identityMap cache-hit의 키 (정점 ②)
                 Object pkValue = rs.getObject(1, toBoxedType(md.idField().javaType()));
                 if (context != null) {
                     Object existing = context.getEntity(new EntityKey(md.entityClass(), pkValue));
@@ -294,7 +293,7 @@ public class EntityPersister {
                         rel.field().set(instance, related);
                     }
                 }
-                // 정점 ② 등록 + @SfsOneToMany 컬렉션 stub 주입 (context 있는 정상 로드 경로만)
+                // @SfsOneToMany 컬렉션 stub 주입 + identityMap 등재 (context 있는 정상 로드 경로만)
                 if (context != null) {
                     // @SfsOneToMany 필드 — SfsPersistentList stub 주입
                     // WHY: context 가드 안에 두는 이유 — SfsPersistentList가 context.isClosed()를 호출하므로
@@ -303,10 +302,10 @@ public class EntityPersister {
                     // WHY: DB 호출 0 — stub 생성만, 첫 List 메서드 호출 시점에 lazy 발화 (학습 정점 ①)
                     for (CollectionMetadata col : md.oneToManies()) {
                         @SuppressWarnings("unchecked")
-                        SfsPersistentList<Object> proxy = new SfsPersistentList<>(
+                        SfsPersistentList<Object> lazyList = new SfsPersistentList<>(
                                 (Class<Object>) col.elementType(), pkValue, col.joinColumnName(),
                                 emf.collectionLoader(), context);
-                        col.field().set(instance, proxy);
+                        col.field().set(instance, lazyList);
                     }
                     context.putEntity(new EntityKey(md.entityClass(), pkValue), instance);
                 }
