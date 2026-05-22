@@ -13,7 +13,7 @@ import com.choisk.sfs.samples.orm.service.UserService;
 import java.math.BigDecimal;
 
 /**
- * Phase 4 ORM 학습 정점 7가지 시연 애플리케이션.
+ * Phase 4 + MP-2 ORM 학습 정점 시연 애플리케이션.
  *
  * DA: SEQUENCE 정상 vs IDENTITY 즉시 INSERT
  * DB: 더티 체킹 — status 변경만으로 UPDATE 자동 발견
@@ -22,6 +22,9 @@ import java.math.BigDecimal;
  * DE: LazyInitializationException — tx 종료 후 lazy 접근
  * DF: merge return value 함정
  * DG: @Transactional 누락 — SfsTransactionRequiredException
+ * DH: findAll(User) + for-loop getOrders().size() → N+1 자연 노출 (MP-2 학습 정점 ②)
+ * DI: user.getOrders().iterator() 첫 호출 시점에 1 SELECT 발화 (MP-2 학습 정점 ①)
+ * DJ: add(newOrder) + persist(user)만 → newOrder INSERT 안 됨 (cascade 부재 자연 노출, MP-3 회수)
  */
 public class OrmDemoApplication {
 
@@ -91,6 +94,34 @@ public class OrmDemoApplication {
                 System.out.println("  OK Caught: " + e.getClass().getSimpleName());
                 System.out.println("  INFO EM은 트랜잭션 바운드 -- TSM이 resource lookup 실패\n");
             }
+
+            // ─── MP-2 @SfsOneToMany 시연 ───────────────────────────────────────
+            System.out.println("\n=== MP-2: @SfsOneToMany 시연 ===\n");
+
+            // 사전 데이터 준비: User 2명 추가 (alice는 DA에서 생성됨) + 각 주문 1건씩 추가
+            // alice에게 주문 2건 (orderId는 DA에서 이미 1건 생성됨)
+            orderSvc.placeOrder(alice.getId(), new BigDecimal("50.00"));  // alice 주문 2번째
+
+            User bob = userSvc.createUser("Bob", "bob@example.com");
+            orderSvc.placeOrder(bob.getId(), new BigDecimal("150.00"));
+
+            User carol = userSvc.createUser("Carol", "carol@example.com");
+            orderSvc.placeOrder(carol.getId(), new BigDecimal("250.00"));
+
+            // [DH] findAll + for-loop getOrders().size() → N+1 자연 노출
+            System.out.println("[DH] N+1 문제 자연 노출 — findAll(User) + for-loop lazy init");
+            userSvc.dumpAllUserOrders();
+            System.out.println();
+
+            // [DI] lazy collection 발화 시점 박제 — iterator() 첫 호출 시 1 SELECT
+            System.out.println("[DI] lazy collection 발화 시점 — alice 주문 조회");
+            userSvc.describeUserOrders(alice.getId());
+            System.out.println();
+
+            // [DJ] cascade 부재 자연 노출 — add(newOrder) + persist(user)만으로는 INSERT 미발생
+            System.out.println("[DJ] cascade 부재 자연 노출 — bob에게 신규 주문 add 시도");
+            userSvc.tryAddOrderWithoutCascade(bob.getId());
+            System.out.println();
 
             System.out.println("=== Demo 완료 ===");
         }
