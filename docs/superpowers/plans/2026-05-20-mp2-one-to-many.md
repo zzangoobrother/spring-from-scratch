@@ -1755,7 +1755,7 @@ git commit -m "test(sfs-orm): NPlusOneIntegrationTest 2건 — findAll + for-loo
 
 > **TDD 제외** — demo는 manual run 검증. M1+M2가 회귀망.
 
-- [ ] **Step 1: `UserService`에 시나리오 3 메서드 추가**
+- [x] **Step 1: `UserService`에 시나리오 3 메서드 추가**
 
 ```java
 package com.choisk.sfs.samples.orm.service;
@@ -1828,7 +1828,7 @@ public class UserService {
 }
 ```
 
-- [ ] **Step 2: `OrmDemoApplication` main에 시나리오 3건 추가**
+- [x] **Step 2: `OrmDemoApplication` main에 시나리오 3건 추가**
 
 ```java
 // 기존 OrmDemoApplication.java의 main 끝부분에 추가 — DA~DG 그대로 보존
@@ -1852,7 +1852,7 @@ userService.describeUserOrders(1L);
 userService.tryAddOrderWithoutCascade(1L);
 ```
 
-- [ ] **Step 3: manual run 검증**
+- [x] **Step 3: manual run 검증**
 
 Run: `./gradlew :sfs-samples:ormDemo`
 Expected: 정상 시작 + DA~DG 시연 + 신설 DH/DI/DJ console 출력 확인:
@@ -1860,12 +1860,12 @@ Expected: 정상 시작 + DA~DG 시연 + 신설 DH/DI/DJ console 출력 확인:
 - DI: "첫 호출 시점에 1 SELECT 발생" 메시지
 - DJ: "newOrder는 INSERT 안 됨" 메시지
 
-- [ ] **Step 4: 컴파일 + 회귀 검증**
+- [x] **Step 4: 컴파일 + 회귀 검증**
 
 Run: `./gradlew build`
 Expected: 318 PASS 유지.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-samples/src/main/java/com/choisk/sfs/samples/orm/service/UserService.java \
@@ -1873,7 +1873,7 @@ git add sfs-samples/src/main/java/com/choisk/sfs/samples/orm/service/UserService
 git commit -m "feat(sfs-samples): OrmDemoApplication MP-2 시연 3건(DH/DI/DJ) + UserService 확장 — collection lazy + N+1 + cascade 부재 박제 (F2)"
 ```
 
-- [ ] **Step 6: plan 체크박스 갱신**
+- [x] **Step 6: plan 체크박스 갱신**
 
 ---
 
