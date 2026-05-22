@@ -105,6 +105,7 @@ class OneToManyLazyIntegrationTest {
         // PC closed 상태에서 컬렉션 접근 → SfsLazyInitializationException
         assertThatThrownBy(() -> owner.children.size())
                 .isInstanceOf(SfsLazyInitializationException.class)
+                // 메시지 형식 "elementType#ownerPk.collection" — alice(id=1)의 TestChild 컬렉션 식별
                 .hasMessageContaining("TestChild#1");
     }
 

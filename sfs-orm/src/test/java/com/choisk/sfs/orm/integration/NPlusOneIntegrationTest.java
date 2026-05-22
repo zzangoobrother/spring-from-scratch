@@ -88,9 +88,9 @@ class NPlusOneIntegrationTest {
                 o.children.size();
             }
 
-            // N+1 정점: findAll 1 SELECT + 3 owners 각각 children 1 SELECT = 총 4 SELECT
+            // N+1 정점: findAll 1 SELECT + owner 수만큼 children 각 1 SELECT = 총 1+N SELECT
             assertThat(owners).hasSize(3);
-            assertThat(spyJdbc.countMatching("SELECT")).isEqualTo(4);
+            assertThat(spyJdbc.countMatching("SELECT")).isEqualTo(1 + owners.size());
             return null;
         });
     }

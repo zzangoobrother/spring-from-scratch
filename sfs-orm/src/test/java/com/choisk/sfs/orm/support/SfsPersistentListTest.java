@@ -1,5 +1,6 @@
 package com.choisk.sfs.orm.support;
 
+import com.choisk.sfs.orm.exception.SfsLazyInitializationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -55,7 +56,7 @@ class SfsPersistentListTest {
         context.close();
 
         assertThatThrownBy(() -> list.size())
-                .isInstanceOf(com.choisk.sfs.orm.exception.SfsLazyInitializationException.class)
+                .isInstanceOf(SfsLazyInitializationException.class)
                 .hasMessageContaining("String#1");
     }
 
