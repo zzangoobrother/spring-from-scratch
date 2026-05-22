@@ -1317,7 +1317,7 @@ git commit -m "feat(sfs-orm): SfsEntityManager.findAll 시그니처 + RealEntity
 
 > **TDD 제외** — 단순 POJO + 어노테이션 추가. demo가 회수.
 
-- [ ] **Step 1: `User` 도메인에 `orders` 필드 + getter 추가**
+- [x] **Step 1: `User` 도메인에 `orders` 필드 + getter 추가**
 
 기존 User.java에 import + 필드 + getter 추가:
 
@@ -1364,19 +1364,19 @@ public class User {
 }
 ```
 
-- [ ] **Step 2: 컴파일 + 회귀 검증**
+- [x] **Step 2: 컴파일 + 회귀 검증**
 
 Run: `./gradlew :sfs-orm:test :sfs-samples:compileJava`
 Expected: 314 PASS 유지. sfs-samples 컴파일 성공.
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add sfs-samples/src/main/java/com/choisk/sfs/samples/orm/domain/User.java
 git commit -m "feat(sfs-samples): User.orders: List<Order> + @SfsOneToMany 도메인 확장 — MP-2 demo 토대 (F1)"
 ```
 
-- [ ] **Step 4: plan 체크박스 갱신**
+- [x] **Step 4: plan 체크박스 갱신**
 
 ---
 
