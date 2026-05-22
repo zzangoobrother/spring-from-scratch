@@ -566,20 +566,28 @@ public class SqlCountingJdbcTemplate extends JdbcTemplate {
 
 ## 8. Definition of Done — 14 항목
 
-1. **`@SfsOneToMany` 어노테이션** — `fetch()`, `joinColumn()` 속성 정의 (FetchType.LAZY only enum)
-2. **`CollectionMetadata` record** — `field`, `elementType`, `joinColumnName`
-3. **`EntityMetadata`** `oneToManies: List<CollectionMetadata>` + `selectAllSql: String` 필드 2개 추가
-4. **`EntityMetadataAnalyzer`** `@SfsOneToMany` 분기 + generic 자동 추출 + fail-fast 3종 + `buildSelectAllSql` 헬퍼
-5. **`SfsPersistentList<T> implements List<T>`** — 모든 메서드 lazy init trigger + closed 예외 + isInitialized 헬퍼
-6. **`CollectionLoader` 인터페이스** + **`DefaultCollectionLoader`** 구현 (jdbc 의존 없음, persister 위임)
-7. **`EntityPersister.buildRowMapper`** oneToManies 채우기 (SfsPersistentList stub 주입) + cache hit 재사용 보강
-8. **`EntityPersister.findAll`** + **`EntityPersister.findByForeignKey`** + **`RealEntityManager.findAll`** + **`SfsEntityManager.findAll`** 시그니처
-9. **`SfsLazyInitializationException` 재사용** (collection closed 시) — Phase 4 인프라 그대로
-10. **fail-fast 3종 통합 검증** — List 외 타입 / generic 누락 / elementType 비엔티티
-11. **`User` 도메인 확장** — `List<Order> orders` + `@SfsOneToMany(joinColumn = "user_id")` + getter/setter
-12. **`OrmDemoApplication` 시연 3건 (DH/DI/DJ)** — manual run으로 console 출력 확인
-13. **회귀 +14 (목표 ~318 PASS, ±2 자연 변동 허용)**
-14. **마감 게이트** — 다관점 리뷰 + 리팩토링 + simplify (CLAUDE.md "완료 후 품질 게이트" 정합)
+1. [x] **`@SfsOneToMany` 어노테이션** — `fetch()`, `joinColumn()` 속성 정의 (FetchType.LAZY only enum)
+2. [x] **`CollectionMetadata` record** — `field`, `elementType`, `joinColumnName`
+3. [x] **`EntityMetadata`** `oneToManies: List<CollectionMetadata>` + `selectAllSql: String` 필드 2개 추가
+4. [x] **`EntityMetadataAnalyzer`** `@SfsOneToMany` 분기 + generic 자동 추출 + fail-fast 3종 + `buildSelectAllSql` 헬퍼
+5. [x] **`SfsPersistentList<T> implements List<T>`** — 모든 메서드 lazy init trigger + closed 예외 + isInitialized 헬퍼
+6. [x] **`CollectionLoader` 인터페이스** + **`DefaultCollectionLoader`** 구현 (jdbc 의존 없음, persister 위임)
+7. [x] **`EntityPersister.buildRowMapper`** oneToManies 채우기 (SfsPersistentList stub 주입) + cache hit 재사용 보강
+8. [x] **`EntityPersister.findAll`** + **`EntityPersister.findByForeignKey`** + **`RealEntityManager.findAll`** + **`SfsEntityManager.findAll`** 시그니처
+9. [x] **`SfsLazyInitializationException` 재사용** (collection closed 시) — Phase 4 인프라 그대로
+10. [x] **fail-fast 3종 통합 검증** — List 외 타입 / generic 누락 / elementType 비엔티티
+11. [x] **`User` 도메인 확장** — `List<Order> orders` + `@SfsOneToMany(joinColumn = "user_id")` + getter/setter
+12. [x] **`OrmDemoApplication` 시연 3건 (DH/DI/DJ)** — manual run으로 console 출력 확인
+13. [x] **회귀 +14 (목표 ~318 PASS, ±2 자연 변동 허용)**
+14. [x] **마감 게이트** — 다관점 리뷰 + 리팩토링 + simplify (CLAUDE.md "완료 후 품질 게이트" 정합) — G2 완료(plan § 15 품질 게이트 기록)
+
+> **DoD 충족 기록 (2026-05-22):** **14/14 [x] 전부 충족.** G1 시점 318 PASS → G2 마감 게이트에서 I-1(findAll dirty-tracking 일관성) 보강으로 **최종 319 PASS / 0 FAIL** (sfs-core 28 + sfs-beans 66 + sfs-context 57 + sfs-aop 35 + sfs-tx 40 + **sfs-orm 71** + sfs-samples 22). MP-2 신규 **+15** = 계획 +14(sfs-orm 56→70: B1 4 + C1 4 + D1 1 + E2 1 + M1 2 + M2 2) + G2 보강 +1(FindAllDirtyTracking). demo DH/DI/DJ manual run 확인(DH 4 SELECT N+1 / DI 1 SELECT lazy / DJ INSERT 누락). 품질 게이트: 지적 ~31건 / 반영 16건 / 보류 ~15건 (plan § 15).
+>
+> **구현 중 정정 4건 박제** (plan 상단 "플랜 정정 기록" + 각 task 실행 기록 참조):
+> - **정정 ① (D1)**: identityMap 등록을 `buildRowMapper`로 이동(cache-hit read + putEntity). 본 § 8 항목 7 "cache hit 재사용 보강"이 이 위치에서 구현됨 (원래 E1 예정 → D1로 이동).
+> - **정정 ② (E3)**: `SfsTransactionalEntityManager.findAll` 위임 추가(인터페이스 변경 시 컴파일 에러 방지) — 본 § 8 항목 8의 숨은 구현체.
+> - **emf.close() 부재**: `SfsEntityManagerFactory`에 close() 없음 — 통합 테스트는 nanoTime DB URL 격리로 정리.
+> - **integration 패키지 fixture는 `public static class`** 필수(EntityPersister가 다른 패키지에서 reflection 인스턴스화).
 
 ---
 

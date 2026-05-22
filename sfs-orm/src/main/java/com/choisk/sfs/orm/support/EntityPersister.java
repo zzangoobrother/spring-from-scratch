@@ -76,7 +76,7 @@ public class EntityPersister {
      * PK로 엔티티 행을 조회한다.
      *
      * @param pk      조회할 기본 키 값
-     * @param context 영속성 컨텍스트 (J1에서 LAZY/EAGER 분기 처리 예정, 현재는 미사용)
+     * @param context 영속성 컨텍스트 (LAZY/EAGER 분기 + identityMap 등재)
      * @return 매핑된 엔티티 인스턴스, 없으면 null
      */
     public Object loadById(Object pk, PersistenceContext context) {
@@ -85,6 +85,36 @@ public class EntityPersister {
             return null;
         }
         return rows.get(0);
+    }
+
+    /**
+     * 대상 테이블의 FK 컬럼이 일치하는 모든 행을 SELECT한다.
+     * OneToMany 컬렉션 lazy init이 호출하는 진입점.
+     *
+     * <p>SQL 캡슐화는 persister가 담당, DefaultCollectionLoader는 persister lookup + 위임만(책임 분담).
+     * 결과 row들은 buildRowMapper를 거치며 identityMap에 등재(정점 ②).
+     *
+     * @param fkColumn FK 컬럼명 (예: "user_id")
+     * @param fkValue  FK 값 (부모 entity의 PK)
+     * @param context  영속성 컨텍스트
+     * @return 조회된 entity 리스트 (빈 리스트 가능)
+     */
+    public List<Object> findByForeignKey(String fkColumn, Object fkValue, PersistenceContext context) {
+        // selectAllSql("SELECT id, ... FROM <table>")에 WHERE 절만 덧붙임 — Phase 4 SQL 캐싱 일관성
+        String sql = md.selectAllSql() + " WHERE " + fkColumn + " = ?";
+        return jdbc.query(sql, buildRowMapper(context), fkValue);
+    }
+
+    /**
+     * SELECT * FROM &lt;table&gt; 실행 — 모든 entity 반환.
+     *
+     * <p>각 row → buildRowMapper → identityMap 등재 (cache hit이면 재사용, 정점 ②).
+     *
+     * @param context 영속성 컨텍스트
+     * @return entity 리스트 (빈 리스트 가능)
+     */
+    public List<Object> findAll(PersistenceContext context) {
+        return jdbc.query(md.selectAllSql(), buildRowMapper(context));
     }
 
     /**
@@ -208,32 +238,38 @@ public class EntityPersister {
     /**
      * ResultSet 행을 엔티티 인스턴스로 변환하는 RowMapper를 반환한다.
      *
-     * <p>J1 통합: @SfsManyToOne 필드에 대해 LAZY/EAGER 분기를 수행한다.
-     * <ul>
-     *   <li>LAZY: {@link LazyProxyFactory}로 프록시 생성 — 실제 접근 시 DB fallback 로드</li>
-     *   <li>EAGER: {@link EntityPersister#loadById}로 즉시 별도 SELECT (1차 캐시 경유)</li>
-     * </ul>
+     * <p>identityMap에서 먼저 PK로 조회해, 같은 PK가 두 번 로드될 때 동일 인스턴스를 반환한다
+     * (학습 정점 ②: 같은 PK = 같은 인스턴스 보장).
      *
-     * <p>context가 null이면 LAZY/EAGER 관계 채우기를 건너뜀 (fallback 로드 순환 회피).
+     * <p>{@code context == null}이면 관계 채우기(LAZY/EAGER)와 identityMap 등재를 모두 건너뛴다.
+     * 이 경로는 fallback 로드(순환 참조 회피)에서 사용되며, stub 주입 시 NPE를 방지한다.
      *
-     * @param context 영속성 컨텍스트 (null이면 관계 채우기 생략)
+     * <p>매핑 완료 후 {@code putEntity}로 영속성 컨텍스트에 등재하므로
+     * findByForeignKey / findAll / loadById 어느 경로에서 로드해도 1차 캐시 일관성이 유지된다.
+     *
+     * @param context 영속성 컨텍스트 (null이면 관계 채우기 및 identityMap 등재 생략)
      */
     private RowMapper<Object> buildRowMapper(PersistenceContext context) {
         return (rs, rowNum) -> {
             try {
+                // id를 먼저 추출 — identityMap cache-hit의 키 (정점 ②)
+                Object pkValue = rs.getObject(1, toBoxedType(md.idField().javaType()));
+                if (context != null) {
+                    Object existing = context.getEntity(new EntityKey(md.entityClass(), pkValue));
+                    // 같은 PK = 같은 인스턴스: identityMap에 이미 있으면 즉시 반환
+                    if (existing != null) return existing;
+                }
                 // 기본 생성자로 인스턴스 생성
                 Object instance = md.entityClass().getDeclaredConstructor().newInstance();
+                md.idField().field().set(instance, pkValue);
 
-                // SELECT 컬럼 순서: id → columns... → fk-columns...
-                int idx = 1;
-                // id 필드 매핑 (프리미티브 타입은 박싱 타입으로 변환 후 getObject 호출)
-                md.idField().field().set(instance,
-                        rs.getObject(idx++, toBoxedType(md.idField().javaType())));
+                // id는 위에서 처리했으므로 일반 컬럼은 idx=2부터 시작
+                int idx = 2;
                 // 일반 컬럼 필드 매핑
                 for (FieldMetadata col : md.columns()) {
                     col.field().set(instance, rs.getObject(idx++, toBoxedType(col.javaType())));
                 }
-                // @ManyToOne FK 컬럼 — LAZY/EAGER 분기
+                // @ManyToOne FK 컬럼 — LAZY/EAGER 분기 (기존 로직 그대로 보존)
                 for (RelationMetadata rel : md.manyToOnes()) {
                     Object fk = rs.getObject(idx++);
                     // fk null: 연관 엔티티 없음 / context null: fallback 로드(순환 참조 회피)
@@ -256,6 +292,22 @@ public class EntityPersister {
                         }
                         rel.field().set(instance, related);
                     }
+                }
+                // @SfsOneToMany 컬렉션 stub 주입 + identityMap 등재 (context 있는 정상 로드 경로만)
+                if (context != null) {
+                    // @SfsOneToMany 필드 — SfsPersistentList stub 주입
+                    // WHY: context 가드 안에 두는 이유 — SfsPersistentList가 context.isClosed()를 호출하므로
+                    //      context==null fallback 경로에서 주입하면 NPE. manyToOnes 처럼 fallback 엔티티는
+                    //      컬렉션도 null로 degrade하는 것이 일관성 있는 설계.
+                    // WHY: DB 호출 0 — stub 생성만, 첫 List 메서드 호출 시점에 lazy 발화 (학습 정점 ①)
+                    for (CollectionMetadata col : md.oneToManies()) {
+                        @SuppressWarnings("unchecked")
+                        SfsPersistentList<Object> lazyList = new SfsPersistentList<>(
+                                (Class<Object>) col.elementType(), pkValue, col.joinColumnName(),
+                                emf.collectionLoader(), context);
+                        col.field().set(instance, lazyList);
+                    }
+                    context.putEntity(new EntityKey(md.entityClass(), pkValue), instance);
                 }
                 return instance;
             } catch (Exception e) {

@@ -4,6 +4,9 @@ import com.choisk.sfs.orm.annotation.SfsColumn;
 import com.choisk.sfs.orm.annotation.SfsEntity;
 import com.choisk.sfs.orm.annotation.SfsGeneratedValue;
 import com.choisk.sfs.orm.annotation.SfsId;
+import com.choisk.sfs.orm.annotation.SfsOneToMany;
+
+import java.util.List;
 
 /**
  * ORM demo 사용자 엔티티 — 학습 정점 ① SEQUENCE 정상 박제.
@@ -22,6 +25,9 @@ public class User {
     @SfsColumn
     private String email;
 
+    @SfsOneToMany(joinColumn = "user_id")   // default LAZY
+    private List<Order> orders;
+
     /** ORM reflection 접근용 기본 생성자 */
     public User() {}
 
@@ -33,4 +39,7 @@ public class User {
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
+
+    public List<Order> getOrders() { return orders; }
+    public void setOrders(List<Order> orders) { this.orders = orders; }
 }
