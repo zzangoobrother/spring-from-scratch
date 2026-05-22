@@ -1885,20 +1885,20 @@ git commit -m "feat(sfs-samples): OrmDemoApplication MP-2 시연 3건(DH/DI/DJ) 
 - Modify: `docs/superpowers/plans/2026-05-20-mp2-one-to-many.md` (모든 Task 체크박스 [x])
 - Modify: `docs/superpowers/specs/2026-05-19-mp2-one-to-many-design.md` (§ 8 DoD 14항목 [x] + 회귀 실측 박제)
 
-- [ ] **Step 1: 전체 빌드**
+- [x] **Step 1: 전체 빌드**
 
 Run: `./gradlew clean build`
 Expected: BUILD SUCCESSFUL. 318 PASS / 0 FAIL / 0 errors.
 
-- [ ] **Step 2: DoD 14 항목 체크박스 갱신**
+- [x] **Step 2: DoD 14 항목 체크박스 갱신**
 
 spec § 8 표에 *상태* 컬럼 추가 후 14/14 [x] 갱신. Phase 4 spec § 8 패턴 정합.
 
-- [ ] **Step 3: 회귀 카운트 정정** (실측 vs 추정)
+- [x] **Step 3: 회귀 카운트 정정** (실측 vs 추정)
 
 추정 +14 vs 실측 결과 정합 여부 plan § 12 회귀 표에 박제. ±2 자연 변동 허용. 초과/미달 시 plan에 *실행 기록 (YYYY-MM-DD)* 블록으로 사유 박제.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add docs/superpowers/plans/2026-05-20-mp2-one-to-many.md \
@@ -1906,7 +1906,7 @@ git add docs/superpowers/plans/2026-05-20-mp2-one-to-many.md \
 git commit -m "docs: MP-2 DoD 14/14 [x] 갱신 + 회귀 318 PASS 박제 (G1)"
 ```
 
-- [ ] **Step 5: plan 체크박스 갱신**
+- [x] **Step 5: plan 체크박스 갱신**
 
 ---
 
@@ -1994,6 +1994,8 @@ main 머지는 *사용자 직접 진행* (Phase 4 동일 패턴).
 | G2 (마감 게이트) | 318 | — (대기) | 다관점 리뷰 + 리팩토링 + simplify |
 
 목표: **318 PASS** (추정 +14 = 304 + 14). ±2 자연 변동 허용. G1에서 실측 박제.
+
+> **실측 박제 (2026-05-22, G1):** `./gradlew clean build` BUILD SUCCESSFUL → **318 PASS / 0 FAIL** — 추정과 **정확히 일치**(±0). 모듈별: sfs-core 28 / sfs-beans 66 / sfs-context 57 / sfs-aop 35 / sfs-tx 40 / sfs-orm 70 / sfs-samples 22. MP-2 신규 +14는 전부 sfs-orm(56→70): B1 4 + C1 4 + D1 1 + E2 1 + M1 2 + M2 2.
 
 ---
 
