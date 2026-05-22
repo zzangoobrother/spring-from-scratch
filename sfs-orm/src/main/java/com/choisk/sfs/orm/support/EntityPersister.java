@@ -106,6 +106,18 @@ public class EntityPersister {
     }
 
     /**
+     * SELECT * FROM &lt;table&gt; 실행 — 모든 entity 반환.
+     *
+     * <p>각 row → buildRowMapper → identityMap 등재 (cache hit이면 재사용, 정점 ②).
+     *
+     * @param context 영속성 컨텍스트
+     * @return entity 리스트 (빈 리스트 가능)
+     */
+    public List<Object> findAll(PersistenceContext context) {
+        return jdbc.query(md.selectAllSql(), buildRowMapper(context));
+    }
+
+    /**
      * 엔티티를 DB에 INSERT한다.
      * {@code buildInsertParams}에서 {@code isPostInsert()} 분기로 IDENTITY/SEQUENCE 처리를 구분한다.
      *
