@@ -76,7 +76,7 @@ public class EntityPersister {
      * PK로 엔티티 행을 조회한다.
      *
      * @param pk      조회할 기본 키 값
-     * @param context 영속성 컨텍스트 (J1에서 LAZY/EAGER 분기 처리 예정, 현재는 미사용)
+     * @param context 영속성 컨텍스트 (LAZY/EAGER 분기 + identityMap 등재)
      * @return 매핑된 엔티티 인스턴스, 없으면 null
      */
     public Object loadById(Object pk, PersistenceContext context) {
@@ -85,6 +85,24 @@ public class EntityPersister {
             return null;
         }
         return rows.get(0);
+    }
+
+    /**
+     * 대상 테이블의 FK 컬럼이 일치하는 모든 행을 SELECT한다.
+     * OneToMany 컬렉션 lazy init이 호출하는 진입점.
+     *
+     * <p>SQL 캡슐화는 persister가 담당, DefaultCollectionLoader는 persister lookup + 위임만(책임 분담).
+     * 결과 row들은 buildRowMapper를 거치며 identityMap에 등재(정점 ②).
+     *
+     * @param fkColumn FK 컬럼명 (예: "user_id")
+     * @param fkValue  FK 값 (부모 entity의 PK)
+     * @param context  영속성 컨텍스트
+     * @return 조회된 entity 리스트 (빈 리스트 가능)
+     */
+    public List<Object> findByForeignKey(String fkColumn, Object fkValue, PersistenceContext context) {
+        // selectAllSql("SELECT id, ... FROM <table>")에 WHERE 절만 덧붙임 — Phase 4 SQL 캐싱 일관성
+        String sql = md.selectAllSql() + " WHERE " + fkColumn + " = ?";
+        return jdbc.query(sql, buildRowMapper(context), fkValue);
     }
 
     /**
@@ -208,32 +226,39 @@ public class EntityPersister {
     /**
      * ResultSet 행을 엔티티 인스턴스로 변환하는 RowMapper를 반환한다.
      *
-     * <p>J1 통합: @SfsManyToOne 필드에 대해 LAZY/EAGER 분기를 수행한다.
-     * <ul>
-     *   <li>LAZY: {@link LazyProxyFactory}로 프록시 생성 — 실제 접근 시 DB fallback 로드</li>
-     *   <li>EAGER: {@link EntityPersister#loadById}로 즉시 별도 SELECT (1차 캐시 경유)</li>
-     * </ul>
+     * <p>D1 rewrite — 변경점 3가지:
+     * <ol>
+     *   <li>id를 idx=1에서 미리 추출 → cache-hit read (정점 ②: 같은 PK = 같은 인스턴스)</li>
+     *   <li>일반 컬럼 idx를 2부터 시작 (id는 위에서 처리했으므로)</li>
+     *   <li>끝에 putEntity 등록 — findByForeignKey/findAll/loadById/find 모두 이 한 곳으로 일관 등록</li>
+     * </ol>
      *
-     * <p>context가 null이면 LAZY/EAGER 관계 채우기를 건너뜀 (fallback 로드 순환 회피).
+     * <p>@SfsManyToOne LAZY/EAGER 분기 로직은 그대로 보존.
+     * context가 null이면 LAZY/EAGER 관계 채우기 + 등록을 건너뜀 (fallback 로드 순환 회피).
      *
-     * @param context 영속성 컨텍스트 (null이면 관계 채우기 생략)
+     * @param context 영속성 컨텍스트 (null이면 관계 채우기 및 identityMap 등재 생략)
      */
     private RowMapper<Object> buildRowMapper(PersistenceContext context) {
         return (rs, rowNum) -> {
             try {
+                // id를 먼저 추출 — cache-hit read의 키 (정점 ②)
+                Object pkValue = rs.getObject(1, toBoxedType(md.idField().javaType()));
+                if (context != null) {
+                    Object existing = context.getEntity(new EntityKey(md.entityClass(), pkValue));
+                    // 같은 PK = 같은 인스턴스: identityMap에 이미 있으면 즉시 반환
+                    if (existing != null) return existing;
+                }
                 // 기본 생성자로 인스턴스 생성
                 Object instance = md.entityClass().getDeclaredConstructor().newInstance();
+                md.idField().field().set(instance, pkValue);
 
-                // SELECT 컬럼 순서: id → columns... → fk-columns...
-                int idx = 1;
-                // id 필드 매핑 (프리미티브 타입은 박싱 타입으로 변환 후 getObject 호출)
-                md.idField().field().set(instance,
-                        rs.getObject(idx++, toBoxedType(md.idField().javaType())));
+                // id는 위에서 처리했으므로 일반 컬럼은 idx=2부터 시작
+                int idx = 2;
                 // 일반 컬럼 필드 매핑
                 for (FieldMetadata col : md.columns()) {
                     col.field().set(instance, rs.getObject(idx++, toBoxedType(col.javaType())));
                 }
-                // @ManyToOne FK 컬럼 — LAZY/EAGER 분기
+                // @ManyToOne FK 컬럼 — LAZY/EAGER 분기 (기존 로직 그대로 보존)
                 for (RelationMetadata rel : md.manyToOnes()) {
                     Object fk = rs.getObject(idx++);
                     // fk null: 연관 엔티티 없음 / context null: fallback 로드(순환 참조 회피)
@@ -256,6 +281,10 @@ public class EntityPersister {
                         }
                         rel.field().set(instance, related);
                     }
+                }
+                // 정점 ② 등록 — findByForeignKey/findAll/loadById/find 모두 이 한 곳으로 일관 등록
+                if (context != null) {
+                    context.putEntity(new EntityKey(md.entityClass(), pkValue), instance);
                 }
                 return instance;
             } catch (Exception e) {
