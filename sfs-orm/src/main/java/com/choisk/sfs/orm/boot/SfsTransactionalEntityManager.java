@@ -4,6 +4,8 @@ import com.choisk.sfs.orm.SfsEntityManager;
 import com.choisk.sfs.orm.exception.SfsTransactionRequiredException;
 import com.choisk.sfs.tx.support.TransactionSynchronizationManager;
 
+import java.util.List;
+
 /**
  * 트랜잭션-범위 EntityManager 프록시.
  *
@@ -78,5 +80,11 @@ public class SfsTransactionalEntityManager implements SfsEntityManager {
     @Override
     public boolean contains(Object entity) {
         return currentEm().contains(entity);
+    }
+
+    @Override
+    public <T> List<T> findAll(Class<T> entityClass) {
+        // 현재 트랜잭션에 바인딩된 RealEntityManager로 위임 — TSM 활성 검증은 currentEm() 내부 수행
+        return currentEm().findAll(entityClass);
     }
 }

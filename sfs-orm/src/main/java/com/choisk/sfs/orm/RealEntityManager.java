@@ -15,6 +15,7 @@ import com.choisk.sfs.orm.support.UpdateAction;
 
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -179,6 +180,25 @@ public class RealEntityManager implements SfsEntityManager {
         context.putEntity(key, loaded);
         context.putSnapshot(key, captureSnapshot(loaded, md));
         return entityClass.cast(loaded);
+    }
+
+    /**
+     * 엔티티 클래스에 해당하는 전체 행을 DB에서 SELECT해 List로 반환한다.
+     *
+     * <p>N+1 학습 시나리오의 진입점 — findAll() 후 each entity의 @SfsOneToMany 컬렉션 접근 시
+     * 컬렉션 건수만큼 추가 SELECT가 발생하는 구조를 학습(M1+에서 박제).
+     *
+     * <p>1차 캐시를 거치지 않는다 — SELECT * 결과는 EntityPersister.findAll(context)에서
+     * buildRowMapper를 통해 로드되며 context에 직접 등재하지 않음 (단순화).
+     *
+     * @param entityClass 조회할 엔티티 클래스 (@SfsEntity 붙은 클래스)
+     * @return 전체 엔티티 목록 (없으면 빈 List)
+     */
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> List<T> findAll(Class<T> entityClass) {
+        EntityPersister persister = emf.persisterOf(entityClass);
+        return (List<T>) persister.findAll(context);
     }
 
     /**
