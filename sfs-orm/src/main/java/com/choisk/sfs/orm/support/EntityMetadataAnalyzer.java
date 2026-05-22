@@ -7,10 +7,12 @@ import com.choisk.sfs.orm.annotation.SfsGeneratedValue.GenerationType;
 import com.choisk.sfs.orm.annotation.SfsId;
 import com.choisk.sfs.orm.annotation.SfsJoinColumn;
 import com.choisk.sfs.orm.annotation.SfsManyToOne;
+import com.choisk.sfs.orm.annotation.SfsOneToMany;
 import com.choisk.sfs.orm.exception.SfsEntityMappingException;
 import com.choisk.sfs.orm.exception.SfsPersistenceException;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -106,6 +108,8 @@ public class EntityMetadataAnalyzer {
         // 4) 일반 컬럼 + 연관 관계 필드 수집
         List<FieldMetadata> columns = new ArrayList<>();
         List<RelationMetadata> manyToOnes = new ArrayList<>();
+        // oneToManies: 루프 내 @SfsOneToMany 분기에서 add되므로 루프 위에 선언 (B1 신설)
+        List<CollectionMetadata> oneToManies = new ArrayList<>();
         for (Field f : entityClass.getDeclaredFields()) {
             f.setAccessible(true);
             if (f.equals(idField)) continue;
@@ -114,14 +118,18 @@ public class EntityMetadataAnalyzer {
                 SfsManyToOne rel = f.getAnnotation(SfsManyToOne.class);
                 SfsJoinColumn joinCol = f.getAnnotation(SfsJoinColumn.class);
                 manyToOnes.add(new RelationMetadata(f, rel.fetch(), f.getType(), joinCol.name()));
+            } else if (f.isAnnotationPresent(SfsOneToMany.class)) {
+                // 신설 — MP-2 B1: generic 추출 + fail-fast 3종 검증 후 CollectionMetadata 등록
+                validateOneToMany(f);
+                SfsOneToMany rel = f.getAnnotation(SfsOneToMany.class);
+                Class<?> elementType = extractGenericType(f);
+                oneToManies.add(new CollectionMetadata(f, elementType, rel.joinColumn()));
             } else if (f.isAnnotationPresent(SfsColumn.class)) {
                 columns.add(new FieldMetadata(f, columnNameOf(f), f.getType()));
             }
         }
 
         // 5) SQL 미리 생성
-        // B1에서 @SfsOneToMany 분기 추가 예정 — A3는 빈 리스트로 시작
-        List<CollectionMetadata> oneToManies = new ArrayList<>();
 
         String insertSql = buildInsertSql(tableName, idField, columns, manyToOnes, idGeneratorSpec);
         String selectSql = buildSelectByIdSql(tableName, idField, columns, manyToOnes);
@@ -150,6 +158,43 @@ public class EntityMetadataAnalyzer {
             throw new SfsEntityMappingException(
                     "@SfsManyToOne field '" + f.getName() + "' missing @SfsJoinColumn");
         }
+    }
+
+    /**
+     * @SfsOneToMany 필드 fail-fast 검증:
+     * - List 외 타입(Set, Collection 등) → 예외 (MP-2는 List<T> only)
+     * - raw List (generic 미명시) → 예외
+     *
+     * elementType 비엔티티 검증은 extractGenericType 내부에서 처리.
+     */
+    private void validateOneToMany(Field f) {
+        if (!List.class.isAssignableFrom(f.getType())) {
+            throw new SfsEntityMappingException(
+                    "@SfsOneToMany field '" + f.getName()
+                    + "' must be List<T> (other types not supported in MP-2)");
+        }
+        if (!(f.getGenericType() instanceof ParameterizedType)) {
+            throw new SfsEntityMappingException(
+                    "@SfsOneToMany field '" + f.getName()
+                    + "' must have generic type parameter");
+        }
+    }
+
+    /**
+     * Hibernate 본가 패턴 정합 — ParameterizedType.getActualTypeArguments[0]로
+     * generic erasure를 우회해 element 타입 자동 추출.
+     *
+     * @throws SfsEntityMappingException elementType이 @SfsEntity 미소유 시
+     */
+    private Class<?> extractGenericType(Field f) {
+        ParameterizedType pt = (ParameterizedType) f.getGenericType();
+        Class<?> elementType = (Class<?>) pt.getActualTypeArguments()[0];
+        if (!elementType.isAnnotationPresent(SfsEntity.class)) {
+            throw new SfsEntityMappingException(
+                    "@SfsOneToMany element type " + elementType.getSimpleName()
+                    + " is not annotated with @SfsEntity");
+        }
+        return elementType;
     }
 
     /**
