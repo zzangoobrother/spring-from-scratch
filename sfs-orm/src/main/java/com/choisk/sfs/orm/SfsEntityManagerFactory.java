@@ -31,13 +31,13 @@ public class SfsEntityManagerFactory {
     private final Map<Class<?>, EntityMetadata> metadataByClass;
     private final Map<Class<?>, EntityPersister> persisterByClass;
     private final LazyProxyFactory lazyProxyFactory;
-    // D1 신설 — DefaultCollectionLoader가 컬렉션 lazy init 위임을 담당
+    // DefaultCollectionLoader가 컬렉션 lazy init 위임을 담당
     private final CollectionLoader collectionLoader;
 
     private SfsEntityManagerFactory(Builder b) {
         this.dataSource = b.dataSource;
         this.tsm = b.tsm;
-        // spy 주입(M1/M2 테스트용) 옵션 — null이면 기본 JdbcTemplate 생성
+        // spy 주입 옵션 — null이면 기본 JdbcTemplate 생성
         this.jdbcTemplate = (b.jdbcTemplate != null) ? b.jdbcTemplate : new JdbcTemplate(dataSource, tsm);
 
         EntityMetadataAnalyzer analyzer = new EntityMetadataAnalyzer();
@@ -88,7 +88,7 @@ public class SfsEntityManagerFactory {
     // EntityPersister(support 패키지)에서 LAZY proxy 생성 시 접근하므로 public
     public LazyProxyFactory lazyProxyFactory() { return lazyProxyFactory; }
 
-    // D1 신설 — SfsPersistentList가 컬렉션 lazy init 시 사용
+    // SfsPersistentList가 컬렉션 lazy init 시 사용
     public CollectionLoader collectionLoader() { return collectionLoader; }
 
     DataSource dataSource() { return dataSource; }
@@ -99,7 +99,7 @@ public class SfsEntityManagerFactory {
         private DataSource dataSource;
         private TransactionSynchronizationManager tsm;
         private final List<Class<?>> entityClasses = new ArrayList<>();
-        // optional — M1/M2 테스트에서 SQL 카운팅 spy 주입용, 기본 null (null이면 JdbcTemplate 자동 생성)
+        // optional — SQL 카운팅 spy 주입용, 기본 null (null이면 JdbcTemplate 자동 생성)
         private JdbcTemplate jdbcTemplate;
 
         public Builder dataSource(DataSource ds) {
@@ -117,7 +117,7 @@ public class SfsEntityManagerFactory {
             return this;
         }
 
-        /** M1/M2 테스트에서 SQL 카운팅 spy를 주입할 때 사용. 일반 경우 호출 불필요. */
+        /** SQL 카운팅 spy를 주입할 때 사용(테스트용). 일반 경우 호출 불필요. */
         public Builder jdbcTemplate(JdbcTemplate jt) {
             this.jdbcTemplate = jt;
             return this;

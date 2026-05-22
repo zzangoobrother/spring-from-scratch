@@ -18,7 +18,7 @@ import java.util.List;
 public class SqlCountingJdbcTemplate extends JdbcTemplate {
 
     /** 실행된 SQL 문자열 목록 — 동시성 안전(synchronized list). */
-    public final List<String> executedSqls = Collections.synchronizedList(new ArrayList<>());
+    private final List<String> executedSqls = Collections.synchronizedList(new ArrayList<>());
 
     public SqlCountingJdbcTemplate(DataSource ds, TransactionSynchronizationManager tsm) {
         super(ds, tsm);

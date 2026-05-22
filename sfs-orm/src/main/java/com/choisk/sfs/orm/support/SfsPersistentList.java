@@ -55,7 +55,7 @@ public class SfsPersistentList<T> implements List<T> {
     }
 
     /** 테스트 헬퍼 — 초기화 여부 확인용 (delegate null 여부로 판단). */
-    public boolean isInitialized() { return delegate != null; }
+    boolean isInitialized() { return delegate != null; }
 
     // ─── List<T> 위임 (모든 메서드가 initialize() 트리거) ─────────────────────
     @Override public int size() { initialize(); return delegate.size(); }

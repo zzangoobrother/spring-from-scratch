@@ -108,7 +108,7 @@ public class EntityMetadataAnalyzer {
         // 4) 일반 컬럼 + 연관 관계 필드 수집
         List<FieldMetadata> columns = new ArrayList<>();
         List<RelationMetadata> manyToOnes = new ArrayList<>();
-        // oneToManies: 루프 내 @SfsOneToMany 분기에서 add되므로 루프 위에 선언 (B1 신설)
+        // oneToManies: 루프 내 @SfsOneToMany 분기에서 add되므로 루프 위에 선언
         List<CollectionMetadata> oneToManies = new ArrayList<>();
         for (Field f : entityClass.getDeclaredFields()) {
             f.setAccessible(true);
@@ -119,7 +119,7 @@ public class EntityMetadataAnalyzer {
                 SfsJoinColumn joinCol = f.getAnnotation(SfsJoinColumn.class);
                 manyToOnes.add(new RelationMetadata(f, rel.fetch(), f.getType(), joinCol.name()));
             } else if (f.isAnnotationPresent(SfsOneToMany.class)) {
-                // 신설 — MP-2 B1: generic 추출 + fail-fast 3종 검증 후 CollectionMetadata 등록
+                // generic 추출 + fail-fast 3종 검증 후 CollectionMetadata 등록
                 validateOneToMany(f);
                 SfsOneToMany rel = f.getAnnotation(SfsOneToMany.class);
                 Class<?> elementType = extractGenericType(f);
@@ -133,7 +133,7 @@ public class EntityMetadataAnalyzer {
 
         String insertSql = buildInsertSql(tableName, idField, columns, manyToOnes, idGeneratorSpec);
         String selectSql = buildSelectByIdSql(tableName, idField, columns, manyToOnes);
-        String selectAllSql = buildSelectAllSql(tableName, idField, columns, manyToOnes); // 신설
+        String selectAllSql = buildSelectAllSql(tableName, idField, columns, manyToOnes);
         String deleteSql = buildDeleteSql(tableName, idField);
 
         return new EntityMetadata(entityClass, tableName, idMeta, idGeneratorSpec,
