@@ -579,9 +579,9 @@ public class SqlCountingJdbcTemplate extends JdbcTemplate {
 11. [x] **`User` 도메인 확장** — `List<Order> orders` + `@SfsOneToMany(joinColumn = "user_id")` + getter/setter
 12. [x] **`OrmDemoApplication` 시연 3건 (DH/DI/DJ)** — manual run으로 console 출력 확인
 13. [x] **회귀 +14 (목표 ~318 PASS, ±2 자연 변동 허용)**
-14. [ ] **마감 게이트** — 다관점 리뷰 + 리팩토링 + simplify (CLAUDE.md "완료 후 품질 게이트" 정합) *(G2 진행 예정)*
+14. [x] **마감 게이트** — 다관점 리뷰 + 리팩토링 + simplify (CLAUDE.md "완료 후 품질 게이트" 정합) — G2 완료(plan § 15 품질 게이트 기록)
 
-> **DoD 충족 기록 (2026-05-22):** 항목 1~13 모두 충족(G2만 진행 예정). `./gradlew clean build` BUILD SUCCESSFUL, **318 PASS / 0 FAIL** (sfs-core 28 + sfs-beans 66 + sfs-context 57 + sfs-aop 35 + sfs-tx 40 + sfs-orm 70 + sfs-samples 22). MP-2 신규 **+14** (sfs-orm 56→70: B1 4 + C1 4 + D1 1 + E2 1 + M1 2 + M2 2) — 추정치 정확 정합. demo DH/DI/DJ manual run 확인(DH 4 SELECT N+1 / DI 1 SELECT lazy / DJ INSERT 누락).
+> **DoD 충족 기록 (2026-05-22):** **14/14 [x] 전부 충족.** G1 시점 318 PASS → G2 마감 게이트에서 I-1(findAll dirty-tracking 일관성) 보강으로 **최종 319 PASS / 0 FAIL** (sfs-core 28 + sfs-beans 66 + sfs-context 57 + sfs-aop 35 + sfs-tx 40 + **sfs-orm 71** + sfs-samples 22). MP-2 신규 **+15** = 계획 +14(sfs-orm 56→70: B1 4 + C1 4 + D1 1 + E2 1 + M1 2 + M2 2) + G2 보강 +1(FindAllDirtyTracking). demo DH/DI/DJ manual run 확인(DH 4 SELECT N+1 / DI 1 SELECT lazy / DJ INSERT 누락). 품질 게이트: 지적 ~31건 / 반영 16건 / 보류 ~15건 (plan § 15).
 >
 > **구현 중 정정 4건 박제** (plan 상단 "플랜 정정 기록" + 각 task 실행 기록 참조):
 > - **정정 ① (D1)**: identityMap 등록을 `buildRowMapper`로 이동(cache-hit read + putEntity). 본 § 8 항목 7 "cache hit 재사용 보강"이 이 위치에서 구현됨 (원래 E1 예정 → D1로 이동).

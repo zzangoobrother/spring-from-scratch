@@ -1914,7 +1914,7 @@ git commit -m "docs: MP-2 DoD 14/14 [x] 갱신 + 회귀 318 PASS 박제 (G1)"
 
 CLAUDE.md *"완료 후 품질 게이트"* 정합. Phase 4 패턴 그대로 (3 reviewer + 3 simplify).
 
-- [ ] **Step 1: 다관점 코드리뷰** — 아래 5관점 각각 독립적으로:
+- [x] **Step 1: 다관점 코드리뷰** — 아래 5관점 각각 독립적으로:
   - 아키텍처·설계 일관성 (spec § 2 모듈 의존 / spec § 3 컴포넌트 boundary 정합)
   - 가독성·네이밍·주석 WHY (CLAUDE.md 주석 규칙)
   - 테스트 커버리지 (TDD 적용/제외 판단 정합)
@@ -1923,17 +1923,17 @@ CLAUDE.md *"완료 후 품질 게이트"* 정합. Phase 4 패턴 그대로 (3 re
 
   실행: `feature-dev:code-reviewer` 에이전트 (자동 스캔) + `superpowers:requesting-code-review` (외부 관점). 결과 *"남겨둘 / 즉시 고칠"* 분류.
 
-- [ ] **Step 2: 리팩토링** — 즉시 고칠 이슈만 반영. 동작 변경 없음. 커밋 `refactor(sfs-orm): ...`
+- [x] **Step 2: 리팩토링** — 즉시 고칠 이슈만 반영. 동작 변경 없음. 커밋 `refactor(sfs-orm): ...`
 
-- [ ] **Step 3: `/simplify` 패스** — 재사용 패턴 추출, 중복 제거, 데드 코드 정리. diff 단위 검토 후 가치 있는 것만 반영. 커밋 `refactor(sfs-orm): ...` 또는 `chore: ...`
+- [x] **Step 3: `/simplify` 패스** — 재사용 패턴 추출, 중복 제거, 데드 코드 정리. diff 단위 검토 후 가치 있는 것만 반영. 커밋 `refactor(sfs-orm): ...` 또는 `chore: ...`
 
-- [ ] **Step 4: 게이트 통과 기준**:
+- [x] **Step 4: 게이트 통과 기준**:
   - `./gradlew build` 전체 PASS
   - 회귀 카운트가 plan DoD 예상치와 일치 (~318 ±2)
   - 본 plan + spec DoD 14항목 모두 `[x]`
   - 본 plan 하단에 `> **품질 게이트 기록 (YYYY-MM-DD):**` 블록 박제 (지적사항 N건 / 반영 M건 / 보류 K건)
 
-- [ ] **Step 5: 메모리 박제 + main 머지 준비**
+- [x] **Step 5: 메모리 박제 + main 머지 준비**
 
 ```bash
 git commit -m "docs: Plan § 11 품질 게이트 기록 박제 + DoD 14 [x] — MP-2 마감"
@@ -1946,7 +1946,7 @@ git commit -m "docs: Plan § 11 품질 게이트 기록 박제 + DoD 14 [x] — 
 
 main 머지는 *사용자 직접 진행* (Phase 4 동일 패턴).
 
-- [ ] **Step 6: plan 체크박스 갱신** (모두 [x])
+- [x] **Step 6: plan 체크박스 갱신** (모두 [x])
 
 ---
 
@@ -1996,6 +1996,8 @@ main 머지는 *사용자 직접 진행* (Phase 4 동일 패턴).
 목표: **318 PASS** (추정 +14 = 304 + 14). ±2 자연 변동 허용. G1에서 실측 박제.
 
 > **실측 박제 (2026-05-22, G1):** `./gradlew clean build` BUILD SUCCESSFUL → **318 PASS / 0 FAIL** — 추정과 **정확히 일치**(±0). 모듈별: sfs-core 28 / sfs-beans 66 / sfs-context 57 / sfs-aop 35 / sfs-tx 40 / sfs-orm 70 / sfs-samples 22. MP-2 신규 +14는 전부 sfs-orm(56→70): B1 4 + C1 4 + D1 1 + E2 1 + M1 2 + M2 2.
+>
+> **G2 보강 후 최종 (2026-05-22):** I-1(findAll dirty-tracking 일관성) characterization 테스트 +1 → **최종 319 PASS / 0 FAIL** (sfs-orm 71). ±2 허용 범위 내. § 15 품질 게이트 기록 참조.
 
 ---
 
@@ -2029,3 +2031,34 @@ superpowers:executing-plans 스킬로 Task A1부터 task-by-task 실행.
 회귀 304 → 318 목표 (±2 변동 허용). 
 구현 완료 후 G2 마감 게이트 + main 머지 (사용자 직접).
 ```
+
+---
+
+## 15. 품질 게이트 기록 (2026-05-22, G2)
+
+CLAUDE.md "완료 후 품질 게이트" 3단계 수행. 최종 `./gradlew clean build` BUILD SUCCESSFUL — **319 PASS / 0 FAIL** (계획 +14[304→318] + G2 보강 +1).
+
+### 1단계 — 다관점 코드리뷰 (6 에이전트 병렬)
+- 관점 리뷰 3: ① 아키텍처·버그·규약 ② 동시성·라이프사이클·리소스 ③ 가독성·네이밍·테스트
+- `/simplify` 3: ④ 재사용 ⑤ 품질 ⑥ 효율
+
+### 2~3단계 — 반영/보류 분류 (지적 ~31건 / **반영 16건** / **보류 ~15건**)
+
+**반영 16건:**
+- 실질 버그 2건:
+  - **C-1** DJ demo가 이미 managed인 user에 `em.persist(user)` 재호출 → SEQUENCE id 덮어쓰기 + 중복 INSERT(persist managed 가드 부재). `em.persist(user)` 제거 (`fix`, `4f3906f`).
+  - **I-1** `findAll` 로드 entity가 snapshot 미등재 → `find()`와 달리 첫 flush에서 dirty UPDATE 누락. find()와 일관되게 snapshot 등재 (`feat`+test, `d857cab`, +1 PASS).
+- 정리 14건 (`refactor` 3커밋: `03709c4`/`ce75b0c`/`480bd92`): I-2(find 중복 putEntity 제거 + Javadoc 정정), W1(buildRowMapper Javadoc WHY화), W2(DI 메시지 발화지점 정확화), N1(`proxy`→`lazyList`), N2/N3(낡은·미래형 주석 정정), T1(테스트 FQCN→import), T3(메시지 검증 주석), T4(N+1 단언 `1+owners.size()` 공식화), simplify 가시성 축소 2건(`isInitialized`/`executedSqls`), task 번호 주석 태그 제거 8곳.
+
+**보류 ~15건 (대부분 비이슈/의도된 설계):**
+- 동시성·라이프사이클 9건: PC가 tx-bound 단일 스레드라 volatile/sync 불필요(Hibernate `PersistentBag` 동형). `afterCompletion` close→unbind 순서 정상, PC close 후 잔존 참조는 JPA detached 패턴과 동일(누수 아님).
+- 재사용 6건: `SfsPersistentList` 메서드별 명시 위임(spec § 3.4 의도), `selectAllSql` 재사용·`CollectionLoader` 의존역전은 이미 올바름. `AbstractList` 상속·공통 fixture 추출은 학습 명시성 훼손이라 보류.
+- 효율: `findByForeignKey`가 lazy 발화마다 SQL 문자열 조립 → **MP-3+ FK SQL 사전빌드 후보**로 박제(학습 정점 N+1엔 무관).
+- 기타: 빈 테이블 테스트(T5), `DefaultCollectionLoaderTest` 이름 분리(T2), enum 주석 중복(N4) 등 임계 미만.
+
+### 게이트 통과 기준 충족
+- ✅ `./gradlew build` 전체 PASS (**319 / 0 FAIL**)
+- ✅ 회귀 319 = 계획 +14(304→318) + G2 보강 +1 (±2 허용 내; I-1 dirty-tracking 일관성 보강)
+- ✅ plan + spec DoD **14/14 [x]**
+- ✅ 본 품질 게이트 기록 박제 완료
+- main 머지는 **사용자 직접** (Phase 4 동일 패턴)
