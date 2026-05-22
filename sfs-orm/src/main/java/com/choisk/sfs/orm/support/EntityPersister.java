@@ -282,8 +282,20 @@ public class EntityPersister {
                         rel.field().set(instance, related);
                     }
                 }
-                // 정점 ② 등록 — findByForeignKey/findAll/loadById/find 모두 이 한 곳으로 일관 등록
+                // 정점 ② 등록 + @SfsOneToMany 컬렉션 stub 주입 (context 있는 정상 로드 경로만)
                 if (context != null) {
+                    // @SfsOneToMany 필드 — SfsPersistentList stub 주입
+                    // WHY: context 가드 안에 두는 이유 — SfsPersistentList가 context.isClosed()를 호출하므로
+                    //      context==null fallback 경로에서 주입하면 NPE. manyToOnes 처럼 fallback 엔티티는
+                    //      컬렉션도 null로 degrade하는 것이 일관성 있는 설계.
+                    // WHY: DB 호출 0 — stub 생성만, 첫 List 메서드 호출 시점에 lazy 발화 (학습 정점 ①)
+                    for (CollectionMetadata col : md.oneToManies()) {
+                        @SuppressWarnings("unchecked")
+                        SfsPersistentList<Object> proxy = new SfsPersistentList<>(
+                                (Class<Object>) col.elementType(), pkValue, col.joinColumnName(),
+                                emf.collectionLoader(), context);
+                        col.field().set(instance, proxy);
+                    }
                     context.putEntity(new EntityKey(md.entityClass(), pkValue), instance);
                 }
                 return instance;
