@@ -188,17 +188,34 @@ public class RealEntityManager implements SfsEntityManager {
      * <p>N+1 학습 시나리오의 진입점 — findAll() 후 each entity의 @SfsOneToMany 컬렉션 접근 시
      * 컬렉션 건수만큼 추가 SELECT가 발생하는 구조를 학습(M1+에서 박제).
      *
-     * <p>1차 캐시를 거치지 않는다 — SELECT * 결과는 EntityPersister.findAll(context)에서
-     * buildRowMapper를 통해 로드되며 context에 직접 등재하지 않음 (단순화).
+     * <p>identityMap 등재는 buildRowMapper가 수행. 이 메서드는 find()와의 dirty-tracking 일관성을 위해
+     * 로드된 각 entity에 snapshot을 추가로 등재한다 (첫 flush에서 UPDATE가 올바르게 감지되도록).
+     * snapshot은 columns + manyToOnes만 읽으므로 컬렉션 lazy 발화·추가 SELECT가 발생하지 않는다.
      *
      * @param entityClass 조회할 엔티티 클래스 (@SfsEntity 붙은 클래스)
      * @return 전체 엔티티 목록 (없으면 빈 List)
+     * @throws SfsPersistenceException @SfsId 필드 접근 실패 시
      */
     @Override
     @SuppressWarnings("unchecked")
     public <T> List<T> findAll(Class<T> entityClass) {
         EntityPersister persister = emf.persisterOf(entityClass);
-        return (List<T>) persister.findAll(context);
+        EntityMetadata md = emf.metadataOf(entityClass);
+        List<Object> loaded = persister.findAll(context);
+        // find()와의 dirty-tracking 일관성: 로드된 각 entity에 snapshot 등재
+        // WHY: snapshot 부재 시 flush의 original==null 분기가 현재 상태를 기준선으로 잡고
+        //      첫 flush에서 UPDATE를 건너뜀 → findAll로 로드한 entity 수정이 DB에 미반영됨
+        for (Object entity : loaded) {
+            try {
+                EntityKey key = new EntityKey(entityClass, md.idField().field().get(entity));
+                if (context.getSnapshot(key) == null) {
+                    context.putSnapshot(key, captureSnapshot(entity, md));
+                }
+            } catch (IllegalAccessException e) {
+                throw new SfsPersistenceException("@SfsId 읽기 실패 — findAll snapshot 등재 불가", e);
+            }
+        }
+        return (List<T>) loaded;
     }
 
     /**
