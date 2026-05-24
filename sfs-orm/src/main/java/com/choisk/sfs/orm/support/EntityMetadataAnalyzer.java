@@ -124,8 +124,9 @@ public class EntityMetadataAnalyzer {
                 validateOneToMany(f);
                 SfsOneToMany rel = f.getAnnotation(SfsOneToMany.class);
                 Class<?> elementType = extractGenericType(f);
+                String joinColumnName = resolveJoinColumn(rel, elementType, entityClass, f);
                 oneToManies.add(new CollectionMetadata(
-                        f, elementType, rel.joinColumn(),
+                        f, elementType, joinColumnName,
                         rel.mappedBy(), Set.of(rel.cascade()), rel.orphanRemoval()));
             } else if (f.isAnnotationPresent(SfsColumn.class)) {
                 columns.add(new FieldMetadata(f, columnNameOf(f), f.getType()));
@@ -207,6 +208,47 @@ public class EntityMetadataAnalyzer {
                     + " is not annotated with @SfsEntity");
         }
         return elementType;
+    }
+
+    /**
+     * @SfsOneToMany의 FK 컬럼명을 해석한다.
+     * - 단방향(joinColumn): 그대로 반환.
+     * - 양방향(mappedBy): owning 엔티티(elementType)에서 mappedBy 이름의 @SfsManyToOne 필드를 찾아
+     *   그 @SfsJoinColumn.name을 FK로 채택. targetEntity가 owner 클래스와 일치하는지 검증.
+     *
+     * @param rel         @SfsOneToMany 어노테이션
+     * @param elementType 컬렉션 element(=owning) 엔티티 클래스
+     * @param ownerClass  컬렉션을 소유한 inverse 엔티티 클래스
+     * @param ownerField  컬렉션 필드(에러 메시지용)
+     * @throws SfsEntityMappingException mappedBy 필드 부재/매핑 미비/타입 불일치 시
+     */
+    private String resolveJoinColumn(SfsOneToMany rel, Class<?> elementType,
+                                     Class<?> ownerClass, Field ownerField) {
+        if (!rel.joinColumn().isEmpty()) {
+            return rel.joinColumn();   // 단방향
+        }
+        // 양방향: elementType에서 mappedBy 필드 탐색
+        Field owningField;
+        try {
+            owningField = elementType.getDeclaredField(rel.mappedBy());
+        } catch (NoSuchFieldException e) {
+            throw new SfsEntityMappingException(
+                    "@SfsOneToMany field '" + ownerField.getName() + "' mappedBy='" + rel.mappedBy()
+                    + "' — no such field on " + elementType.getSimpleName());
+        }
+        if (!owningField.isAnnotationPresent(SfsManyToOne.class)
+                || !owningField.isAnnotationPresent(SfsJoinColumn.class)) {
+            throw new SfsEntityMappingException(
+                    "@SfsOneToMany mappedBy target '" + elementType.getSimpleName() + "." + rel.mappedBy()
+                    + "' must be @SfsManyToOne + @SfsJoinColumn (owning side)");
+        }
+        if (!owningField.getType().equals(ownerClass)) {
+            throw new SfsEntityMappingException(
+                    "@SfsOneToMany mappedBy targetEntity mismatch: " + elementType.getSimpleName() + "."
+                    + rel.mappedBy() + " points to " + owningField.getType().getSimpleName()
+                    + " but owner is " + ownerClass.getSimpleName());
+        }
+        return owningField.getAnnotation(SfsJoinColumn.class).name();
     }
 
     /**
