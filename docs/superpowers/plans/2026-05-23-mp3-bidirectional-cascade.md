@@ -38,7 +38,7 @@
 - Create: `sfs-orm/src/main/java/com/choisk/sfs/orm/annotation/SfsCascadeType.java`
 - Modify: `sfs-orm/src/main/java/com/choisk/sfs/orm/annotation/SfsOneToMany.java`
 
-- [ ] **Step 1: `SfsCascadeType` enum 생성**
+- [x] **Step 1: `SfsCascadeType` enum 생성**
 
 ```java
 package com.choisk.sfs.orm.annotation;
@@ -52,7 +52,7 @@ package com.choisk.sfs.orm.annotation;
 public enum SfsCascadeType { PERSIST, REMOVE, ALL }
 ```
 
-- [ ] **Step 2: `@SfsOneToMany`에 mappedBy/cascade/orphanRemoval 추가 + joinColumn default 완화**
+- [x] **Step 2: `@SfsOneToMany`에 mappedBy/cascade/orphanRemoval 추가 + joinColumn default 완화**
 
 기존 `joinColumn()`을 `default ""`로 바꾸고(XOR 검증 위해) 3개 속성 추가:
 
@@ -99,17 +99,17 @@ public @interface SfsOneToMany {
 }
 ```
 
-- [ ] **Step 3: 컴파일 확인**
+- [x] **Step 3: 컴파일 확인**
 
 Run: `./gradlew :sfs-orm:compileJava`
 Expected: BUILD SUCCESSFUL. (CollectionMetadata 생성자는 아직 `rel.joinColumn()` 1개만 받으므로 분석기 무영향 — joinColumn은 여전히 존재.)
 
-- [ ] **Step 4: 회귀 확인 (기존 단방향 무손상)**
+- [x] **Step 4: 회귀 확인 (기존 단방향 무손상)**
 
 Run: `./gradlew :sfs-orm:test`
 Expected: PASS (기존 카운트 유지). joinColumn default `""` 완화는 기존 `@SfsOneToMany(joinColumn="...")` 사용처에 무영향.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-orm/src/main/java/com/choisk/sfs/orm/annotation/SfsCascadeType.java \
