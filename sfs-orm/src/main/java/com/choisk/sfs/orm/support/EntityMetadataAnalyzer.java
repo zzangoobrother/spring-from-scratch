@@ -18,6 +18,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -123,7 +124,9 @@ public class EntityMetadataAnalyzer {
                 validateOneToMany(f);
                 SfsOneToMany rel = f.getAnnotation(SfsOneToMany.class);
                 Class<?> elementType = extractGenericType(f);
-                oneToManies.add(new CollectionMetadata(f, elementType, rel.joinColumn()));
+                oneToManies.add(new CollectionMetadata(
+                        f, elementType, rel.joinColumn(),
+                        rel.mappedBy(), Set.of(rel.cascade()), rel.orphanRemoval()));
             } else if (f.isAnnotationPresent(SfsColumn.class)) {
                 columns.add(new FieldMetadata(f, columnNameOf(f), f.getType()));
             }
