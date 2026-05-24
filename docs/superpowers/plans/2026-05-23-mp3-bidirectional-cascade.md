@@ -128,7 +128,7 @@ git commit -m "feat(sfs-orm): SfsCascadeType enum + @SfsOneToMany mappedBy/casca
 - Modify: `sfs-orm/src/main/java/com/choisk/sfs/orm/support/EntityMetadataAnalyzer.java:126` (생성자 호출부 pass-through)
 - Test: `sfs-orm/src/test/java/com/choisk/sfs/orm/support/CollectionMetadataTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.orm.support;
@@ -173,12 +173,12 @@ class CollectionMetadataTest {
 }
 ```
 
-- [ ] **Step 2: 컴파일 실패 확인**
+- [x] **Step 2: 컴파일 실패 확인**
 
 Run: `./gradlew :sfs-orm:test --tests CollectionMetadataTest`
 Expected: 컴파일 실패 — `CollectionMetadata` 생성자가 6인자가 아님 / `cascadesPersist` 메서드 없음.
 
-- [ ] **Step 3: `CollectionMetadata` record 확장**
+- [x] **Step 3: `CollectionMetadata` record 확장**
 
 ```java
 package com.choisk.sfs.orm.support;
@@ -218,7 +218,7 @@ public record CollectionMetadata(
 }
 ```
 
-- [ ] **Step 4: 분석기 생성자 호출부 pass-through 갱신**
+- [x] **Step 4: 분석기 생성자 호출부 pass-through 갱신**
 
 `EntityMetadataAnalyzer.doAnalyze`의 `@SfsOneToMany` 분기(현재 126행 부근)를 raw 값 pass-through로 갱신. (XOR 검증 + mappedBy FK 해석은 Task 3/4. 여기선 단방향 기존 동작 유지 + 신규 필드 채우기만.) `import java.util.Set;` 추가.
 
@@ -233,17 +233,17 @@ public record CollectionMetadata(
             } else if (f.isAnnotationPresent(SfsColumn.class)) {
 ```
 
-- [ ] **Step 5: 테스트 통과 확인**
+- [x] **Step 5: 테스트 통과 확인**
 
 Run: `./gradlew :sfs-orm:test --tests CollectionMetadataTest`
 Expected: 4 PASS.
 
-- [ ] **Step 6: 회귀 확인**
+- [x] **Step 6: 회귀 확인**
 
 Run: `./gradlew :sfs-orm:test`
 Expected: 기존 + 4 PASS. (단방향 경로: joinColumnName=rel.joinColumn(), mappedBy="" 그대로.)
 
-- [ ] **Step 7: 커밋**
+- [x] **Step 7: 커밋**
 
 ```bash
 git add sfs-orm/src/main/java/com/choisk/sfs/orm/support/CollectionMetadata.java \
