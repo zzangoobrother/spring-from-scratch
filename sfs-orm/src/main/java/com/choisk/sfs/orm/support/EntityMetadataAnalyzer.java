@@ -167,6 +167,7 @@ public class EntityMetadataAnalyzer {
      * @SfsOneToMany 필드 fail-fast 검증:
      * - List 외 타입(Set, Collection 등) → 예외 (MP-2는 List<T> only)
      * - raw List (generic 미명시) → 예외
+     * - joinColumn / mappedBy 중 정확히 하나만 지정되어야 함 (XOR) → 아니면 예외
      *
      * elementType 비엔티티 검증은 extractGenericType 내부에서 처리.
      */
@@ -180,6 +181,14 @@ public class EntityMetadataAnalyzer {
             throw new SfsEntityMappingException(
                     "@SfsOneToMany field '" + f.getName()
                     + "' must have generic type parameter");
+        }
+        SfsOneToMany rel = f.getAnnotation(SfsOneToMany.class);
+        boolean hasJoinColumn = !rel.joinColumn().isEmpty();
+        boolean hasMappedBy = !rel.mappedBy().isEmpty();
+        if (hasJoinColumn == hasMappedBy) {   // 둘 다 true(both) 또는 둘 다 false(neither)
+            throw new SfsEntityMappingException(
+                    "@SfsOneToMany field '" + f.getName()
+                    + "' must specify 정확히 하나 of joinColumn / mappedBy");
         }
     }
 
