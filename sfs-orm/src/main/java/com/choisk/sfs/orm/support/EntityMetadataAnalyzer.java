@@ -18,6 +18,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -123,7 +124,10 @@ public class EntityMetadataAnalyzer {
                 validateOneToMany(f);
                 SfsOneToMany rel = f.getAnnotation(SfsOneToMany.class);
                 Class<?> elementType = extractGenericType(f);
-                oneToManies.add(new CollectionMetadata(f, elementType, rel.joinColumn()));
+                String joinColumnName = resolveJoinColumn(rel, elementType, entityClass, f);
+                oneToManies.add(new CollectionMetadata(
+                        f, elementType, joinColumnName,
+                        rel.mappedBy(), Set.of(rel.cascade()), rel.orphanRemoval()));
             } else if (f.isAnnotationPresent(SfsColumn.class)) {
                 columns.add(new FieldMetadata(f, columnNameOf(f), f.getType()));
             }
@@ -164,6 +168,7 @@ public class EntityMetadataAnalyzer {
      * @SfsOneToMany 필드 fail-fast 검증:
      * - List 외 타입(Set, Collection 등) → 예외 (MP-2는 List<T> only)
      * - raw List (generic 미명시) → 예외
+     * - joinColumn / mappedBy 중 정확히 하나만 지정되어야 함 (XOR) → 아니면 예외
      *
      * elementType 비엔티티 검증은 extractGenericType 내부에서 처리.
      */
@@ -177,6 +182,14 @@ public class EntityMetadataAnalyzer {
             throw new SfsEntityMappingException(
                     "@SfsOneToMany field '" + f.getName()
                     + "' must have generic type parameter");
+        }
+        SfsOneToMany rel = f.getAnnotation(SfsOneToMany.class);
+        boolean hasJoinColumn = !rel.joinColumn().isEmpty();
+        boolean hasMappedBy = !rel.mappedBy().isEmpty();
+        if (hasJoinColumn == hasMappedBy) {   // 둘 다 true(both) 또는 둘 다 false(neither)
+            throw new SfsEntityMappingException(
+                    "@SfsOneToMany field '" + f.getName()
+                    + "' must specify 정확히 하나 of joinColumn / mappedBy");
         }
     }
 
@@ -195,6 +208,47 @@ public class EntityMetadataAnalyzer {
                     + " is not annotated with @SfsEntity");
         }
         return elementType;
+    }
+
+    /**
+     * @SfsOneToMany의 FK 컬럼명을 해석한다.
+     * - 단방향(joinColumn): 그대로 반환.
+     * - 양방향(mappedBy): owning 엔티티(elementType)에서 mappedBy 이름의 @SfsManyToOne 필드를 찾아
+     *   그 @SfsJoinColumn.name을 FK로 채택. targetEntity가 owner 클래스와 일치하는지 검증.
+     *
+     * @param rel         @SfsOneToMany 어노테이션
+     * @param elementType 컬렉션 element(=owning) 엔티티 클래스
+     * @param ownerClass  컬렉션을 소유한 inverse 엔티티 클래스
+     * @param ownerField  컬렉션 필드(에러 메시지용)
+     * @throws SfsEntityMappingException mappedBy 필드 부재/매핑 미비/타입 불일치 시
+     */
+    private String resolveJoinColumn(SfsOneToMany rel, Class<?> elementType,
+                                     Class<?> ownerClass, Field ownerField) {
+        if (!rel.joinColumn().isEmpty()) {
+            return rel.joinColumn();   // 단방향
+        }
+        // 양방향: elementType에서 mappedBy 필드 탐색
+        Field owningField;
+        try {
+            owningField = elementType.getDeclaredField(rel.mappedBy());
+        } catch (NoSuchFieldException e) {
+            throw new SfsEntityMappingException(
+                    "@SfsOneToMany field '" + ownerField.getName() + "' mappedBy='" + rel.mappedBy()
+                    + "' — no such field on " + elementType.getSimpleName());
+        }
+        if (!owningField.isAnnotationPresent(SfsManyToOne.class)
+                || !owningField.isAnnotationPresent(SfsJoinColumn.class)) {
+            throw new SfsEntityMappingException(
+                    "@SfsOneToMany mappedBy target '" + elementType.getSimpleName() + "." + rel.mappedBy()
+                    + "' must be @SfsManyToOne + @SfsJoinColumn (owning side)");
+        }
+        if (!owningField.getType().equals(ownerClass)) {
+            throw new SfsEntityMappingException(
+                    "@SfsOneToMany mappedBy targetEntity mismatch: " + elementType.getSimpleName() + "."
+                    + rel.mappedBy() + " points to " + owningField.getType().getSimpleName()
+                    + " but owner is " + ownerClass.getSimpleName());
+        }
+        return owningField.getAnnotation(SfsJoinColumn.class).name();
     }
 
     /**
