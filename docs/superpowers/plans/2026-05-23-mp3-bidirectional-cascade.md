@@ -547,7 +547,7 @@ git commit -m "feat(sfs-orm): @SfsOneToMany mappedBy → owning @SfsJoinColumn F
 - Modify: `sfs-orm/src/main/java/com/choisk/sfs/orm/support/SfsPersistentList.java`
 - Test: `sfs-orm/src/test/java/com/choisk/sfs/orm/support/SfsPersistentListTest.java` (확장)
 
-- [ ] **Step 1: 실패 테스트 추가**
+- [x] **Step 1: 실패 테스트 추가**
 
 `SfsPersistentListTest`에 추가:
 
@@ -575,12 +575,12 @@ git commit -m "feat(sfs-orm): @SfsOneToMany mappedBy → owning @SfsJoinColumn F
 
 > 참조 동등성 정합: FakeCollectionLoader가 `new ArrayList<>(List.of("a","b","c"))`를 반환하므로 `remove("b")`는 String 동등성으로 제거된다. 실제 엔티티는 identityMap이 1:1을 보장해 동일 인스턴스 — 본 fake는 String이라 equals로 충분(테스트 단순화).
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 Run: `./gradlew :sfs-orm:test --tests SfsPersistentListTest`
 Expected: 컴파일 실패 — `findOrphans` 없음.
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 `SfsPersistentList`에 storedSnapshot 필드 + capture + findOrphans 추가. `initialize()` 수정:
 
@@ -629,14 +629,14 @@ Expected: 컴파일 실패 — `findOrphans` 없음.
 
 > 주의: `import java.util.ArrayList;` 추가 필요(현재 미import).
 
-- [ ] **Step 4: 통과 확인**
+- [x] **Step 4: 통과 확인**
 
 Run: `./gradlew :sfs-orm:test --tests SfsPersistentListTest`
 Expected: 기존 4 + 신규 3 PASS.
 
 > `findOrphans_remove한_element를_orphan으로_반환`은 String 동등성(`remove("b")`)으로 delegate에서 제거되지만, storedSnapshot의 "b"와 delegate에 남은 "a","c"를 *참조* 비교한다. storedSnapshot은 `new ArrayList<>(delegate)`로 같은 인스턴스를 담으므로 "b"(원본 인스턴스)는 delegate에서 사라져 orphan으로 잡힌다. PASS.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-orm/src/main/java/com/choisk/sfs/orm/support/SfsPersistentList.java \
@@ -654,7 +654,7 @@ git commit -m "feat(sfs-orm): SfsPersistentList storedSnapshot + findOrphans (Pe
 - Modify: `sfs-orm/src/main/java/com/choisk/sfs/orm/RealEntityManager.java`
 - Test: `sfs-orm/src/test/java/com/choisk/sfs/orm/support/RealEntityManagerCascadeTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.orm.support;
@@ -793,12 +793,12 @@ class RealEntityManagerCascadeTest {
 }
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 Run: `./gradlew :sfs-orm:test --tests RealEntityManagerCascadeTest`
 Expected: FAIL — cascade 미구현이라 actionQueue size 1(parent only).
 
-- [ ] **Step 3: `persist`를 doPersist/cascadePersist로 재구성**
+- [x] **Step 3: `persist`를 doPersist/cascadePersist로 재구성**
 
 `RealEntityManager`의 기존 `persist(Object)` 본문을 `doPersist`로 옮기고 cascade 추가. `import java.util.IdentityHashMap;`, `import java.util.Map;`, `import com.choisk.sfs.orm.support.CollectionMetadata;`, `import java.lang.reflect.Field;` 추가.
 
@@ -891,17 +891,17 @@ Expected: FAIL — cascade 미구현이라 actionQueue size 1(parent only).
 
 > 기존 `persist`의 SEQUENCE/IDENTITY 본문은 `insertNew`로 그대로 이동(Javadoc은 `persist`에 유지하거나 `insertNew`로 이전). `captureSnapshot`/`convertId`는 기존 메서드 재사용.
 
-- [ ] **Step 4: 통과 확인**
+- [x] **Step 4: 통과 확인**
 
 Run: `./gradlew :sfs-orm:test --tests RealEntityManagerCascadeTest`
 Expected: 3 PASS.
 
-- [ ] **Step 5: 회귀 확인 (기존 persist 동작 무손상)**
+- [x] **Step 5: 회귀 확인 (기존 persist 동작 무손상)**
 
 Run: `./gradlew :sfs-orm:test`
 Expected: 누적 PASS. (RealEntityManagerPersistTest의 SEQUENCE/IDENTITY 단일 persist 동작 보존 — cascade 컬렉션 없으면 doPersist는 self-insert만.)
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add sfs-orm/src/main/java/com/choisk/sfs/orm/RealEntityManager.java \

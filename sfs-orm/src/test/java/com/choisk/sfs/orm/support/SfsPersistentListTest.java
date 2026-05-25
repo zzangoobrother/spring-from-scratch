@@ -60,6 +60,26 @@ class SfsPersistentListTest {
                 .hasMessageContaining("String#1");
     }
 
+    @Test
+    void findOrphans_초기화_후_변경_없으면_빈_리스트() {
+        list.size();   // 초기화 → storedSnapshot = [a, b, c]
+        assertThat(list.findOrphans()).isEmpty();
+    }
+
+    @Test
+    void findOrphans_remove한_element를_orphan으로_반환() {
+        list.size();          // 초기화 → ["a","b","c"]
+        list.remove("b");     // delegate = ["a","c"]
+        assertThat(list.findOrphans()).containsExactly("b");
+    }
+
+    @Test
+    void findOrphans_미초기화_상태면_빈_리스트() {
+        // 한 번도 메서드 호출 안 함 — delegate null
+        assertThat(list.findOrphans()).isEmpty();
+        assertThat(list.isInitialized()).isFalse();
+    }
+
     // ─── fake loader ──────────────────────────────────────────
     static class FakeCollectionLoader implements CollectionLoader {
         final AtomicInteger callCount = new AtomicInteger(0);
