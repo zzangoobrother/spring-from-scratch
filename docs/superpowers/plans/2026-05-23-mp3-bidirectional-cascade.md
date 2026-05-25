@@ -547,7 +547,7 @@ git commit -m "feat(sfs-orm): @SfsOneToMany mappedBy → owning @SfsJoinColumn F
 - Modify: `sfs-orm/src/main/java/com/choisk/sfs/orm/support/SfsPersistentList.java`
 - Test: `sfs-orm/src/test/java/com/choisk/sfs/orm/support/SfsPersistentListTest.java` (확장)
 
-- [ ] **Step 1: 실패 테스트 추가**
+- [x] **Step 1: 실패 테스트 추가**
 
 `SfsPersistentListTest`에 추가:
 
@@ -575,12 +575,12 @@ git commit -m "feat(sfs-orm): @SfsOneToMany mappedBy → owning @SfsJoinColumn F
 
 > 참조 동등성 정합: FakeCollectionLoader가 `new ArrayList<>(List.of("a","b","c"))`를 반환하므로 `remove("b")`는 String 동등성으로 제거된다. 실제 엔티티는 identityMap이 1:1을 보장해 동일 인스턴스 — 본 fake는 String이라 equals로 충분(테스트 단순화).
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 Run: `./gradlew :sfs-orm:test --tests SfsPersistentListTest`
 Expected: 컴파일 실패 — `findOrphans` 없음.
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 `SfsPersistentList`에 storedSnapshot 필드 + capture + findOrphans 추가. `initialize()` 수정:
 
@@ -629,14 +629,14 @@ Expected: 컴파일 실패 — `findOrphans` 없음.
 
 > 주의: `import java.util.ArrayList;` 추가 필요(현재 미import).
 
-- [ ] **Step 4: 통과 확인**
+- [x] **Step 4: 통과 확인**
 
 Run: `./gradlew :sfs-orm:test --tests SfsPersistentListTest`
 Expected: 기존 4 + 신규 3 PASS.
 
 > `findOrphans_remove한_element를_orphan으로_반환`은 String 동등성(`remove("b")`)으로 delegate에서 제거되지만, storedSnapshot의 "b"와 delegate에 남은 "a","c"를 *참조* 비교한다. storedSnapshot은 `new ArrayList<>(delegate)`로 같은 인스턴스를 담으므로 "b"(원본 인스턴스)는 delegate에서 사라져 orphan으로 잡힌다. PASS.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-orm/src/main/java/com/choisk/sfs/orm/support/SfsPersistentList.java \
