@@ -654,7 +654,7 @@ git commit -m "feat(sfs-orm): SfsPersistentList storedSnapshot + findOrphans (Pe
 - Modify: `sfs-orm/src/main/java/com/choisk/sfs/orm/RealEntityManager.java`
 - Test: `sfs-orm/src/test/java/com/choisk/sfs/orm/support/RealEntityManagerCascadeTest.java`
 
-- [ ] **Step 1: 실패 테스트 작성**
+- [x] **Step 1: 실패 테스트 작성**
 
 ```java
 package com.choisk.sfs.orm.support;
@@ -793,12 +793,12 @@ class RealEntityManagerCascadeTest {
 }
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 Run: `./gradlew :sfs-orm:test --tests RealEntityManagerCascadeTest`
 Expected: FAIL — cascade 미구현이라 actionQueue size 1(parent only).
 
-- [ ] **Step 3: `persist`를 doPersist/cascadePersist로 재구성**
+- [x] **Step 3: `persist`를 doPersist/cascadePersist로 재구성**
 
 `RealEntityManager`의 기존 `persist(Object)` 본문을 `doPersist`로 옮기고 cascade 추가. `import java.util.IdentityHashMap;`, `import java.util.Map;`, `import com.choisk.sfs.orm.support.CollectionMetadata;`, `import java.lang.reflect.Field;` 추가.
 
@@ -891,17 +891,17 @@ Expected: FAIL — cascade 미구현이라 actionQueue size 1(parent only).
 
 > 기존 `persist`의 SEQUENCE/IDENTITY 본문은 `insertNew`로 그대로 이동(Javadoc은 `persist`에 유지하거나 `insertNew`로 이전). `captureSnapshot`/`convertId`는 기존 메서드 재사용.
 
-- [ ] **Step 4: 통과 확인**
+- [x] **Step 4: 통과 확인**
 
 Run: `./gradlew :sfs-orm:test --tests RealEntityManagerCascadeTest`
 Expected: 3 PASS.
 
-- [ ] **Step 5: 회귀 확인 (기존 persist 동작 무손상)**
+- [x] **Step 5: 회귀 확인 (기존 persist 동작 무손상)**
 
 Run: `./gradlew :sfs-orm:test`
 Expected: 누적 PASS. (RealEntityManagerPersistTest의 SEQUENCE/IDENTITY 단일 persist 동작 보존 — cascade 컬렉션 없으면 doPersist는 self-insert만.)
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add sfs-orm/src/main/java/com/choisk/sfs/orm/RealEntityManager.java \
