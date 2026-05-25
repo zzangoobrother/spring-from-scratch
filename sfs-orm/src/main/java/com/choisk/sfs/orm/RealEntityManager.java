@@ -1,6 +1,7 @@
 package com.choisk.sfs.orm;
 
 import com.choisk.sfs.orm.exception.SfsPersistenceException;
+import com.choisk.sfs.orm.support.CollectionMetadata;
 import com.choisk.sfs.orm.support.DeleteAction;
 import com.choisk.sfs.orm.support.EntityAction;
 import com.choisk.sfs.orm.support.EntityKey;
@@ -13,9 +14,12 @@ import com.choisk.sfs.orm.support.PersistenceContext;
 import com.choisk.sfs.orm.support.RelationMetadata;
 import com.choisk.sfs.orm.support.UpdateAction;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -46,7 +50,7 @@ public class RealEntityManager implements SfsEntityManager {
     }
 
     /**
-     * 엔티티를 영속 상태로 전환한다.
+     * 엔티티를 영속 상태로 전환한다. cascade PERSIST 컬렉션을 그래프 순회해 자식도 함께 등록한다.
      *
      * <p>SEQUENCE 전략(pre-insert):
      * <ol>
@@ -58,21 +62,85 @@ public class RealEntityManager implements SfsEntityManager {
      *
      * <p>IDENTITY 전략(post-insert): id는 INSERT 후 DB가 생성한 generated key에서 받는다.
      *
+     * <p>cascade PERSIST: @SfsOneToMany(cascade=PERSIST/ALL) 컬렉션의 각 자식을 재귀 순회.
+     * 이미 방문한 엔티티는 IdentityHashMap으로 추적하여 양방향 사이클을 차단한다.
+     *
      * @param entity 영속화할 엔티티 인스턴스
      * @throws SfsPersistenceException 알 수 없는 엔티티 클래스이거나 reflection 접근 실패 시
      */
     @Override
     public void persist(Object entity) {
+        doPersist(entity, new IdentityHashMap<>());
+    }
+
+    /**
+     * cascade 그래프 순회 진입점. visited는 단일 persist 호출 전체에서 공유(참조 기반)되어
+     * 사이클(양방향 모두 cascade일 때)과 중복 방문을 차단한다.
+     *
+     * @param entity  영속화 대상 엔티티
+     * @param visited 이미 방문한 엔티티 추적 맵 (참조 동등성 기반)
+     */
+    private void doPersist(Object entity, Map<Object, Boolean> visited) {
+        if (visited.put(entity, Boolean.TRUE) != null) return;   // 이미 방문 — 사이클/중복 가드
+
         EntityMetadata md = emf.metadataOf(entity.getClass());
         if (md == null) {
             throw new SfsPersistenceException("Unknown entity class: " + entity.getClass());
         }
+        if (!isManaged(entity, md)) {
+            insertNew(entity, md);   // 신규 엔티티: SEQUENCE/IDENTITY 분기 self-insert
+        }
+        // cascade PERSIST — managed든 아니든 진행(managed 재persist도 새 자식 전파)
+        for (CollectionMetadata cm : md.oneToManies()) {
+            if (!cm.cascadesPersist()) continue;
+            Object coll = readField(cm.field(), entity);
+            if (coll == null) continue;
+            for (Object child : (Iterable<?>) coll) {
+                doPersist(child, visited);
+            }
+        }
+    }
 
+    /**
+     * 엔티티가 이미 1차 캐시(managed)인지 확인한다.
+     * id가 null이면 신규, id가 있고 identityMap에 등재됐으면 managed.
+     *
+     * @param entity 확인할 엔티티 인스턴스
+     * @param md     엔티티 메타데이터
+     * @return 이미 managed 상태면 true
+     */
+    private boolean isManaged(Object entity, EntityMetadata md) {
+        try {
+            Object id = md.idField().field().get(entity);
+            if (id == null) return false;
+            return context.contains(new EntityKey(entity.getClass(), id));
+        } catch (IllegalAccessException e) {
+            throw new SfsPersistenceException("@SfsId 읽기 실패 — managed 판정 불가", e);
+        }
+    }
+
+    /**
+     * 미관리 신규 엔티티의 self-insert를 수행한다.
+     *
+     * <p>SEQUENCE 전략(pre-insert): id를 먼저 받아 엔티티에 세팅 후 1차 캐시 등재 + snapshot 캡처 +
+     * actionQueue InsertAction 등록(write-behind). DB INSERT는 flush(K2)에서 발생한다.
+     *
+     * <p>IDENTITY 전략(post-insert): 즉시 INSERT (학습 정점 ① 깨짐 함정 박제).
+     * generate()가 INSERT를 수행하고 entity.id를 DB generated key로 채움.
+     * actionQueue에 등재하지 않는다 — flush 시 재실행하면 중복 INSERT → UNIQUE 위반.
+     *
+     * <p>설계 균열선: {@code gen.isPostInsert()} 한 줄이 IDENTITY(post-insert)와
+     * SEQUENCE(pre-insert)를 분기하며, 두 전략의 생명주기가 완전히 다름을 표현한다.
+     *
+     * @param entity 신규 엔티티 인스턴스
+     * @param md     엔티티 메타데이터
+     */
+    private void insertNew(Object entity, EntityMetadata md) {
         EntityPersister persister = emf.persisterOf(entity.getClass());
         IdentifierGenerator gen = persister.idGenerator();
 
         if (gen.isPostInsert()) {
-            // IDENTITY: 즉시 INSERT (학습 정점 ① 깨짐 함정 박제)
+            // IDENTITY: 즉시 INSERT
             // generate()가 INSERT를 수행하고 entity.id를 DB generated key로 채움
             // actionQueue에 등재하지 않는다 — flush 시 재실행하면 중복 INSERT → UNIQUE 위반
             gen.generate(entity, md);
@@ -109,6 +177,22 @@ public class RealEntityManager implements SfsEntityManager {
             context.putEntity(key, entity);
             context.putSnapshot(key, captureSnapshot(entity, md));
             context.enqueueAction(new InsertAction(entity, md));
+        }
+    }
+
+    /**
+     * reflection으로 필드 값을 읽는 공통 헬퍼. cascade/orphan 순회에서 사용.
+     *
+     * @param f      읽을 필드
+     * @param target 필드를 읽을 대상 인스턴스
+     * @return 필드 값 (null 가능)
+     * @throws SfsPersistenceException IllegalAccessException 래핑
+     */
+    private Object readField(Field f, Object target) {
+        try {
+            return f.get(target);
+        } catch (IllegalAccessException e) {
+            throw new SfsPersistenceException("필드 접근 실패: " + f.getName(), e);
         }
     }
 
