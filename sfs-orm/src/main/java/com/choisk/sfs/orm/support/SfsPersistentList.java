@@ -2,6 +2,7 @@ package com.choisk.sfs.orm.support;
 
 import com.choisk.sfs.orm.exception.SfsLazyInitializationException;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -27,6 +28,8 @@ public class SfsPersistentList<T> implements List<T> {
     private final PersistenceContext context;
     /** null = 미초기화 상태. delegate != null 가드로 중복 loader 호출 방지. */
     private List<T> delegate;
+    /** 로드 직후 element 사본 — orphanRemoval diff 기준선(Hibernate PersistentBag.storedSnapshot 동형). */
+    private List<T> storedSnapshot;
 
     public SfsPersistentList(Class<T> elementType, Object ownerPk, String joinColumnName,
                               CollectionLoader loader, PersistenceContext context) {
@@ -52,10 +55,31 @@ public class SfsPersistentList<T> implements List<T> {
                     elementType.getSimpleName() + "#" + ownerPk + ".collection");
         }
         delegate = loader.loadCollection(elementType, joinColumnName, ownerPk, context);
+        storedSnapshot = new ArrayList<>(delegate);   // 로드 직후 사본
     }
 
     /** 테스트 헬퍼 — 초기화 여부 확인용 (delegate null 여부로 판단). */
     boolean isInitialized() { return delegate != null; }
+
+    /**
+     * orphan = storedSnapshot에는 있으나 현재 delegate에 없는 element.
+     * 미초기화(delegate null)면 변경이 없으므로 빈 리스트.
+     *
+     * <p>WHY 참조 동등성: identityMap이 1 entity = 1 instance를 보장하므로 동일 인스턴스 비교로 충분.
+     * 엔티티가 equals/hashCode를 재정의 안 했을 수 있어 참조 비교가 안전.
+     */
+    List<T> findOrphans() {
+        if (delegate == null) return List.of();
+        List<T> orphans = new ArrayList<>();
+        for (T e : storedSnapshot) {
+            boolean stillPresent = false;
+            for (T d : delegate) {
+                if (d == e) { stillPresent = true; break; }
+            }
+            if (!stillPresent) orphans.add(e);
+        }
+        return orphans;
+    }
 
     // ─── List<T> 위임 (모든 메서드가 initialize() 트리거) ─────────────────────
     @Override public int size() { initialize(); return delegate.size(); }
