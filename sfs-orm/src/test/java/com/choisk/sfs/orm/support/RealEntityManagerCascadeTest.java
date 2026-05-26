@@ -33,7 +33,7 @@ class RealEntityManagerCascadeTest {
         @SfsId @SfsGeneratedValue(strategy = GenerationType.SEQUENCE, sequenceName = "cp_parent_seq")
         Long id;
         @SfsColumn String name;
-        @SfsOneToMany(mappedBy = "parent", cascade = {SfsCascadeType.PERSIST})
+        @SfsOneToMany(mappedBy = "parent", cascade = {SfsCascadeType.PERSIST, SfsCascadeType.REMOVE})
         List<CpChild> children = new ArrayList<>();
     }
 
@@ -67,6 +67,9 @@ class RealEntityManagerCascadeTest {
         JdbcTemplate jdbc = new JdbcTemplate(ds, tsm);
         jdbc.update("CREATE SEQUENCE cp_parent_seq START WITH 1");
         jdbc.update("CREATE SEQUENCE cp_child_seq START WITH 1");
+        jdbc.update("CREATE TABLE cp_parent (id BIGINT PRIMARY KEY, name VARCHAR(50))");
+        jdbc.update("CREATE TABLE cp_parent_nocascade (id BIGINT PRIMARY KEY, name VARCHAR(50))");
+        jdbc.update("CREATE TABLE cp_child (id BIGINT PRIMARY KEY, parent_id BIGINT, parent2_id BIGINT, label VARCHAR(50))");
         emf = SfsEntityManagerFactory.builder()
                 .dataSource(ds).transactionSynchronizationManager(tsm)
                 .addEntityClass(CpParent.class)
@@ -130,5 +133,28 @@ class RealEntityManagerCascadeTest {
         long parentInserts = em.context().actionQueue().stream()
                 .filter(a -> a instanceof InsertAction ia && ia.entity() == p).count();
         assertThat(parentInserts).isEqualTo(1);
+    }
+
+    @Test
+    void remove_parent_cascade_REMOVE_시_자식_DeleteAction이_부모보다_먼저() {
+        RealEntityManager em = (RealEntityManager) emf.createEntityManager();
+        CpParent p = new CpParent();
+        p.name = "p1";
+        CpChild c1 = new CpChild();
+        c1.label = "c1"; c1.parent = p;
+        CpChild c2 = new CpChild();
+        c2.label = "c2"; c2.parent = p;
+        p.children.add(c1);
+        p.children.add(c2);
+        em.persist(p);
+        em.flush();   // DB INSERT + actionQueue 비움 → p/c1/c2 managed
+
+        em.remove(p);
+
+        // queue: [Delete(c1), Delete(c2), Delete(p)] — 부모는 마지막
+        List<EntityAction> q = em.context().actionQueue();
+        assertThat(q).hasSize(3);
+        assertThat(q).allMatch(a -> a instanceof DeleteAction);
+        assertThat(((DeleteAction) q.get(q.size() - 1)).entity()).isSameAs(p);
     }
 }

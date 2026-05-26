@@ -308,6 +308,10 @@ public class RealEntityManager implements SfsEntityManager {
      * <p>write-behind 패턴: 즉시 DELETE하지 않고 actionQueue에 DeleteAction을 등록한다.
      * 실제 DELETE SQL은 flush(K2)에서 실행된다.
      *
+     * <p>cascade REMOVE: @SfsOneToMany(cascade=REMOVE/ALL) 컬렉션의 자식 DeleteAction을
+     * 부모보다 먼저 등록한다(FK 순서). flush의 stable sort가 INSERT→UPDATE→DELETE 내에서
+     * 등록 순서를 유지하므로 자식이 부모보다 항상 먼저 DELETE된다.
+     *
      * @param entity 삭제할 엔티티 인스턴스 (반드시 1차 캐시에 있는 관리 상태여야 함)
      * @throws IllegalArgumentException  미관리(detached/new) 엔티티를 넘긴 경우
      * @throws SfsPersistenceException   알 수 없는 엔티티 클래스이거나 @SfsId 필드 접근 실패 시
@@ -318,16 +322,26 @@ public class RealEntityManager implements SfsEntityManager {
         if (md == null) {
             throw new SfsPersistenceException("Unknown entity class: " + entity.getClass());
         }
+        Object pk;
         try {
-            Object pk = md.idField().field().get(entity);
-            EntityKey key = new EntityKey(entity.getClass(), pk);
-            if (!context.contains(key)) {
-                throw new IllegalArgumentException("Entity not managed: " + entity);
-            }
-            context.enqueueAction(new DeleteAction(entity, md));
+            pk = md.idField().field().get(entity);
         } catch (IllegalAccessException e) {
             throw new SfsPersistenceException("Cannot read @SfsId for remove", e);
         }
+        EntityKey key = new EntityKey(entity.getClass(), pk);
+        if (!context.contains(key)) {
+            throw new IllegalArgumentException("Entity not managed: " + entity);
+        }
+        // cascade REMOVE — 자식 DeleteAction을 부모보다 먼저 등록(FK 순서). flush의 stable sort가 순서 보존.
+        for (CollectionMetadata cm : md.oneToManies()) {
+            if (!cm.cascadesRemove()) continue;
+            Object coll = readField(cm.field(), entity);
+            if (coll == null) continue;
+            for (Object child : (Iterable<?>) coll) {
+                remove(child);
+            }
+        }
+        context.enqueueAction(new DeleteAction(entity, md));
     }
 
     /**
