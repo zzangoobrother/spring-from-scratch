@@ -68,7 +68,7 @@ public class SfsPersistentList<T> implements List<T> {
      * <p>WHY 참조 동등성: identityMap이 1 entity = 1 instance를 보장하므로 동일 인스턴스 비교로 충분.
      * 엔티티가 equals/hashCode를 재정의 안 했을 수 있어 참조 비교가 안전.
      */
-    List<T> findOrphans() {
+    public List<T> findOrphans() {
         if (delegate == null) return List.of();
         List<T> orphans = new ArrayList<>();
         for (T e : storedSnapshot) {

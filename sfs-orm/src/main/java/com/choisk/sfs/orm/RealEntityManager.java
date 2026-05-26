@@ -12,6 +12,7 @@ import com.choisk.sfs.orm.support.IdentifierGenerator;
 import com.choisk.sfs.orm.support.InsertAction;
 import com.choisk.sfs.orm.support.PersistenceContext;
 import com.choisk.sfs.orm.support.RelationMetadata;
+import com.choisk.sfs.orm.support.SfsPersistentList;
 import com.choisk.sfs.orm.support.UpdateAction;
 
 import java.lang.reflect.Field;
@@ -380,6 +381,25 @@ public class RealEntityManager implements SfsEntityManager {
             }
         }
 
+        // Phase 1.5: orphanRemoval — 컬렉션 snapshot diff (cascade와 다른 트리거)
+        // identityMap 순회 중 enqueue하므로 별도 루프로 분리(ConcurrentModification 회피: actionQueue는 별도 리스트)
+        for (var entry : context.identityMap().entrySet()) {
+            EntityMetadata md = emf.metadataOf(entry.getKey().entityClass());
+            Object owner = entry.getValue();
+            for (CollectionMetadata cm : md.oneToManies()) {
+                if (!cm.orphanRemoval()) continue;
+                Object coll = readField(cm.field(), owner);
+                if (!(coll instanceof SfsPersistentList<?> pl)) continue;
+                for (Object orphan : pl.findOrphans()) {
+                    EntityMetadata orphanMd = emf.metadataOf(orphan.getClass());
+                    EntityKey ok = new EntityKey(orphan.getClass(), readId(orphan, orphanMd));
+                    if (context.contains(ok) && !hasPendingDelete(orphan)) {
+                        context.enqueueAction(new DeleteAction(orphan, orphanMd));
+                    }
+                }
+            }
+        }
+
         // Phase 2: action 실행 (INSERT → UPDATE → DELETE 순)
         var actions = new ArrayList<>(context.actionQueue());
         actions.sort((a, b) -> typeOrder(a) - typeOrder(b));
@@ -422,6 +442,35 @@ public class RealEntityManager implements SfsEntityManager {
             case UpdateAction ua -> 2;
             case DeleteAction da -> 3;
         };
+    }
+
+    /**
+     * @SfsId 값 읽기 — orphan EntityKey 구성용.
+     *
+     * @param entity 대상 엔티티 인스턴스
+     * @param md     엔티티 메타데이터
+     * @return @SfsId 필드 값
+     * @throws SfsPersistenceException IllegalAccessException 래핑
+     */
+    private Object readId(Object entity, EntityMetadata md) {
+        try {
+            return md.idField().field().get(entity);
+        } catch (IllegalAccessException e) {
+            throw new SfsPersistenceException("@SfsId 읽기 실패 — orphan key 구성 불가", e);
+        }
+    }
+
+    /**
+     * 이미 같은 인스턴스에 대한 DeleteAction이 큐에 있으면 true(cascade REMOVE 중복 가드).
+     *
+     * @param entity 검사할 엔티티 인스턴스 (참조 동등성 기반)
+     * @return 이미 DeleteAction이 큐에 등재되어 있으면 true
+     */
+    private boolean hasPendingDelete(Object entity) {
+        for (EntityAction a : context.actionQueue()) {
+            if (a instanceof DeleteAction da && da.entity() == entity) return true;
+        }
+        return false;
     }
 
     /**
