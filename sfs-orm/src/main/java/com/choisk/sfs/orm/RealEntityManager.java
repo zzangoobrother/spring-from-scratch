@@ -12,6 +12,7 @@ import com.choisk.sfs.orm.support.IdentifierGenerator;
 import com.choisk.sfs.orm.support.InsertAction;
 import com.choisk.sfs.orm.support.PersistenceContext;
 import com.choisk.sfs.orm.support.RelationMetadata;
+import com.choisk.sfs.orm.support.SfsPersistentList;
 import com.choisk.sfs.orm.support.UpdateAction;
 
 import java.lang.reflect.Field;
@@ -308,6 +309,10 @@ public class RealEntityManager implements SfsEntityManager {
      * <p>write-behind 패턴: 즉시 DELETE하지 않고 actionQueue에 DeleteAction을 등록한다.
      * 실제 DELETE SQL은 flush(K2)에서 실행된다.
      *
+     * <p>cascade REMOVE: @SfsOneToMany(cascade=REMOVE/ALL) 컬렉션의 자식 DeleteAction을
+     * 부모보다 먼저 등록한다(FK 순서). flush의 stable sort가 INSERT→UPDATE→DELETE 내에서
+     * 등록 순서를 유지하므로 자식이 부모보다 항상 먼저 DELETE된다.
+     *
      * @param entity 삭제할 엔티티 인스턴스 (반드시 1차 캐시에 있는 관리 상태여야 함)
      * @throws IllegalArgumentException  미관리(detached/new) 엔티티를 넘긴 경우
      * @throws SfsPersistenceException   알 수 없는 엔티티 클래스이거나 @SfsId 필드 접근 실패 시
@@ -318,16 +323,26 @@ public class RealEntityManager implements SfsEntityManager {
         if (md == null) {
             throw new SfsPersistenceException("Unknown entity class: " + entity.getClass());
         }
+        Object pk;
         try {
-            Object pk = md.idField().field().get(entity);
-            EntityKey key = new EntityKey(entity.getClass(), pk);
-            if (!context.contains(key)) {
-                throw new IllegalArgumentException("Entity not managed: " + entity);
-            }
-            context.enqueueAction(new DeleteAction(entity, md));
+            pk = md.idField().field().get(entity);
         } catch (IllegalAccessException e) {
             throw new SfsPersistenceException("Cannot read @SfsId for remove", e);
         }
+        EntityKey key = new EntityKey(entity.getClass(), pk);
+        if (!context.contains(key)) {
+            throw new IllegalArgumentException("Entity not managed: " + entity);
+        }
+        // cascade REMOVE — 자식 DeleteAction을 부모보다 먼저 등록(FK 순서). flush의 stable sort가 순서 보존.
+        for (CollectionMetadata cm : md.oneToManies()) {
+            if (!cm.cascadesRemove()) continue;
+            Object coll = readField(cm.field(), entity);
+            if (coll == null) continue;
+            for (Object child : (Iterable<?>) coll) {
+                remove(child);
+            }
+        }
+        context.enqueueAction(new DeleteAction(entity, md));
     }
 
     /**
@@ -363,6 +378,25 @@ public class RealEntityManager implements SfsEntityManager {
                 // 변경된 컬럼이 있으면 UpdateAction을 큐에 등록하고 snapshot 기준선 갱신
                 context.enqueueAction(new UpdateAction(entity, md, dirty));
                 context.putSnapshot(key, current);
+            }
+        }
+
+        // Phase 1.5: orphanRemoval — 컬렉션 snapshot diff (cascade와 다른 트리거)
+        // identityMap 순회 중 enqueue하므로 별도 루프로 분리(ConcurrentModification 회피: actionQueue는 별도 리스트)
+        for (var entry : context.identityMap().entrySet()) {
+            EntityMetadata md = emf.metadataOf(entry.getKey().entityClass());
+            Object owner = entry.getValue();
+            for (CollectionMetadata cm : md.oneToManies()) {
+                if (!cm.orphanRemoval()) continue;
+                Object coll = readField(cm.field(), owner);
+                if (!(coll instanceof SfsPersistentList<?> pl)) continue;
+                for (Object orphan : pl.findOrphans()) {
+                    EntityMetadata orphanMd = emf.metadataOf(orphan.getClass());
+                    EntityKey ok = new EntityKey(orphan.getClass(), readId(orphan, orphanMd));
+                    if (context.contains(ok) && !hasPendingDelete(orphan)) {
+                        context.enqueueAction(new DeleteAction(orphan, orphanMd));
+                    }
+                }
             }
         }
 
@@ -408,6 +442,35 @@ public class RealEntityManager implements SfsEntityManager {
             case UpdateAction ua -> 2;
             case DeleteAction da -> 3;
         };
+    }
+
+    /**
+     * @SfsId 값 읽기 — orphan EntityKey 구성용.
+     *
+     * @param entity 대상 엔티티 인스턴스
+     * @param md     엔티티 메타데이터
+     * @return @SfsId 필드 값
+     * @throws SfsPersistenceException IllegalAccessException 래핑
+     */
+    private Object readId(Object entity, EntityMetadata md) {
+        try {
+            return md.idField().field().get(entity);
+        } catch (IllegalAccessException e) {
+            throw new SfsPersistenceException("@SfsId 읽기 실패 — orphan key 구성 불가", e);
+        }
+    }
+
+    /**
+     * 이미 같은 인스턴스에 대한 DeleteAction이 큐에 있으면 true(cascade REMOVE 중복 가드).
+     *
+     * @param entity 검사할 엔티티 인스턴스 (참조 동등성 기반)
+     * @return 이미 DeleteAction이 큐에 등재되어 있으면 true
+     */
+    private boolean hasPendingDelete(Object entity) {
+        for (EntityAction a : context.actionQueue()) {
+            if (a instanceof DeleteAction da && da.entity() == entity) return true;
+        }
+        return false;
     }
 
     /**
