@@ -919,7 +919,7 @@ git commit -m "feat(sfs-orm): cascade PERSIST — persist 그래프 순회 + man
 - Modify: `sfs-orm/src/main/java/com/choisk/sfs/orm/RealEntityManager.java` (`remove`)
 - Test: `RealEntityManagerCascadeTest` (확장)
 
-- [ ] **Step 1: 실패 테스트 추가**
+- [x] **Step 1: 실패 테스트 추가**
 
 `RealEntityManagerCascadeTest`에 `cascade = {SfsCascadeType.PERSIST, SfsCascadeType.REMOVE}` fixture가 필요하므로 CpParent의 cascade에 REMOVE 추가. 기존 `@SfsOneToMany(mappedBy = "parent", cascade = {SfsCascadeType.PERSIST})`를 `cascade = {SfsCascadeType.PERSIST, SfsCascadeType.REMOVE}`로 변경(Task 6 테스트는 PERSIST 포함 유지되어 영향 없음). 그 후 테스트 추가:
 
@@ -956,12 +956,12 @@ git commit -m "feat(sfs-orm): cascade PERSIST — persist 그래프 순회 + man
 > ```
 > (Task 6 테스트들은 flush를 안 하지만 테이블이 있어도 무해.)
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 Run: `./gradlew :sfs-orm:test --tests RealEntityManagerCascadeTest`
 Expected: FAIL — `remove(p)`가 자식 cascade 없이 DeleteAction 1건만 등록.
 
-- [ ] **Step 3: `remove`에 cascade REMOVE 추가**
+- [x] **Step 3: `remove`에 cascade REMOVE 추가**
 
 기존 `remove(Object)`를 갱신 — managed 검증 후, 부모 enqueue 전에 자식 cascade:
 
@@ -995,17 +995,17 @@ Expected: FAIL — `remove(p)`가 자식 cascade 없이 DeleteAction 1건만 등
     }
 ```
 
-- [ ] **Step 4: 통과 확인**
+- [x] **Step 4: 통과 확인**
 
 Run: `./gradlew :sfs-orm:test --tests RealEntityManagerCascadeTest`
 Expected: Task 6의 3 + 신규 1 = 4 PASS.
 
-- [ ] **Step 5: 회귀 확인**
+- [x] **Step 5: 회귀 확인**
 
 Run: `./gradlew :sfs-orm:test`
 Expected: 누적 PASS. (RealEntityManagerRemoveTest: cascade 컬렉션 없는 엔티티는 기존 동작 — 미관리 예외 + DeleteAction 1건 유지.)
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add sfs-orm/src/main/java/com/choisk/sfs/orm/RealEntityManager.java \
