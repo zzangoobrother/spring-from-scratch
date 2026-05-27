@@ -1203,7 +1203,7 @@ git commit -m "feat(sfs-orm): flush orphanRemoval — 컬렉션 snapshot diff DE
 - Create: `sfs-orm/src/test/java/com/choisk/sfs/orm/integration/AbstractBidirectionalCascadeTest.java`
 - Create: `sfs-orm/src/test/java/com/choisk/sfs/orm/integration/BidirectionalConsistencyIntegrationTest.java`
 
-- [ ] **Step 1: 통합 베이스 작성 (fixture + 인프라)**
+- [x] **Step 1: 통합 베이스 작성 (fixture + 인프라)**
 
 ```java
 package com.choisk.sfs.orm.integration;
@@ -1305,7 +1305,7 @@ abstract class AbstractBidirectionalCascadeTest {
 
 > **검증 포인트:** `SfsEntityManagerFactory.Builder` 타입명이 실제 빌더 반환 타입과 일치하는지 확인(`SfsEntityManagerFactory.builder()` 반환형). 다르면 `var b = SfsEntityManagerFactory.builder()...`로 대체.
 
-- [ ] **Step 2: 양방향 일관성 함정 테스트 작성**
+- [x] **Step 2: 양방향 일관성 함정 테스트 작성**
 
 ```java
 package com.choisk.sfs.orm.integration;
@@ -1370,17 +1370,17 @@ class BidirectionalConsistencyIntegrationTest extends AbstractBidirectionalCasca
 }
 ```
 
-- [ ] **Step 3: 실행 — 통과 확인**
+- [x] **Step 3: 실행 — 통과 확인**
 
 Run: `./gradlew :sfs-orm:test --tests BidirectionalConsistencyIntegrationTest`
 Expected: 2 PASS. (Task 1~8 구현이 cascade persist + 양방향 매핑을 지원하므로 GREEN. 만약 첫 실행이 빌더/타입 문제로 실패하면 Step 1의 검증 포인트 적용.)
 
-- [ ] **Step 4: 회귀 확인**
+- [x] **Step 4: 회귀 확인**
 
 Run: `./gradlew :sfs-orm:test`
 Expected: 누적 PASS.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add sfs-orm/src/test/java/com/choisk/sfs/orm/integration/AbstractBidirectionalCascadeTest.java \
