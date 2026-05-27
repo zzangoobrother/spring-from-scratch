@@ -1397,7 +1397,7 @@ git commit -m "test(sfs-orm): 양방향 일관성 함정(FK null) 통합 — 학
 **Files:**
 - Create: `sfs-orm/src/test/java/com/choisk/sfs/orm/integration/CascadePersistIntegrationTest.java`
 
-- [ ] **Step 1: 테스트 작성 (spy 주입)**
+- [x] **Step 1: 테스트 작성 (spy 주입)**
 
 ```java
 package com.choisk.sfs.orm.integration;
@@ -1447,17 +1447,17 @@ class CascadePersistIntegrationTest extends AbstractBidirectionalCascadeTest {
 
 > **주의:** `jdbcTemplateOverride()`가 `setupBidirectional()`의 `b.jdbcTemplate(...)` 시점에 호출되는데, 그 시점엔 `ds`/`tsm`이 이미 초기화돼 있다(베이스 setup 내 DDL 이후 빌더 단계). spy 생성 시 `ds`/`tsm` non-null 보장됨.
 
-- [ ] **Step 2: 실행 — 통과 확인**
+- [x] **Step 2: 실행 — 통과 확인**
 
 Run: `./gradlew :sfs-orm:test --tests CascadePersistIntegrationTest`
 Expected: 1 PASS.
 
-- [ ] **Step 3: 회귀 확인**
+- [x] **Step 3: 회귀 확인**
 
 Run: `./gradlew :sfs-orm:test`
 Expected: 누적 PASS.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add sfs-orm/src/test/java/com/choisk/sfs/orm/integration/CascadePersistIntegrationTest.java
