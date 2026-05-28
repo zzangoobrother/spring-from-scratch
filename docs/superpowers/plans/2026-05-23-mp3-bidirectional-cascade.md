@@ -1473,7 +1473,7 @@ git commit -m "test(sfs-orm): cascade PERSIST E2E — persist(user) 1회로 orde
 **Files:**
 - Create: `sfs-orm/src/test/java/com/choisk/sfs/orm/integration/CascadeRemoveIntegrationTest.java`
 
-- [ ] **Step 1: 테스트 작성**
+- [x] **Step 1: 테스트 작성**
 
 ```java
 package com.choisk.sfs.orm.integration;
@@ -1524,17 +1524,17 @@ class CascadeRemoveIntegrationTest extends AbstractBidirectionalCascadeTest {
 
 > remove의 cascade가 `u.getOrders()`(SfsPersistentList)를 순회 → lazy 초기화 → 자식 2건 로드 + identityMap 등재 → 각 remove(child) → DeleteAction. find→remove→flush가 같은 트랜잭션 내라 PC가 열려 있어 lazy 발화 가능.
 
-- [ ] **Step 2: 실행 — 통과 확인**
+- [x] **Step 2: 실행 — 통과 확인**
 
 Run: `./gradlew :sfs-orm:test --tests CascadeRemoveIntegrationTest`
 Expected: 1 PASS. (삭제 순서가 틀렸다면 H2 FK 위반으로 FAIL → "자식 먼저" 구현 검증.)
 
-- [ ] **Step 3: 회귀 확인**
+- [x] **Step 3: 회귀 확인**
 
 Run: `./gradlew :sfs-orm:test`
 Expected: 누적 PASS.
 
-- [ ] **Step 4: 커밋**
+- [x] **Step 4: 커밋**
 
 ```bash
 git add sfs-orm/src/test/java/com/choisk/sfs/orm/integration/CascadeRemoveIntegrationTest.java
