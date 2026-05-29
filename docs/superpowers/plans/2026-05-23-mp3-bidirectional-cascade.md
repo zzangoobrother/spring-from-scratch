@@ -1628,7 +1628,7 @@ git commit -m "test(sfs-orm): orphanRemoval E2E — 컬렉션 제거 element flu
 - Modify: `sfs-samples/.../orm/service/UserService.java`
 - Modify: `sfs-samples/.../orm/OrmDemoApplication.java`
 
-- [ ] **Step 1: `User.orders`를 양방향 + helper로 마이그레이션**
+- [x] **Step 1: `User.orders`를 양방향 + helper로 마이그레이션**
 
 `User.java`: `orders` 필드 어노테이션 교체 + 초기화 + helper. `import java.util.ArrayList;`, `import com.choisk.sfs.orm.annotation.SfsCascadeType;` 추가.
 
@@ -1648,7 +1648,7 @@ git commit -m "test(sfs-orm): orphanRemoval E2E — 컬렉션 제거 element flu
 
 > `Order.setUser`는 이미 존재(Order.java:45). owning side(@SfsManyToOne user_id) 그대로.
 
-- [ ] **Step 2: `UserService`에 DK~DN 시나리오 메서드 추가**
+- [x] **Step 2: `UserService`에 DK~DN 시나리오 메서드 추가**
 
 기존 `tryAddOrderWithoutCascade`는 *단방향 학습 산출물*로 존치(증상 측). 신규 메서드 추가(시그니처는 데모 흐름에 맞춰; 아래는 권장 형태):
 
@@ -1687,7 +1687,7 @@ git commit -m "test(sfs-orm): orphanRemoval E2E — 컬렉션 제거 element flu
 
 > import: `com.choisk.sfs.orm.SfsEntityManager` 또는 데모가 쓰는 EM 타입(`OrmDemoApplication`의 기존 사용 패턴에 맞춤 — 실제 타입명 확인). `java.math.BigDecimal`. **DL(양방향 함정)**은 통합 테스트가 박제하므로 console에서는 DK에 "helper 안 쓰면 FK null" 한 줄 주석으로 갈음하거나, 함정 발화 메서드를 추가(선택).
 
-- [ ] **Step 3: `OrmDemoApplication`에 DK~DN 호출 추가**
+- [x] **Step 3: `OrmDemoApplication`에 DK~DN 호출 추가**
 
 기존 MP-2 시연(DH~DJ) 블록 뒤에 MP-3 블록 추가. `tryAddOrderWithoutCascade`의 "MP-3에서 자동화 예정" 약속이 DK로 이행됨을 console에 명시:
 
@@ -1700,17 +1700,17 @@ git commit -m "test(sfs-orm): orphanRemoval E2E — 컬렉션 제거 element flu
 
 > 정확한 호출부는 `OrmDemoApplication`의 기존 `em`/`userService` 변수와 시드 흐름에 맞춰 작성. 본 step은 *컴파일되는 호출*을 추가하는 것이 목표.
 
-- [ ] **Step 4: 컴파일 + 회귀 확인**
+- [x] **Step 4: 컴파일 + 회귀 확인**
 
 Run: `./gradlew :sfs-samples:compileJava :sfs-samples:test`
 Expected: BUILD SUCCESSFUL. (User.orders 양방향 전환이 기존 sfs-samples 테스트에 영향 없는지 확인 — 영향 시 해당 테스트 조정.)
 
-- [ ] **Step 5: 데모 실행 확인 (선택)**
+- [x] **Step 5: 데모 실행 확인 (선택)**
 
 Run: `./gradlew :sfs-samples:run` (OrmDemoApplication이 run 타깃일 경우) 또는 해당 main 실행.
 Expected: console에 DK~DN 메시지 출력, 예외 없음.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add sfs-samples/src/main/java/com/choisk/sfs/samples/orm/domain/User.java \
@@ -1718,6 +1718,16 @@ git add sfs-samples/src/main/java/com/choisk/sfs/samples/orm/domain/User.java \
         sfs-samples/src/main/java/com/choisk/sfs/samples/orm/OrmDemoApplication.java
 git commit -m "feat(sfs-samples): User.orders 양방향 마이그레이션 + DK~DN 시연(cascade/orphan 박제)"
 ```
+
+> **실행 기록 (2026-05-29):**
+>
+> (a) **plan 시그니처 → 필드 주입 적응**: plan Step 2는 `cascadePersistDemo(EntityManager em)` 등 `em`을 파라미터로 받는 형태였으나, 실제 `UserService`는 `@Autowired private SfsEntityManager em;` 필드 주입 + `@Transactional` 메서드 패턴을 사용한다. 신규 메서드(DK/DN/DM) 전체를 `em` 파라미터 없이 `@Transactional` + 필드 `em`으로 구현하여 코드베이스 컨벤션에 맞췄다.
+>
+> (b) **id 전략 비대칭(SEQUENCE user / IDENTITY order) + FK + created_at NOT NULL 적응**: 단순 `persist(user) → addOrder → persist(user) → flush` 순서로는 FK 위반이 발생했다. SEQUENCE user는 write-behind 큐에 대기하는 반면 IDENTITY order는 cascade 시점에 즉시 INSERT를 실행하여 아직 users 테이블에 없는 FK를 참조하기 때문이다. DK에서 `persist(u)` 직후 `em.flush()`를 삽입해 부모를 먼저 DB에 반영한 뒤 자식 cascade INSERT를 수행하도록 적응했다. 또한 `orders.created_at NOT NULL` 제약을 만족하기 위해 각 Order에 `setCreatedAt(LocalDateTime.now())`을 추가했다.
+>
+> (c) **콘솔 실행 순서 DK→DN→DM으로 채택**: plan은 DK/DM/DN 순서였으나, 단일 dk-user로 세 시나리오를 자기완결적으로 연결하기 위해 DK(생성) → DN(orphan 1건 제거) → DM(user + 남은 order cascade 삭제) 순서로 변경했다. 이 순서가 더 교육적이고 시드 데이터 의존성을 제거한다.
+>
+> **검증 결과**: `:sfs-samples:compileJava` BUILD SUCCESSFUL / `:sfs-orm:test` 94 PASS 0 FAIL / `./gradlew :sfs-samples:ormDemo` — DK/DN/DM 모두 예외 없이 출력, "=== Demo 완료 ===" 도달 확인.
 
 ---
 
@@ -1728,23 +1738,26 @@ git commit -m "feat(sfs-samples): User.orders 양방향 마이그레이션 + DK~
 **Files:**
 - Modify: `docs/superpowers/specs/2026-05-23-mp3-bidirectional-cascade-design.md` (DoD 체크박스)
 
-- [ ] **Step 1: 전체 빌드**
+- [x] **Step 1: 전체 빌드**
 
 Run: `./gradlew build`
 Expected: BUILD SUCCESSFUL. 회귀 카운트 확인(예상 319 → ~337). 실제 카운트를 기록.
+> 실측: BUILD SUCCESSFUL (exit 0). 회귀 **343** (마감 게이트 cycle 가드 테스트 +1 포함, 게이트 전 342).
 
-- [ ] **Step 2: spec DoD 체크박스 갱신**
+- [x] **Step 2: spec DoD 체크박스 갱신**
 
 `spec § 8`의 14항목을 실제 완료분에 맞춰 `- [ ]` → `- [x]`. 회귀 카운트 실측치를 항목 14에 기입.
+> 1~13 게이트 진입 전 체크(`6045057`), 14는 게이트 완료 후 343으로 확정 체크.
 
-- [ ] **Step 3: 커밋**
+- [x] **Step 3: 커밋**
 
 ```bash
 git add docs/superpowers/specs/2026-05-23-mp3-bidirectional-cascade-design.md
 git commit -m "docs(mp3): DoD 14항목 체크 + 회귀 카운트 실측 기입"
 ```
+> 실제: `6045057`(DoD 1~13 + 342) → 게이트 후 14 확정은 본 게이트 기록 커밋에 포함.
 
-- [ ] **Step 4: 마감 게이트 (CLAUDE.md "완료 후 품질 게이트")**
+- [x] **Step 4: 마감 게이트 (CLAUDE.md "완료 후 품질 게이트")**
 
 전 task 완료 + DoD 만족 시점에 다음 3단계 수행(별도 실행, 본 plan 범위의 종료 의식):
 1. **다관점 코드리뷰** — `feature-dev:code-reviewer` 에이전트 + `superpowers:requesting-code-review`. 결과 "남겨둘/즉시 고칠" 분류.
@@ -1786,3 +1799,25 @@ git commit -m "docs(mp3): DoD 14항목 체크 + 회귀 카운트 실측 기입"
 **구현은 별도 세션 권장**([[feedback_design_implementation_session_split]]) — 본 세션은 디자인(spec+plan)까지. 구현 세션 진입 전 **MP-2 → main 머지**(사용자 직접) 후 `feat/mp3-bidirectional-cascade`를 main에 rebase.
 
 **어느 방식으로 진행할까요?**
+
+---
+
+> **품질 게이트 기록 (2026-05-29):**
+>
+> 다관점 코드리뷰(3 reviewer: ① correctness 버그 스캔 ② 아키텍처·라이프사이클·실패복구 ③ 테스트 커버리지·가독성·주석 WHY) + `/simplify`(2 finder: 재사용·단순화 / 효율·데드코드) 병행. 범위는 MP-3만 (`1c14b54..HEAD`, 19파일 +1145행, MP-2는 자체 G2 게이트 완료라 제외).
+>
+> **지적 ~16건 / 반영 2건 / 보류 14건**
+>
+> **반영 2건:**
+> - `feat(sfs-orm)` `d34b05d` — `remove()` cascade REMOVE에 `visited` 사이클 가드(doPersist와 대칭) + 양방향 cascade=ALL 사이클 테스트. **3 reviewer가 독립 수렴한 유일 발견** (correctness="StackOverflow 위험" / 아키텍처="persist·remove 대칭성 위반" / 테스트="사이클 테스트 부재"). visited 가드가 사이클 + 단일 호출 내 중복 enqueue(B-2) 동시 해소. spec § 3.5 의사코드 자체가 가드를 누락했던 것이 구현으로 전파된 케이스.
+> - `refactor(sfs-orm)` `888eeae` — `readId`를 `readField` 위임으로 축약(reflection-get 래퍼 단일화). 3 reviewer + simplify 2 finder가 공통 지적.
+>
+> **보류 14건 (남겨둘):**
+> - *의도적 박제(결함 아님)*: id 전략 비대칭(SEQUENCE 부모/IDENTITY 자식 — 데모+Task13 실행기록에 학습 정점 박제) · flush Phase 1/1.5 이중 순회(트리거 분리 + ConcurrentModification 회피) · findOrphans O(n²)(학습 범위, WHY 주석) · doPersist/doRemove 대칭 미추출(추출 시 cascade 순서 학습 정점 가림).
+> - *발생 불가 시나리오 방어*: orphan id-null NPE 가드 · flush null-md 가드 (identityMap엔 managed만 등재 → CLAUDE.md "발생 불가 경로 방어 금지").
+> - *MP-3 범위 밖*: @SfsId 7-site 인라인 통합(Phase4/MP-2 메서드 isManaged/insertNew/merge/contains) · flush 중간 실패 PC 오염(Phase4 기존 단순화) · actionQueue 확장 잠재 함정.
+> - *spec 정의 모델 / 향후 용도*: `CollectionMetadata.mappedBy` production 미사용(spec § 3.3 정의 + record arity churn + MP-3-α flush-time cascade 후보) · cascade ALL E2E 부재(단위 안전망 존재) · 테스트 import/setup 반복(fixture 시나리오별 상이).
+> - *경계*: User.java 마이그레이션 주석(데모, task 참조 회색지대).
+>
+> **게이트 통과:** `./gradlew build` PASS(exit 0) · 회귀 **343** (계획 +23 + 게이트 cycle 테스트 +1, 전부 sfs-orm) · DoD 14/14 [x].
+> **선행 머지 의존:** MP-2 미머지 상태 → MP-2 → main 머지(사용자 직접) 후 본 브랜치 rebase. **main 머지는 사용자 직접** ([[project_mp2_design_resume_point]] 정합).

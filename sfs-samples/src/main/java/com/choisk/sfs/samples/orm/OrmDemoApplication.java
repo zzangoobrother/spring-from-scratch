@@ -13,7 +13,7 @@ import com.choisk.sfs.samples.orm.service.UserService;
 import java.math.BigDecimal;
 
 /**
- * Phase 4 + MP-2 ORM 학습 정점 시연 애플리케이션.
+ * Phase 4 + MP-2 + MP-3 ORM 학습 정점 시연 애플리케이션.
  *
  * DA: SEQUENCE 정상 vs IDENTITY 즉시 INSERT
  * DB: 더티 체킹 — status 변경만으로 UPDATE 자동 발견
@@ -25,6 +25,9 @@ import java.math.BigDecimal;
  * DH: findAll(User) + for-loop getOrders().size() → N+1 자연 노출 (MP-2 학습 정점 ②)
  * DI: user.getOrders().iterator() 첫 호출 시점에 1 SELECT 발화 (MP-2 학습 정점 ①)
  * DJ: add(newOrder) + persist(user)만 → newOrder INSERT 안 됨 (cascade 부재 자연 노출, MP-3 회수)
+ * DK: cascade PERSIST — addOrder + persist(user)로 order 2건 자동 INSERT (MP-3 학습 정점 ③)
+ * DN: orphanRemoval — removeOrder → 컬렉션 제거 element만 flush 시 DELETE (MP-3 학습 정점 ③)
+ * DM: cascade REMOVE — remove(user) 1회로 자식 order까지 삭제 (MP-3 학습 정점 ②)
  */
 public class OrmDemoApplication {
 
@@ -122,6 +125,28 @@ public class OrmDemoApplication {
             System.out.println("[DJ] cascade 부재 자연 노출 — bob에게 신규 주문 add 시도");
             userSvc.tryAddOrderWithoutCascade(bob.getId());
             System.out.println();
+
+            // ─── MP-3: 양방향 + cascade + orphanRemoval 시연 ──────────────────────
+            System.out.println("\n=== MP-3: 양방향 + cascade + orphanRemoval 시연 ===\n");
+
+            // [DK] cascade PERSIST — dk-user + order 2건 자동 INSERT
+            System.out.println("[DK] cascade PERSIST — dk-user + order 2건 자동 INSERT");
+            Long dkUserId = userSvc.cascadePersistDemo();
+            System.out.println();
+
+            // [DN] orphanRemoval — 컬렉션에서 order 1건 제거 후 flush
+            // (DK→DN→DM 순서로 한 user가 세 시나리오를 자기완결적으로 커버)
+            System.out.println("[DN] orphanRemoval — 컬렉션에서 order 1건 제거 후 flush");
+            userSvc.orphanRemovalDemo(dkUserId);
+            System.out.println();
+
+            // [DM] cascade REMOVE — dk-user remove로 남은 order까지 삭제
+            System.out.println("[DM] cascade REMOVE — dk-user remove로 남은 order까지 삭제");
+            userSvc.cascadeRemoveDemo(dkUserId);
+            System.out.println();
+
+            // DL(양방향 일관성 함정 — inverse만 추가 시 FK null)은
+            // BidirectionalConsistencyIntegrationTest가 박제하므로 콘솔 생략
 
             System.out.println("=== Demo 완료 ===");
         }

@@ -359,20 +359,20 @@ public void removeOrder(Order o) { orders.remove(o); o.setUser(null); }
 
 ## 8. Definition of Done — 14 항목
 
-- [ ] 1. `SfsCascadeType` enum 신설 (PERSIST/REMOVE/ALL)
-- [ ] 2. `@SfsOneToMany`에 mappedBy/cascade/orphanRemoval 추가, joinColumn default `""` 완화
-- [ ] 3. `CollectionMetadata` 확장 + `cascadesPersist()`/`cascadesRemove()` 헬퍼
-- [ ] 4. `EntityMetadataAnalyzer` XOR 검증 (both/neither → `SfsEntityMappingException`)
-- [ ] 5. `EntityMetadataAnalyzer` mappedBy 해석 (owning `@SfsManyToOne` `@SfsJoinColumn`에서 FK 도출 + targetEntity 일치 검증)
-- [ ] 6. `RealEntityManager.persist` cascade PERSIST (managed 재persist 포함, `IdentityHashMap` 사이클 가드)
-- [ ] 7. `RealEntityManager.remove` cascade REMOVE (자식 먼저 enqueue → FK 순서, stable sort)
-- [ ] 8. `SfsPersistentList` storedSnapshot 보관 + `findOrphans`
-- [ ] 9. `RealEntityManager.flush` orphanRemoval diff (cascade remove 중복 가드)
-- [ ] 10. 도메인 마이그레이션 (`User.orders` mappedBy + `addOrder`/`removeOrder` helper)
-- [ ] 11. demo 시연 DK~DN + `SqlCountingJdbcTemplate` 카운트 단언
-- [ ] 12. 단위 테스트 (analyzer/cascade/orphan/SfsPersistentList) — TDD 적용분 전수
-- [ ] 13. 통합 테스트 (양방향 함정/cascade persist·remove E2E/orphan E2E)
-- [ ] 14. `./gradlew build` 전체 PASS (회귀 319 → ~337) + 마감 게이트(다관점 리뷰 + 리팩토링 + `/simplify`) 기록 박제
+- [x] 1. `SfsCascadeType` enum 신설 (PERSIST/REMOVE/ALL)
+- [x] 2. `@SfsOneToMany`에 mappedBy/cascade/orphanRemoval 추가, joinColumn default `""` 완화
+- [x] 3. `CollectionMetadata` 확장 + `cascadesPersist()`/`cascadesRemove()` 헬퍼
+- [x] 4. `EntityMetadataAnalyzer` XOR 검증 (both/neither → `SfsEntityMappingException`)
+- [x] 5. `EntityMetadataAnalyzer` mappedBy 해석 (owning `@SfsManyToOne` `@SfsJoinColumn`에서 FK 도출 + targetEntity 일치 검증)
+- [x] 6. `RealEntityManager.persist` cascade PERSIST (managed 재persist 포함, `IdentityHashMap` 사이클 가드)
+- [x] 7. `RealEntityManager.remove` cascade REMOVE (자식 먼저 enqueue → FK 순서, stable sort)
+- [x] 8. `SfsPersistentList` storedSnapshot 보관 + `findOrphans`
+- [x] 9. `RealEntityManager.flush` orphanRemoval diff (cascade remove 중복 가드)
+- [x] 10. 도메인 마이그레이션 (`User.orders` mappedBy + `addOrder`/`removeOrder` helper)
+- [x] 11. demo 시연 DK~DN + `SqlCountingJdbcTemplate` 카운트 단언
+- [x] 12. 단위 테스트 (analyzer/cascade/orphan/SfsPersistentList) — TDD 적용분 전수
+- [x] 13. 통합 테스트 (양방향 함정/cascade persist·remove E2E/orphan E2E)
+- [x] 14. `./gradlew build` 전체 PASS (회귀 319 → **343 실측**, MP-3 신규 +24 전부 sfs-orm: 계획 +23 + 마감 게이트 cycle 가드 테스트 +1) + 마감 게이트(다관점 리뷰 3 + 리팩토링 + `/simplify` 2) 기록 박제 — plan 하단 품질 게이트 기록 참조
 
 ---
 
