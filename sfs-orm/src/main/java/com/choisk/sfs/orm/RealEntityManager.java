@@ -469,11 +469,7 @@ public class RealEntityManager implements SfsEntityManager {
      * @throws SfsPersistenceException IllegalAccessException 래핑
      */
     private Object readId(Object entity, EntityMetadata md) {
-        try {
-            return md.idField().field().get(entity);
-        } catch (IllegalAccessException e) {
-            throw new SfsPersistenceException("@SfsId 읽기 실패 — orphan key 구성 불가", e);
-        }
+        return readField(md.idField().field(), entity);
     }
 
     /**
