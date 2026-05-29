@@ -372,7 +372,7 @@ public void removeOrder(Order o) { orders.remove(o); o.setUser(null); }
 - [x] 11. demo 시연 DK~DN + `SqlCountingJdbcTemplate` 카운트 단언
 - [x] 12. 단위 테스트 (analyzer/cascade/orphan/SfsPersistentList) — TDD 적용분 전수
 - [x] 13. 통합 테스트 (양방향 함정/cascade persist·remove E2E/orphan E2E)
-- [ ] 14. `./gradlew build` 전체 PASS (회귀 319 → **342 실측**, MP-3 신규 +23 전부 sfs-orm) + 마감 게이트(다관점 리뷰 + 리팩토링 + `/simplify`) 기록 박제 — *빌드 PASS 완료, 마감 게이트 진행 중*
+- [x] 14. `./gradlew build` 전체 PASS (회귀 319 → **343 실측**, MP-3 신규 +24 전부 sfs-orm: 계획 +23 + 마감 게이트 cycle 가드 테스트 +1) + 마감 게이트(다관점 리뷰 3 + 리팩토링 + `/simplify` 2) 기록 박제 — plan 하단 품질 게이트 기록 참조
 
 ---
 
