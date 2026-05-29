@@ -1628,7 +1628,7 @@ git commit -m "test(sfs-orm): orphanRemoval E2E — 컬렉션 제거 element flu
 - Modify: `sfs-samples/.../orm/service/UserService.java`
 - Modify: `sfs-samples/.../orm/OrmDemoApplication.java`
 
-- [ ] **Step 1: `User.orders`를 양방향 + helper로 마이그레이션**
+- [x] **Step 1: `User.orders`를 양방향 + helper로 마이그레이션**
 
 `User.java`: `orders` 필드 어노테이션 교체 + 초기화 + helper. `import java.util.ArrayList;`, `import com.choisk.sfs.orm.annotation.SfsCascadeType;` 추가.
 
@@ -1648,7 +1648,7 @@ git commit -m "test(sfs-orm): orphanRemoval E2E — 컬렉션 제거 element flu
 
 > `Order.setUser`는 이미 존재(Order.java:45). owning side(@SfsManyToOne user_id) 그대로.
 
-- [ ] **Step 2: `UserService`에 DK~DN 시나리오 메서드 추가**
+- [x] **Step 2: `UserService`에 DK~DN 시나리오 메서드 추가**
 
 기존 `tryAddOrderWithoutCascade`는 *단방향 학습 산출물*로 존치(증상 측). 신규 메서드 추가(시그니처는 데모 흐름에 맞춰; 아래는 권장 형태):
 
@@ -1687,7 +1687,7 @@ git commit -m "test(sfs-orm): orphanRemoval E2E — 컬렉션 제거 element flu
 
 > import: `com.choisk.sfs.orm.SfsEntityManager` 또는 데모가 쓰는 EM 타입(`OrmDemoApplication`의 기존 사용 패턴에 맞춤 — 실제 타입명 확인). `java.math.BigDecimal`. **DL(양방향 함정)**은 통합 테스트가 박제하므로 console에서는 DK에 "helper 안 쓰면 FK null" 한 줄 주석으로 갈음하거나, 함정 발화 메서드를 추가(선택).
 
-- [ ] **Step 3: `OrmDemoApplication`에 DK~DN 호출 추가**
+- [x] **Step 3: `OrmDemoApplication`에 DK~DN 호출 추가**
 
 기존 MP-2 시연(DH~DJ) 블록 뒤에 MP-3 블록 추가. `tryAddOrderWithoutCascade`의 "MP-3에서 자동화 예정" 약속이 DK로 이행됨을 console에 명시:
 
@@ -1700,17 +1700,17 @@ git commit -m "test(sfs-orm): orphanRemoval E2E — 컬렉션 제거 element flu
 
 > 정확한 호출부는 `OrmDemoApplication`의 기존 `em`/`userService` 변수와 시드 흐름에 맞춰 작성. 본 step은 *컴파일되는 호출*을 추가하는 것이 목표.
 
-- [ ] **Step 4: 컴파일 + 회귀 확인**
+- [x] **Step 4: 컴파일 + 회귀 확인**
 
 Run: `./gradlew :sfs-samples:compileJava :sfs-samples:test`
 Expected: BUILD SUCCESSFUL. (User.orders 양방향 전환이 기존 sfs-samples 테스트에 영향 없는지 확인 — 영향 시 해당 테스트 조정.)
 
-- [ ] **Step 5: 데모 실행 확인 (선택)**
+- [x] **Step 5: 데모 실행 확인 (선택)**
 
 Run: `./gradlew :sfs-samples:run` (OrmDemoApplication이 run 타깃일 경우) 또는 해당 main 실행.
 Expected: console에 DK~DN 메시지 출력, 예외 없음.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add sfs-samples/src/main/java/com/choisk/sfs/samples/orm/domain/User.java \
@@ -1718,6 +1718,16 @@ git add sfs-samples/src/main/java/com/choisk/sfs/samples/orm/domain/User.java \
         sfs-samples/src/main/java/com/choisk/sfs/samples/orm/OrmDemoApplication.java
 git commit -m "feat(sfs-samples): User.orders 양방향 마이그레이션 + DK~DN 시연(cascade/orphan 박제)"
 ```
+
+> **실행 기록 (2026-05-29):**
+>
+> (a) **plan 시그니처 → 필드 주입 적응**: plan Step 2는 `cascadePersistDemo(EntityManager em)` 등 `em`을 파라미터로 받는 형태였으나, 실제 `UserService`는 `@Autowired private SfsEntityManager em;` 필드 주입 + `@Transactional` 메서드 패턴을 사용한다. 신규 메서드(DK/DN/DM) 전체를 `em` 파라미터 없이 `@Transactional` + 필드 `em`으로 구현하여 코드베이스 컨벤션에 맞췄다.
+>
+> (b) **id 전략 비대칭(SEQUENCE user / IDENTITY order) + FK + created_at NOT NULL 적응**: 단순 `persist(user) → addOrder → persist(user) → flush` 순서로는 FK 위반이 발생했다. SEQUENCE user는 write-behind 큐에 대기하는 반면 IDENTITY order는 cascade 시점에 즉시 INSERT를 실행하여 아직 users 테이블에 없는 FK를 참조하기 때문이다. DK에서 `persist(u)` 직후 `em.flush()`를 삽입해 부모를 먼저 DB에 반영한 뒤 자식 cascade INSERT를 수행하도록 적응했다. 또한 `orders.created_at NOT NULL` 제약을 만족하기 위해 각 Order에 `setCreatedAt(LocalDateTime.now())`을 추가했다.
+>
+> (c) **콘솔 실행 순서 DK→DN→DM으로 채택**: plan은 DK/DM/DN 순서였으나, 단일 dk-user로 세 시나리오를 자기완결적으로 연결하기 위해 DK(생성) → DN(orphan 1건 제거) → DM(user + 남은 order cascade 삭제) 순서로 변경했다. 이 순서가 더 교육적이고 시드 데이터 의존성을 제거한다.
+>
+> **검증 결과**: `:sfs-samples:compileJava` BUILD SUCCESSFUL / `:sfs-orm:test` 94 PASS 0 FAIL / `./gradlew :sfs-samples:ormDemo` — DK/DN/DM 모두 예외 없이 출력, "=== Demo 완료 ===" 도달 확인.
 
 ---
 

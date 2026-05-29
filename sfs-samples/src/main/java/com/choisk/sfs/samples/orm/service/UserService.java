@@ -98,4 +98,81 @@ public class UserService {
         System.out.println("[DJ] add() + flush() → newOrder는 INSERT 안 됨 (단방향 + cascade 미도입)");
         System.out.println("[DJ] 해결: em.persist(newOrder) 별도 호출 필요 — MP-3에서 cascade=PERSIST로 자동화");
     }
+
+    /**
+     * DK — cascade PERSIST 회수: addOrder + persist(user)로 order 2건 자동 INSERT.
+     * MP-3 학습 정점: 수동 persist(order) 없이 cascade가 자동 INSERT 발화.
+     *
+     * <p>id 전략 비대칭(SEQUENCE user / IDENTITY order) + FK 제약 때문에
+     * 부모(user)를 먼저 flush로 DB에 반영한 뒤 자식(order) cascade INSERT를 실행해야 한다.
+     * 이 flush는 cascade PERSIST 전의 선행 조건이며 별도의 ORM 함정(비대칭 전략)을 시연한다.
+     *
+     * @return 생성된 dk-user id (DN/DM 시나리오에서 재사용)
+     */
+    @Transactional
+    public Long cascadePersistDemo() {
+        User u = new User();
+        u.setName("dk-user");
+        u.setEmail("dk@example.com");
+        em.persist(u);
+        // SEQUENCE user를 먼저 DB에 반영 — IDENTITY 자식 cascade INSERT의 FK 선행 조건
+        // (id 전략 비대칭 함정: SEQUENCE는 write-behind 큐에 대기, IDENTITY는 즉시 INSERT)
+        em.flush();
+
+        Order o1 = new Order();
+        o1.setAmount(new BigDecimal("10.00"));
+        o1.setStatus("NEW");
+        o1.setCreatedAt(LocalDateTime.now());
+
+        Order o2 = new Order();
+        o2.setAmount(new BigDecimal("20.00"));
+        o2.setStatus("NEW");
+        o2.setCreatedAt(LocalDateTime.now());
+
+        // 양방향 일관성 helper: inverse(orders 추가) + owning(order.user 세팅) 동시 처리
+        u.addOrder(o1);
+        u.addOrder(o2);
+        // managed 재persist → cascade PERSIST → o1/o2 자동 INSERT (수동 persist(order) 불필요)
+        em.persist(u);
+        em.flush();
+
+        System.out.println("[DK] addOrder + persist(user) → order 2건 자동 INSERT (cascade PERSIST — MP-2 부채 회수)");
+        System.out.println("  INFO id 전략 비대칭(SEQUENCE user / IDENTITY order) + FK → 부모를 먼저 flush해야 자식 cascade INSERT 가능");
+        return u.getId();
+    }
+
+    /**
+     * DN — orphanRemoval: 컬렉션에서 제거한 order만 flush 시 DELETE.
+     * MP-3 학습 정점: removeOrder → snapshot diff → orphan으로 분류 → flush 시 DELETE.
+     *
+     * @param userId DK가 반환한 dk-user id
+     */
+    @Transactional
+    public void orphanRemovalDemo(Long userId) {
+        User u = em.find(User.class, userId);
+        if (!u.getOrders().isEmpty()) {
+            // 첫 접근 시 lazy init(SELECT) 발화 → storedSnapshot 캡처
+            Order first = u.getOrders().get(0);
+            // removeOrder: 컬렉션에서 제거(inverse) + order.user=null(owning)
+            u.removeOrder(first);
+        }
+        // flush 시 snapshot diff → first만 orphan → DELETE (나머지 order는 유지)
+        em.flush();
+        System.out.println("[DN] removeOrder → 컬렉션에서 빠진 order만 orphanRemoval DELETE");
+    }
+
+    /**
+     * DM — cascade REMOVE: remove(user)로 자식 order까지 삭제(FK 순서: 자식 먼저).
+     * MP-3 학습 정점: remove(user) 1회로 자식 order가 먼저 DELETE된 후 user DELETE.
+     *
+     * @param userId DN이 처리한 dk-user id (남은 order 1건 + user 삭제)
+     */
+    @Transactional
+    public void cascadeRemoveDemo(Long userId) {
+        User u = em.find(User.class, userId);
+        em.remove(u);
+        // FK 순서 보장: 자식 order DELETE → user DELETE
+        em.flush();
+        System.out.println("[DM] remove(user) → 자식 order까지 cascade DELETE (자식 먼저)");
+    }
 }
