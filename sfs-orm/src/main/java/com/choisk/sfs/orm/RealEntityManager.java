@@ -313,12 +313,28 @@ public class RealEntityManager implements SfsEntityManager {
      * 부모보다 먼저 등록한다(FK 순서). flush의 stable sort가 INSERT→UPDATE→DELETE 내에서
      * 등록 순서를 유지하므로 자식이 부모보다 항상 먼저 DELETE된다.
      *
+     * <p>사이클 가드: 양방향 cascade=ALL 등 순환 참조 그래프에서 무한 재귀(StackOverflowError)를
+     * 막기 위해 IdentityHashMap으로 방문 여부를 추적한다 — {@code doPersist}와 대칭.
+     *
      * @param entity 삭제할 엔티티 인스턴스 (반드시 1차 캐시에 있는 관리 상태여야 함)
      * @throws IllegalArgumentException  미관리(detached/new) 엔티티를 넘긴 경우
      * @throws SfsPersistenceException   알 수 없는 엔티티 클래스이거나 @SfsId 필드 접근 실패 시
      */
     @Override
     public void remove(Object entity) {
+        doRemove(entity, new IdentityHashMap<>());
+    }
+
+    /**
+     * cascade 그래프 순회 진입점. visited는 단일 remove 호출 전체에서 공유(참조 기반)되어
+     * 사이클(양방향 모두 cascade일 때)과 중복 방문을 차단한다 — {@code doPersist}와 대칭.
+     *
+     * @param entity  삭제 대상 엔티티
+     * @param visited 이미 방문한 엔티티 추적 맵 (참조 동등성 기반)
+     */
+    private void doRemove(Object entity, Map<Object, Boolean> visited) {
+        if (visited.put(entity, Boolean.TRUE) != null) return;   // 이미 방문 — 사이클/중복 가드
+
         EntityMetadata md = emf.metadataOf(entity.getClass());
         if (md == null) {
             throw new SfsPersistenceException("Unknown entity class: " + entity.getClass());
@@ -339,7 +355,7 @@ public class RealEntityManager implements SfsEntityManager {
             Object coll = readField(cm.field(), entity);
             if (coll == null) continue;
             for (Object child : (Iterable<?>) coll) {
-                remove(child);
+                doRemove(child, visited);
             }
         }
         context.enqueueAction(new DeleteAction(entity, md));
