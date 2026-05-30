@@ -31,6 +31,7 @@ MP-3가 만든 **cascade 4종 골격**(`SfsCascadeType`)에서 MERGE/DETACH 2종
 
 - `SfsEntityManager` 인터페이스에 `detach`/`clear` 없음.
 - `PersistenceContext`에 **단일 키 제거(`removeEntity`)도, 비-종료 비우기(non-closing clear)도 없음.** `close()`는 맵을 비우되 `closed=true`로 컨텍스트를 죽이므로 `em.clear()`(비우되 계속 사용)와 의미가 다르다.
+- **`SfsPersistentList.initialize()`는 `context.isClosed()`만 확인** (line 29-32) — owner가 detach됐는지 모른다. 따라서 detach(컨텍스트 open 유지) 후 lazy 컬렉션 접근은 *예외가 아니라 정상 로드*된다. 정점 ③ 성립에 메커니즘 보강 필요 (§4.5, 디자인 세션 결정 A).
 
 ### 1.3 의식적 단순화 (범위 밖 결정)
 
@@ -49,7 +50,7 @@ MP-3가 만든 **cascade 4종 골격**(`SfsCascadeType`)에서 MERGE/DETACH 2종
 
 1. **merge 복사 의미론** — `merged != detached` (인자는 여전히 준영속). merge는 detached를 managed로 *전환*하는 게 아니라 별도 managed 인스턴스에 *복사*하고 그것을 반환한다. JPA 초보 최대 오해 지점.
 2. **detach → dirty checking 중단** — detach가 snapshot을 제거하면 flush 시 변경 비교 기준선이 사라져 UPDATE가 발생하지 않는다. "준영속 = 변경 추적 끊김"의 메커니즘 박제.
-3. **detach 후 lazy 접근 → `SfsLazyInitializationException`** — 준영속 + lazy의 그 유명한 조합. 기존 closed-context 예외 경로 재사용.
+3. **detach 후 lazy 접근 → `SfsLazyInitializationException`** — 준영속 + lazy의 그 유명한 조합. **메커니즘 보강(결정 A):** detach가 미초기화 lazy 컬렉션을 `detached`로 마킹 → 이후 초기화 시도가 예외. (`context.isClosed()`만으로는 detach 후에도 정상 로드되어 정점 미성립 — §4.5.)
 4. **cascade MERGE 그래프 전파 + 사이클 가드** — MP-3 `visited` IdentityHashMap 패턴 **3번째 재사용**. cascade 4종(PERSIST/REMOVE/MERGE/DETACH)이 *동일 골격*임을 완성.
 
 ---
@@ -108,15 +109,25 @@ public void detachAll() {
 ### 4.2 `detach(entity)` — managed → 준영속
 
 ```
-detach(p):
+detachInternal(p, visited):
+  if visited.put(p) != null: return     // 사이클/중복 가드 (doRemove 대칭)
   pk = read @SfsId
   if pk == null: return                 // 신규(미영속) → no-op (JPA 정합)
   key = EntityKey(class, pk)
   if !context.contains(key): return     // 이미 준영속/미관리 → no-op
-  ── [D1] 펜딩 액션 취소: actionQueue에서 이 인스턴스 대상 액션 제거
+  context.removePendingActions(p)       // [D1] 펜딩 액션 취소 (유령 INSERT 방지)
   context.removeEntity(key)             // snapshot 제거 → dirty checking 끊김 (정점 ②)
-  ── cascade DETACH: @SfsOneToMany(cascadesDetach()) 자식 재귀, visited 가드
+  for cm in md.oneToManies():
+    coll = readField(cm.field, p)
+    if coll == null: continue
+    if coll instanceof SfsPersistentList pl && !pl.isInitialized():
+        pl.markDetached()               // 미초기화 lazy → 로드 말고 detached 마킹 (정점 ③)
+        continue                         // 로드 안 했으니 자식 detach 불필요
+    if !cm.cascadesDetach(): continue   // 초기화된 컬렉션: cascade=DETACH면 자식도 detach
+    for child in coll: detachInternal(child, visited)
 ```
+
+> **lazy 마킹은 cascade와 독립:** 미초기화 컬렉션 마킹은 *cascade=DETACH 여부와 무관*하게 수행한다 — 정점 ③은 "owner가 준영속이 됐다"는 사실에서 나오지 cascade에서 나오지 않는다(JPA 정합). cascade=DETACH는 *이미 로드된 자식*을 detach할지만 제어한다. 미초기화 컬렉션은 로드를 트리거하지 않으려고 순회 대신 마킹만 한다.
 
 #### 결정 D1 — detach가 펜딩 InsertAction을 취소한다 (채택: (a))
 
@@ -163,6 +174,31 @@ private Object doMerge(Object entity, Map<Object,Boolean> visited) {
 > **사이클 가드 반환값:** merge는 값을 반환하므로(persist=void와 차이) 이미 방문한 엔티티는 `context.getEntity(key)`(=managed 인스턴스)를 돌려줘야 양방향에서 일관된 managed 참조가 유지된다. cascade 4종 동일 골격이지만 반환 타입 차이가 만드는 미묘한 분기.
 > **@ManyToOne 역참조는 치환하지 않는다:** 자식의 부모 back-reference(@ManyToOne)는 기존 merge 로직대로 detached 값 그대로 복사된다(§1.3 "비-cascade 참조 managed 치환 미도입"). 따라서 merge 후 부모→자식 컬렉션은 managed로 재구성되지만 자식→부모 참조는 detached로 남을 수 있다. **양방향 일관성은 application 책임**(MP-3 정합) — 데모/테스트는 양방향 helper로 세팅하므로 실무 무영향. 이 비대칭을 테스트 주석에 박제한다.
 
+### 4.5 `SfsPersistentList` detached 마킹 (정점 ③ 메커니즘 — 결정 A)
+
+현재 `initialize()`는 `context.isClosed()`만 검사하므로 detach(컨텍스트 open) 후 lazy 접근이 정상 로드된다. 정점 ③ 성립을 위해 `detached` 플래그 추가:
+
+```java
+private boolean detached = false;
+
+/** detach 시 미초기화 lazy 컬렉션에 호출 — 이후 초기화 시도가 예외. */
+void markDetached() { this.detached = true; }
+
+private void initialize() {
+    if (delegate != null) return;
+    if (detached) {                         // 신규 가드 — owner가 준영속(detach)됨
+        throw new SfsLazyInitializationException(
+                elementType.getSimpleName() + "#" + ownerPk + ".collection (detached owner)");
+    }
+    if (context.isClosed()) { /* 기존 — 컨텍스트 종료 */ ... }
+    delegate = loader.loadCollection(...);
+    storedSnapshot = new ArrayList<>(delegate);
+}
+```
+
+> **두 예외 경로의 의미 구분:** `context.isClosed()`는 *트랜잭션/세션 종료*(기존 `LazyInitializationExceptionTest` 담당), `detached`는 *엔티티 단위 준영속*(정점 ③). 메시지에 `(detached owner)`를 붙여 디버깅 시 두 원인을 구별한다.
+> **markDetached는 package-private:** `isInitialized()`와 동일 가시성 — 같은 패키지 `RealEntityManager.detach`만 호출(테스트 제외 외부 노출 없음).
+
 ---
 
 ## 5. 테스트 전략
@@ -182,8 +218,9 @@ private Object doMerge(Object entity, Map<Object,Boolean> visited) {
 ### 5.2 단위 테스트 (신설/확장)
 
 - `CollectionMetadataTest` (확장) — cascadesMerge/Detach + ALL 4종 해석
-- `PersistenceContextTest` (확장/신설) — removeEntity/detachAll/ensureOpen
-- `RealEntityManagerDetachTest` (신설) — pk null no-op, not-managed no-op, snapshot 제거, cascade DETACH 전파, **D1 펜딩 InsertAction 취소**
+- `PersistenceContextTest` (확장) — removeEntity/detachAll/removePendingActions/ensureOpen
+- `SfsPersistentListTest` (확장) — markDetached 후 initialize() → `SfsLazyInitializationException` (정점 ③ 단위)
+- `RealEntityManagerDetachTest` (신설) — pk null no-op, not-managed no-op, snapshot 제거, cascade DETACH 전파, **D1 펜딩 InsertAction 취소**, **미초기화 lazy 컬렉션 markDetached**
 - `RealEntityManagerMergeCascadeTest` (신설) — cascade MERGE 자식 재귀, managed 컬렉션 재구성, **양방향 cascade=ALL 사이클 가드**(MP-3 cycle 테스트 대칭)
 
 ### 5.3 통합 테스트 — 학습 정점 4개 승격 (H2 in-memory)
@@ -241,7 +278,7 @@ MP-3 DK~DN 다음 **DO~DS**:
 7. `RealEntityManager.merge` cascade — 그래프 순회 + 컬렉션 재구성 + 사이클 가드
 8. 학습 정점 ① 통합 테스트 (merged != detached)
 9. 학습 정점 ② 통합 테스트 (detach → dirty checking 중단)
-10. 학습 정점 ③ 통합 테스트 (detach 후 lazy → `SfsLazyInitializationException`)
+10. `SfsPersistentList.markDetached` + 단위 테스트 → 학습 정점 ③ 통합 테스트 (detach 후 lazy → `SfsLazyInitializationException`)
 11. 학습 정점 ④ 통합 테스트 (cascade MERGE 그래프 전파 + 사이클)
 12. `OrmDemoApplication` DO~DS 시연 + 콘솔 박제
 13. `./gradlew build` 전체 PASS · 회귀 343 → ~360 (실측 기입)
@@ -253,7 +290,7 @@ MP-3 DK~DN 다음 **DO~DS**:
 
 ## 9. 모듈 영향 범위
 
-- **변경:** `sfs-orm` (annotation/SfsCascadeType, support/{CollectionMetadata, PersistenceContext}, RealEntityManager, SfsEntityManager)
+- **변경:** `sfs-orm` (annotation/SfsCascadeType, support/{CollectionMetadata, PersistenceContext, SfsPersistentList}, RealEntityManager, SfsEntityManager)
 - **변경:** `sfs-samples` (orm/domain, orm/service, orm/OrmDemoApplication — DO~DS)
 - **무영향:** sfs-context / sfs-beans / sfs-core (의존 방향 정합 — 역방향 import 없음)
 
